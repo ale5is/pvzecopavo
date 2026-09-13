@@ -17,7 +17,7 @@ public class LogPanel : MonoBehaviour
 		base.gameObject.SetActive(value: true);
 		Button.gameObject.SetActive(value: true);
 		logText.text = logContent;
-		ButtonText.text = "确定";
+		ButtonText.text = "SI";
 		action = confirmAction;
 	}
 

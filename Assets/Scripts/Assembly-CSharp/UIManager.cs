@@ -1,346 +1,303 @@
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
-	public static UIManager Instance;
+    public static UIManager Instance;
 
-	public Transform UIBackground;
+    public Transform UIBackground;
+    public LogPanel LogPanel;
+    public ConfirmPanel ConfirmPanel;
+    public Transform BattleUI;
+    private LVStartEF LVStartEF;
+    public SetPanel SetPanel;
+    public OverPanel OverPanel;
+    public Transform LastStandBtn;
+    public Transform HostGame;
+    public InputField IpInput;
+    public InputField PortInput;
+    public Transform HostPassword;
+    public InputField HostPasswordInput;
+    public Transform JoinGame;
+    public InputField JoinIpInput;
+    public InputField JoinPasswordInput;
+    private bool isChatBoxOpen;
+    public ChatInput chatInput;
+    public Transform ChatBox;
+    public Transform OutChatBox;
+    public Transform OpenChatButton;
+    public Transform QuickChatGroup;
 
-	public LogPanel LogPanel;
+    public bool IsChatBoxOpen
+    {
+        get => isChatBoxOpen;
+        set
+        {
+            isChatBoxOpen = value;
+            if (value)
+            {
+                chatInput.InputField.ActivateInputField();
+                ChatBox.localScale = Vector3.one;
+                OutChatBox.localScale = Vector3.zero;
+            }
+            else
+            {
+                chatInput.ClearInput();
+                ChatBox.localScale = Vector3.zero;
+                OutChatBox.localScale = Vector3.one;
+            }
+        }
+    }
 
-	public ConfirmPanel ConfirmPanel;
+    private void Awake()
+    {
+        Instance = this;
+        LVStartEF = BattleUI.Find("LVEF").GetComponent<LVStartEF>();
+        OverPanel = BattleUI.Find("OverPanel").GetComponent<OverPanel>();
+        SetPanel = transform.Find("SetPanel").GetComponent<SetPanel>();
+    }
 
-	public Transform BattleUI;
+    private void Start()
+    {
+        OpenChatButton.gameObject.SetActive(GameManager.Instance.isAndroid);
+        LastStandBtn.gameObject.SetActive(false);
+        SetHostAddress();
+    }
 
-	private LVStartEF LVStartEF;
+    private void Update()
+    {
+        if (SetPanel.isOpen || isChatBoxOpen)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (SetPanel.isOpen) SetPanel.CloseSetPanel();
+                else IsChatBoxOpen = false;
+            }
+            return;
+        }
 
-	public SetPanel SetPanel;
+        if (Input.GetKeyDown(KeyCode.Escape) && LVManager.Instance.InGame)
+            ShowBattleSetPanel();
 
-	public OverPanel OverPanel;
+        if (Input.GetKeyDown(KeyCode.T))
+            IsChatBoxOpen = true;
 
-	public Transform LastStandBtn;
+        if (Input.GetKeyDown(KeyCode.Slash))
+        {
+            IsChatBoxOpen = true;
+            chatInput.SlashOpen();
+        }
+    }
 
-	public Transform HostGame;
+    private string GetLocalIPAddress()
+    {
+        NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
 
-	public InputField IpInput;
+        for (int i = 0; i < interfaces.Length; i++)
+        {
+            NetworkInterface network = interfaces[i];
 
-	public InputField PortInput;
+            if (network.OperationalStatus != OperationalStatus.Up ||
+                network.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                continue;
 
-	public Transform HostPassword;
+            IPInterfaceProperties properties = network.GetIPProperties();
 
-	public InputField HostPasswordInput;
+            for (int j = 0; j < properties.UnicastAddresses.Count; j++)
+            {
+                IPAddress address = properties.UnicastAddresses[j].Address;
 
-	public Transform JoinGame;
+                if (address.AddressFamily == AddressFamily.InterNetwork &&
+                    !IPAddress.IsLoopback(address) &&
+                    !address.ToString().StartsWith("169.254."))
+                    return address.ToString();
+            }
+        }
 
-	public InputField JoinIpInput;
+        return "127.0.0.1";
+    }
 
-	public InputField JoinPasswordInput;
+    private void SetHostAddress()
+    {
+        IpInput.text = GetLocalIPAddress();
+        PortInput.text = "45678";
+    }
 
-	private bool isChatBoxOpen;
+    public void SetChooserType(SeedBankType type)
+    {
+        if (type == SeedBankType.SunBank)
+        {
+            SeedChooser.Instance.transform.localScale = Vector3.one;
+            ZombieChooser.Instance.transform.localScale = Vector3.zero;
+            SeedChooser.Instance.ChangeChooserBtn.localScale = Vector3.zero;
+        }
+        else if (type == SeedBankType.MoonBank)
+        {
+            SeedChooser.Instance.transform.localScale = Vector3.zero;
+            ZombieChooser.Instance.transform.localScale = Vector3.one;
+            ZombieChooser.Instance.ChangeChooserBtn.localScale = Vector3.zero;
+        }
+        else if (type == SeedBankType.SunAndMoonBank)
+        {
+            SeedChooser.Instance.transform.localScale = Vector3.one;
+            ZombieChooser.Instance.transform.localScale = Vector3.zero;
+            SeedChooser.Instance.ChangeChooserBtn.localScale = Vector3.one;
+            ZombieChooser.Instance.ChangeChooserBtn.localScale = Vector3.one;
+        }
+    }
 
-	public ChatInput chatInput;
+    public void ChangeChooser()
+    {
+        bool seed = SeedChooser.Instance.transform.localScale.x == 0f;
+        SeedChooser.Instance.transform.localScale = seed ? Vector3.one : Vector3.zero;
+        ZombieChooser.Instance.transform.localScale = seed ? Vector3.zero : Vector3.one;
+    }
 
-	public Transform ChatBox;
+    public void OpenChatBtn()
+    {
+        if (IsChatBoxOpen) chatInput.SendContent();
+        else IsChatBoxOpen = true;
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+    }
 
-	public Transform OutChatBox;
+    public void ShowLVStartEF() => LVStartEF.Show();
+    public void StopLVStartEF() => LVStartEF.StopAll();
+    public void ShowBigWaveEF() => LVStartEF.ShowBigWave();
+    public void ShowFinalWaveEF() => LVStartEF.ShowFinalWave();
+    public void ShowSetPanel() => SetPanel.ShowPanel(true, false);
+    public void ShowBattleSetPanel() => SetPanel.ShowPanel(true, true);
 
-	public Transform OpenChatButton;
+    public void ConfirmOpenServer()
+    {
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
 
-	public Transform QuickChatGroup;
+        if (!IPAddress.TryParse(IpInput.text, out IPAddress address) ||
+            !int.TryParse(PortInput.text, out int port) ||
+            port < 1025 || port > 65535)
+        {
+            LogPanel.DisplayLog("Ingrese una dirección IP y un puerto válidos", () => HostGame.gameObject.SetActive(true));
+            return;
+        }
 
-	public bool IsChatBoxOpen
-	{
-		get
-		{
-			return isChatBoxOpen;
-		}
-		set
-		{
-			isChatBoxOpen = value;
-			if (isChatBoxOpen)
-			{
-				chatInput.InputField.ActivateInputField();
-				ChatBox.localScale = new Vector3(1f, 1f, 1f);
-				OutChatBox.localScale = new Vector3(0f, 0f, 0f);
-			}
-			else
-			{
-				chatInput.ClearInput();
-				ChatBox.localScale = new Vector3(0f, 0f, 0f);
-				OutChatBox.localScale = new Vector3(1f, 1f, 1f);
-			}
-		}
-	}
+        SocketServer.Instance.StartServer(address, port);
+        CloseHostGame();
+    }
 
-	private void Awake()
-	{
-		Instance = this;
-		LVStartEF = BattleUI.Find("LVEF").GetComponent<LVStartEF>();
-		OverPanel = BattleUI.Find("OverPanel").GetComponent<OverPanel>();
-		SetPanel = base.transform.Find("SetPanel").GetComponent<SetPanel>();
-	}
+    public void ConfirmJoinGame()
+    {
+        if (GameManager.Instance.isOnline) return;
 
-	private void Start()
-	{
-		if (GameManager.Instance.isAndroid)
-		{
-			OpenChatButton.gameObject.SetActive(value: true);
-		}
-		else
-		{
-			OpenChatButton.gameObject.SetActive(value: false);
-		}
-		LastStandBtn.gameObject.SetActive(value: false);
-	}
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
 
-	private void Update()
-	{
-		if (SetPanel.isOpen || isChatBoxOpen)
-		{
-			if (Input.GetKeyDown(KeyCode.Escape))
-			{
-				if (SetPanel.isOpen)
-				{
-					SetPanel.CloseSetPanel();
-				}
-				else if (isChatBoxOpen)
-				{
-					IsChatBoxOpen = false;
-				}
-			}
-			return;
-		}
-		if (Input.GetKeyDown(KeyCode.Escape) && LVManager.Instance.InGame && !SetPanel.isOpen)
-		{
-			ShowBattleSetPanel();
-		}
-		if (Input.GetKeyDown(KeyCode.T))
-		{
-			IsChatBoxOpen = true;
-		}
-		if (Input.GetKeyDown(KeyCode.Slash))
-		{
-			IsChatBoxOpen = true;
-			chatInput.SlashOpen();
-		}
-	}
+        string[] address = JoinIpInput.text.Split(':');
 
-	public void SetChooserType(SeedBankType type)
-	{
-		switch (type)
-		{
-		case SeedBankType.SunBank:
-			SeedChooser.Instance.transform.localScale = Vector3.one;
-			ZombieChooser.Instance.transform.localScale = Vector3.zero;
-			SeedChooser.Instance.ChangeChooserBtn.localScale = Vector3.zero;
-			break;
-		case SeedBankType.MoonBank:
-			SeedChooser.Instance.transform.localScale = Vector3.zero;
-			ZombieChooser.Instance.transform.localScale = Vector3.one;
-			ZombieChooser.Instance.ChangeChooserBtn.localScale = Vector3.zero;
-			break;
-		case SeedBankType.SunAndMoonBank:
-			SeedChooser.Instance.transform.localScale = Vector3.one;
-			ZombieChooser.Instance.transform.localScale = Vector3.zero;
-			SeedChooser.Instance.ChangeChooserBtn.localScale = Vector3.one;
-			ZombieChooser.Instance.ChangeChooserBtn.localScale = Vector3.one;
-			break;
-		}
-	}
+        if (address.Length < 2 ||
+            !int.TryParse(address[1], out int port) ||
+            port < 1025 ||
+            port > 65535)
+        {
+            LogPanel.DisplayLog("Ingrese una dirección válida", () => JoinGame.gameObject.SetActive(true));
+            return;
+        }
 
-	public void ChangeChooser()
-	{
-		if (SeedChooser.Instance.transform.localScale.x == 0f)
-		{
-			SeedChooser.Instance.transform.localScale = Vector3.one;
-			ZombieChooser.Instance.transform.localScale = Vector3.zero;
-		}
-		else
-		{
-			SeedChooser.Instance.transform.localScale = Vector3.zero;
-			ZombieChooser.Instance.transform.localScale = Vector3.one;
-		}
-	}
+        try
+        {
+            IPAddress[] addresses = Dns.GetHostAddresses(address[0]);
 
-	public void OpenChatBtn()
-	{
-		if (IsChatBoxOpen)
-		{
-			chatInput.SendContent();
-		}
-		else
-		{
-			IsChatBoxOpen = true;
-		}
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-	}
+            if (addresses.Length == 0)
+            {
+                LogPanel.DisplayLog("No se pudo encontrar la dirección", () => JoinGame.gameObject.SetActive(true));
+                return;
+            }
 
-	public void ShowLVStartEF()
-	{
-		LVStartEF.Show();
-	}
+            LogPanel.DisplayLog("Conectando...", () => JoinGame.gameObject.SetActive(true));
+            LogPanel.ButtonText.text = "Cancelar";
+            LogPanel.CancelConfirm();
+            SocketClient.Instance.JoinGame(addresses[0], port, JoinPasswordInput.text);
+        }
+        catch
+        {
+            LogPanel.DisplayLog("No se pudo encontrar la dirección", () => JoinGame.gameObject.SetActive(true));
+        }
+    }
 
-	public void StopLVStartEF()
-	{
-		LVStartEF.StopAll();
-	}
+    public void ReJoinGame()
+    {
+        if (GameManager.Instance.isOnline) return;
 
-	public void ShowBigWaveEF()
-	{
-		LVStartEF.ShowBigWave();
-	}
+        string[] address = JoinIpInput.text.Split(':');
 
-	public void ShowFinalWaveEF()
-	{
-		LVStartEF.ShowFinalWave();
-	}
+        if (address.Length < 2 || !int.TryParse(address[1], out int port))
+            return;
 
-	public void ShowSetPanel()
-	{
-		SetPanel.ShowPanel(isShow: true, isBattle: false);
-	}
+        try
+        {
+            IPAddress[] addresses = Dns.GetHostAddresses(address[0]);
 
-	public void ShowBattleSetPanel()
-	{
-		SetPanel.ShowPanel(isShow: true, isBattle: true);
-	}
+            if (addresses.Length == 0)
+                return;
 
-	public void ConfirmOpenServer()
-	{
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		if (IPAddress.TryParse(IpInput.text, out var address) && int.TryParse(PortInput.text, out var result))
-		{
-			if (result < 1025 || result > 65535)
-			{
-				LogPanel.DisplayLog("请输入正确的端口", () =>
-				{
-					HostGame.gameObject.SetActive(value: true);
-				});
-			}
-			else
-			{
-				SocketServer.Instance.StartServer(address, result);
-				CloseHostGame();
-			}
-		}
-		else
-		{
-			LogPanel.DisplayLog("请输入正确的端口", () =>
-			{
-				HostGame.gameObject.SetActive(value: true);
-			});
-		}
-	}
+            LogPanel.DisplayLog("Conectando...", null);
+            LogPanel.CancelConfirm();
+            SocketClient.Instance.JoinGame(addresses[0], port, JoinPasswordInput.text);
+        }
+        catch
+        {
+        }
+    }
 
-	public void ConfirmJoinGame()
-	{
-		if (GameManager.Instance.isOnline)
-		{
-			return;
-		}
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		string[] array = JoinIpInput.text.Split(":");
-		int result;
-		if (array.Length < 2)
-		{
-			LogPanel.DisplayLog("请输入正确的地址", () =>
-			{
-				JoinGame.gameObject.SetActive(value: true);
-			});
-		}
-		else if (int.TryParse(array[1], out result))
-		{
-			LogPanel.DisplayLog("连接中...", () =>
-			{
-				JoinGame.gameObject.SetActive(value: true);
-			});
-			LogPanel.ButtonText.text = "取消";
-			LogPanel.CancelConfirm();
-			SocketClient.Instance.JoinGame(Dns.GetHostAddresses(array[0])[0], result, JoinPasswordInput.text);
-		}
-		else
-		{
-			LogPanel.DisplayLog("请输入正确的地址", () =>
-			{
-				JoinGame.gameObject.SetActive(value: true);
-			});
-		}
-	}
+    public void ConnectSuccess()
+    {
+        LogPanel.gameObject.SetActive(false);
+        CloseJoinGame();
+    }
 
-	public void ReJoinGame()
-	{
-		if (!GameManager.Instance.isOnline)
-		{
-			string[] array = JoinIpInput.text.Split(":");
-			if (array.Length >= 2)
-			{
-				int.TryParse(array[1], out var result);
-				LogPanel.DisplayLog("连接中...", null);
-				LogPanel.CancelConfirm();
-				SocketClient.Instance.JoinGame(Dns.GetHostAddresses(array[0])[0], result, JoinPasswordInput.text);
-			}
-		}
-	}
+    public void CloseHostGame()
+    {
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        SetHostAddress();
+        HostGame.gameObject.SetActive(false);
+    }
 
-	public void ConnectSuccess()
-	{
-		LogPanel.gameObject.SetActive(value: false);
-		CloseJoinGame();
-	}
+    public void CloseJoinGame()
+    {
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        JoinGame.gameObject.SetActive(false);
+    }
 
-	public void CloseHostGame()
-	{
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		IpInput.text = "127.0.0.1";
-		PortInput.text = "45678";
-		HostGame.gameObject.SetActive(value: false);
-	}
+    public void ConfirmPassword()
+    {
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        HostPassword.gameObject.SetActive(false);
+    }
 
-	public void CloseJoinGame()
-	{
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		JoinGame.gameObject.SetActive(value: false);
-	}
+    public void OpenAndFocusUI(bool isBlack = true)
+    {
+        UIBackground.GetComponent<Image>().color = new Color(0f, 0f, 0f, isBlack ? 0.4f : 0f);
+        UIBackground.gameObject.SetActive(true);
+    }
 
-	public void ConfirmPassword()
-	{
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		HostPassword.gameObject.SetActive(value: false);
-	}
+    public void CloseUI()
+    {
+        UIBackground.gameObject.SetActive(false);
+        UIBackground.SetSiblingIndex(0);
+    }
 
-	public void OpenAndFocusUI(bool isBlack = true)
-	{
-		if (isBlack)
-		{
-			UIBackground.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.4f);
-		}
-		else
-		{
-			UIBackground.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
-		}
-		UIBackground.gameObject.SetActive(value: true);
-	}
+    public void OpenBattleUI()
+    {
+        Shovel.Instance.LvStart();
+        Glove.Instance.LvStart();
+        CreatePanel.Instance.BattleUIOpen();
+        QuickChatGroup.gameObject.SetActive(SetPanel.OpenQuickChat);
+        BattleUI.localScale = Vector3.one;
+    }
 
-	public void CloseUI()
-	{
-		UIBackground.gameObject.SetActive(value: false);
-		UIBackground.SetSiblingIndex(0);
-	}
-
-	public void OpenBattleUI()
-	{
-		Shovel.Instance.LvStart();
-		Glove.Instance.LvStart();
-		CreatePanel.Instance.BattleUIOpen();
-		QuickChatGroup.gameObject.SetActive(SetPanel.OpenQuickChat);
-		BattleUI.localScale = Vector3.one;
-	}
-
-	public void StartLastStand()
-	{
-		LVManager.Instance.StartLastStand();
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-	}
+    public void StartLastStand()
+    {
+        LVManager.Instance.StartLastStand();
+        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+    }
 }

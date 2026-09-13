@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,36 +15,26 @@ public class SocketServer : MonoBehaviour
 {
     public static SocketServer Instance;
 
-    private Socket socketWatch;
+    private const int MaxPacketSize = 1048576;
 
+    private Socket socketWatch;
     public bool isServerOpen;
 
-    private List<UnityAction> actions = new List<UnityAction>();
+    private readonly ConcurrentQueue<UnityAction> actions = new ConcurrentQueue<UnityAction>();
+    private readonly List<PlayerInfo> players = new List<PlayerInfo>();
+    private readonly List<Socket> sockets = new List<Socket>();
+    private readonly Dictionary<Socket, PlayerInfo> socketPlayers = new Dictionary<Socket, PlayerInfo>();
+    private readonly object socketListLock = new object();
 
     private PlayerInfo HostPlayer;
-
-    private List<PlayerInfo> players = new List<PlayerInfo>();
-
-    private List<Socket> sockets = new List<Socket>();
-
     private int ReConnectCode;
-
-    private List<PlayerInfo> ReConnectPlayer = new List<PlayerInfo>();
-
-    private List<PlayerInfo> HandQuitPlayer = new List<PlayerInfo>();
-
     private int itemId;
 
-    public int noHostPlayerNum => players.Count;
+    private readonly List<PlayerInfo> ReConnectPlayer = new List<PlayerInfo>();
+    private readonly List<PlayerInfo> HandQuitPlayer = new List<PlayerInfo>();
 
-    public int ItemId
-    {
-        get
-        {
-            itemId++;
-            return itemId;
-        }
-    }
+    public int noHostPlayerNum => players.Count;
+    public int ItemId => ++itemId;
 
     private void Awake()
     {
@@ -52,151 +43,147 @@ public class SocketServer : MonoBehaviour
 
     private void Update()
     {
-        while (actions.Count > 0)
+        while (actions.TryDequeue(out UnityAction action))
         {
-            UnityAction unityAction = actions[0];
-            actions.RemoveAt(0);
-
-            try
-            {
-                unityAction();
-            }
-            catch (Exception ex)
-            {
-                Debug.Log("服务器主动断开" + ex);
-            }
+            try { action?.Invoke(); }
+            catch (Exception ex) { Debug.Log("El servidor desconectó activamente la conexión. " + ex); }
         }
+    }
+
+    private void Enqueue(UnityAction action)
+    {
+        if (action != null)
+            actions.Enqueue(action);
+    }
+
+    private void ClearPlayerUI()
+    {
+        BattlePlayerList.Instance?.UpdatePlayerList(null, new List<PlayerInfo>());
+        PlayerList.Instance?.UpdatePlayerList(null, new List<PlayerInfo>());
+    }
+
+    private void CloseSocketList()
+    {
+        Socket[] list;
+
+        lock (socketListLock)
+        {
+            list = sockets.ToArray();
+            sockets.Clear();
+            socketPlayers.Clear();
+        }
+
+        for (int i = 0; i < list.Length; i++)
+            SafeCloseSocket(list[i]);
+    }
+
+    private void ClearServerState(bool clearUI)
+    {
+        isServerOpen = false;
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.isOnline = false;
+
+        SafeCloseSocket(socketWatch);
+        socketWatch = null;
+
+        CloseSocketList();
+
+        players.Clear();
+        ReConnectPlayer.Clear();
+        HandQuitPlayer.Clear();
+
+        HostPlayer = null;
+        ReConnectCode = 0;
+        itemId = 0;
+
+        while (actions.TryDequeue(out _)) { }
+
+        if (clearUI)
+            ClearPlayerUI();
     }
 
     public void StartServer(IPAddress ip, int port)
     {
         if (GameManager.Instance.isOnline)
-        {
             return;
-        }
+
+        StopAllCoroutines();
+        ClearServerState(true);
 
         try
         {
-            socketWatch = new Socket(
-                AddressFamily.InterNetwork,
-                SocketType.Stream,
-                ProtocolType.Tcp
-            );
-
-            IPEndPoint localEP = new IPEndPoint(ip, port);
-
-            socketWatch.Bind(localEP);
+            socketWatch = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socketWatch.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            socketWatch.Bind(new IPEndPoint(ip, port));
             socketWatch.Listen(4);
-
-            Thread receiveThread = new Thread(Recevice);
-            receiveThread.IsBackground = true;
-            receiveThread.Start(socketWatch);
 
             isServerOpen = true;
 
-            HostPlayer = new PlayerInfo();
-            HostPlayer.Name =
-                GameManager.Instance.LocalPlayerSave.playerName;
+            Thread thread = new Thread(Recevice) { IsBackground = true };
+            thread.Start(socketWatch);
 
-            GameManager.Instance.HostName =
-                GameManager.Instance.LocalPlayerSave.playerName;
+            HostPlayer = new PlayerInfo
+            {
+                Name = GameManager.Instance.LocalPlayerSave.playerName,
+                VersionCode = GameManager.Instance.VersionCode
+            };
 
+            GameManager.Instance.HostName = HostPlayer.Name;
             GameManager.Instance.isOnline = true;
 
-            PlayerList.Instance.UpdatePlayerList(
-                HostPlayer,
-                null
-            );
-
-            BattlePlayerList.Instance.UpdatePlayerList(
-                HostPlayer,
-                null
-            );
+            UpdatePlayerLists();
 
             StartCoroutine(SendHeartbeat());
             StartCoroutine(CheckConnect());
 
-            Debug.Log(
-                "服务器启动成功。游戏版本：v" +
-                GameManager.Instance.VersionCode
-            );
+            Debug.Log("Servidor iniciado. Host: " + HostPlayer.Name +
+                " | Versión: v" + GameManager.Instance.VersionCode);
         }
         catch (Exception ex)
         {
-            Debug.LogError(
-                "服务器启动失败：" + ex
-            );
-
-            isServerOpen = false;
-            GameManager.Instance.isOnline = false;
-
-            if (socketWatch != null)
-            {
-                try
-                {
-                    socketWatch.Close();
-                }
-                catch
-                {
-                }
-
-                socketWatch = null;
-            }
+            ClearServerState(true);
+            Debug.LogError("No se pudo iniciar el servidor: " + ex);
         }
     }
 
     private void Recevice(object obj)
     {
-        Debug.Log("启动成功。");
+        Socket serverSocket = obj as Socket;
+        Debug.Log("Inicio exitoso.");
 
-        Socket socket = obj as Socket;
-
-        if (socket == null)
-        {
+        if (serverSocket == null)
             return;
-        }
 
         while (isServerOpen)
         {
             try
             {
-                Socket socket2 = socket.Accept();
+                Socket client = serverSocket.Accept();
 
-                if (socket2 == null)
+                if (!isServerOpen)
                 {
-                    continue;
+                    SafeCloseSocket(client);
+                    break;
                 }
 
-                string text =
-                    socket2.RemoteEndPoint != null
-                        ? socket2.RemoteEndPoint.ToString()
-                        : "未知客户端";
-
-                ReceseMsgGoing(socket2);
-
-                Debug.Log(
-                    text + ":连接到服务器。"
-                );
+                ReceseMsgGoing(client);
+                Debug.Log((client.RemoteEndPoint?.ToString() ?? "Unknown") + ":Conectando al servidor.");
+            }
+            catch (SocketException)
+            {
+                if (isServerOpen)
+                    Debug.Log("Servidor socket cerrado o desconectado.");
+                break;
             }
             catch (ObjectDisposedException)
             {
                 break;
             }
-            catch (SocketException)
-            {
-                if (!isServerOpen)
-                {
-                    break;
-                }
-            }
             catch (Exception ex)
             {
                 if (isServerOpen)
-                {
-                    Debug.LogError(
-                        "服务器接收连接错误：" + ex
-                    );
-                }
+                    Debug.LogError("Error aceptando conexión: " + ex);
             }
         }
     }
@@ -206,1168 +193,765 @@ public class SocketServer : MonoBehaviour
         Thread thread = new Thread(() =>
         {
             PlayerInfo playerInfo = new PlayerInfo();
+            byte[] remainingData = Array.Empty<byte>();
 
-            byte[] array = new byte[1];
-            int num = 0;
-            bool flag = false;
-
-            while (true)
+            try
             {
-                try
+                while (isServerOpen)
                 {
-                    if (TxSocket == null)
-                    {
-                        break;
-                    }
-
-                    byte[] array2 = new byte[1048576];
-
-                    int num2 = TxSocket.Receive(array2);
-
-                    if (num2 <= 0)
-                    {
-                        break;
-                    }
-
-                    List<byte[]> list =
-                        new List<byte[]>();
-
-                    int num3 = 0;
-                    int num4 = num2 - num;
-
-                    if (flag)
-                    {
-                        if (num4 < 0)
-                        {
-                            byte[] array3 =
-                                array2
-                                    .Skip(0)
-                                    .Take(num2)
-                                    .ToArray();
-
-                            byte[] array4 =
-                                new byte[
-                                    array.Length +
-                                    array3.Length
-                                ];
-
-                            array.CopyTo(
-                                array4,
-                                0
-                            );
-
-                            array3.CopyTo(
-                                array4,
-                                array.Length
-                            );
-
-                            num = -num4;
-                            array = array4;
-                        }
-                        else
-                        {
-                            byte[] array5 =
-                                array2
-                                    .Skip(0)
-                                    .Take(num)
-                                    .ToArray();
-
-                            byte[] array6 =
-                                new byte[
-                                    array.Length +
-                                    array5.Length
-                                ];
-
-                            array.CopyTo(
-                                array6,
-                                0
-                            );
-
-                            array5.CopyTo(
-                                array6,
-                                array.Length
-                            );
-
-                            list.Add(array6);
-
-                            num3 += num;
-                        }
-                    }
-
-                    if (num4 >= 0)
-                    {
-                        num = 0;
-                        flag = false;
-                    }
-
-                    while (num4 > 0)
-                    {
-                        if (num3 + 4 > num2)
-                        {
-                            flag = true;
-                            num = num4;
-
-                            array =
-                                array2
-                                    .Skip(num3)
-                                    .Take(num4)
-                                    .ToArray();
-
-                            break;
-                        }
-
-                        int num5 =
-                            BitConverter.ToInt32(
-                                new byte[4]
-                                {
-                                    array2[num3],
-                                    array2[num3 + 1],
-                                    array2[num3 + 2],
-                                    array2[num3 + 3]
-                                },
-                                0
-                            );
-
-                        if (num5 < 0)
-                        {
-                            break;
-                        }
-
-                        int remaining =
-                            num4 - 4;
-
-                        if (num5 > remaining)
-                        {
-                            flag = true;
-
-                            int count =
-                                remaining;
-
-                            num =
-                                num5 - remaining;
-
-                            array =
-                                array2
-                                    .Skip(num3 + 4)
-                                    .Take(count)
-                                    .ToArray();
-
-                            num4 = 0;
-
-                            break;
-                        }
-
-                        byte[] item =
-                            array2
-                                .Skip(num3 + 4)
-                                .Take(num5)
-                                .ToArray();
-
-                        num4 -= 4 + num5;
-
-                        if (num4 >= 0)
-                        {
-                            list.Add(item);
-                        }
-
-                        num3 += 4 + num5;
-                    }
-
-                    for (int i = 0; i < list.Count; i++)
-                    {
-                        if (list[i] == null ||
-                            list[i].Length < 2)
-                        {
-                            continue;
-                        }
-
-                        byte b = list[i][0];
-                        byte b2 = list[i][1];
-
-                        string getmsg =
-                            Encoding.UTF8.GetString(
-                                list[i],
-                                2,
-                                list[i].Length - 2
-                            );
-
-                        switch (b)
-                        {
-                            case 0:
-
-                                switch (b2)
-                                {
-                                    case 1:
-                                        {
-                                            playerInfo =
-                                                JsonUtility.FromJson<PlayerInfo>(
-                                                    getmsg
-                                                );
-
-                                            if (playerInfo == null)
-                                            {
-                                                TxSocket.Close();
-                                                break;
-                                            }
-
-                                            bool flag2 = true;
-
-                                            /*
-                                             * IMPORTANTE:
-                                             * La versión correcta del servidor
-                                             * viene de GameManager.Instance.VersionCode.
-                                             *
-                                             * Ya NO se utiliza "1" como versión.
-                                             */
-                                            string serverVersion =
-                                                GameManager.Instance.VersionCode;
-
-                                            if (
-                                                playerInfo.VersionCode ==
-                                                serverVersion
-                                            )
-                                            {
-                                                if (CanReConnect(playerInfo))
-                                                {
-                                                    if (
-                                                        ReConnectCode !=
-                                                        playerInfo.ReCntCode
-                                                    )
-                                                    {
-                                                        flag2 = false;
-                                                    }
-                                                }
-                                                else if (
-                                                    UIManager.Instance
-                                                        .HostPasswordInput
-                                                        .text != "" &&
-                                                    playerInfo.Password !=
-                                                    UIManager.Instance
-                                                        .HostPasswordInput
-                                                        .text
-                                                )
-                                                {
-                                                    flag2 = false;
-
-                                                    SendFailConnectMsg(
-                                                        "密码错误，加入失败。",
-                                                        TxSocket
-                                                    );
-                                                }
-                                                else if (
-                                                    players.Count >= 3
-                                                )
-                                                {
-                                                    flag2 = false;
-
-                                                    SendFailConnectMsg(
-                                                        "人数过多，加入失败。",
-                                                        TxSocket
-                                                    );
-                                                }
-                                                else if (
-                                                    HostPlayer != null &&
-                                                    HostPlayer.Name ==
-                                                    playerInfo.Name
-                                                )
-                                                {
-                                                    flag2 = false;
-
-                                                    SendFailConnectMsg(
-                                                        "与在线玩家重名，加入失败。",
-                                                        TxSocket
-                                                    );
-                                                }
-                                                else if (
-                                                    LVManager.Instance.InGame
-                                                )
-                                                {
-                                                    flag2 = false;
-
-                                                    SendFailConnectMsg(
-                                                        "游戏已开始，加入失败。",
-                                                        TxSocket
-                                                    );
-                                                }
-                                                else if (
-                                                    playerInfo.CmdEnable !=
-                                                    GameManager.Instance
-                                                        .LocalPlayerSave
-                                                        .CmdEnable
-                                                )
-                                                {
-                                                    flag2 = false;
-
-                                                    if (playerInfo.CmdEnable)
-                                                    {
-                                                        SendFailConnectMsg(
-                                                            "你已启用指令，而服务器未启用，无法加入。",
-                                                            TxSocket
-                                                        );
-                                                    }
-                                                    else
-                                                    {
-                                                        SendFailConnectMsg(
-                                                            "你未启用指令，而服务器已启用，无法加入。",
-                                                            TxSocket
-                                                        );
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    for (
-                                                        int num6 = 0;
-                                                        num6 < players.Count;
-                                                        num6++
-                                                    )
-                                                    {
-                                                        if (
-                                                            players[num6].Name ==
-                                                            playerInfo.Name
-                                                        )
-                                                        {
-                                                            flag2 = false;
-
-                                                            SendFailConnectMsg(
-                                                                "与在线玩家重名，加入失败。",
-                                                                TxSocket
-                                                            );
-
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-
-                                                if (flag2)
-                                                {
-                                                    sockets.Add(TxSocket);
-
-                                                    actions.Add(() =>
-                                                    {
-                                                        playerInfo.Heartbeat =
-                                                            true;
-
-                                                        if (
-                                                            CanReConnect(
-                                                                playerInfo
-                                                            )
-                                                        )
-                                                        {
-                                                            players.Add(
-                                                                playerInfo
-                                                            );
-
-                                                            for (
-                                                                int j = 0;
-                                                                j < ReConnectPlayer.Count;
-                                                                j++
-                                                            )
-                                                            {
-                                                                if (
-                                                                    ReConnectPlayer[j]
-                                                                        .Name ==
-                                                                    playerInfo.Name
-                                                                )
-                                                                {
-                                                                    ReConnectPlayer
-                                                                        .RemoveAt(
-                                                                            j
-                                                                        );
-
-                                                                    break;
-                                                                }
-                                                            }
-
-                                                            ReConnectListChange();
-                                                        }
-                                                        else
-                                                        {
-                                                            AddNewPlayer(
-                                                                playerInfo
-                                                            );
-
-                                                            SendCommandBag(
-                                                                TxSocket
-                                                            );
-
-                                                            PvPModeSyn syn =
-                                                                new PvPModeSyn
-                                                                {
-                                                                    Mode =
-                                                                        PvPSelector
-                                                                            .Instance
-                                                                            .CurrMode
-                                                                };
-
-                                                            SynPvPMode(
-                                                                syn,
-                                                                TxSocket
-                                                            );
-
-                                                            PvPSelector.Instance
-                                                                .ServerSynTeam();
-
-                                                            SpectatorList.Instance
-                                                                .ServerSynSpectList();
-                                                        }
-                                                    });
-
-                                                    break;
-                                                }
-
-                                                try
-                                                {
-                                                    TxSocket.Close();
-                                                }
-                                                catch
-                                                {
-                                                }
-                                            }
-                                            else
-                                            {
-                                                Debug.Log(
-                                                    "客户端游戏版本不同。客户端版本：v" +
-                                                    playerInfo.VersionCode +
-                                                    "；服务器版本：v" +
-                                                    serverVersion
-                                                );
-
-                                                SendFailConnectMsg(
-                                                    "与服务器游戏版本不同。服务器游戏版本：v" +
-                                                    serverVersion,
-                                                    TxSocket
-                                                );
-
-                                                try
-                                                {
-                                                    TxSocket.Close();
-                                                }
-                                                catch
-                                                {
-                                                }
-                                            }
-
-                                            goto end_IL_0817;
-                                        }
-
-                                    case 2:
-                                        {
-                                            HandQuitPlayer.Add(
-                                                playerInfo
-                                            );
-
-                                            sockets.Remove(
-                                                TxSocket
-                                            );
-
-                                            try
-                                            {
-                                                TxSocket.Close();
-                                            }
-                                            catch
-                                            {
-                                            }
-
-                                            break;
-                                        }
-
-                                    case byte.MaxValue:
-                                        {
-                                            playerInfo.Heartbeat =
-                                                true;
-
-                                            break;
-                                        }
-                                }
-
-                                break;
-
-                            case 1:
-
-                                switch (b2)
-                                {
-                                    case 0:
-                                        actions.Add(() =>
-                                        {
-                                            PlantSpawn plantSpawn =
-                                                JsonUtility.FromJson<PlantSpawn>(
-                                                    getmsg
-                                                );
-
-                                            UpdateCardCD updateCardCD =
-                                                new UpdateCardCD
-                                                {
-                                                    CardId =
-                                                        plantSpawn.CardId,
-                                                    name =
-                                                        playerInfo.Name
-                                                };
-
-                                            if (
-                                                LV.Instance.CurrLVType ==
-                                                    LVType.PvP &&
-                                                !PvPSelector.Instance
-                                                    .IsSameTeam(
-                                                        playerInfo.Name
-                                                    )
-                                            )
-                                            {
-                                                plantSpawn.GridPos =
-                                                    new Vector2(
-                                                        0f -
-                                                        plantSpawn.GridPos.x,
-                                                        plantSpawn.GridPos.y
-                                                    );
-                                            }
-
-                                            PlantBase newPlant =
-                                                PlantManager.Instance
-                                                    .GetNewPlant(
-                                                        plantSpawn.plantType
-                                                    );
-
-                                            Grid gridByWorldPos =
-                                                MapManager.Instance
-                                                    .GetGridByWorldPos(
-                                                        plantSpawn.GridPos
-                                                    );
-
-                                            if (
-                                                SeedBank.Instance.CheckPlant(
-                                                    newPlant,
-                                                    gridByWorldPos,
-                                                    -1,
-                                                    playerInfo.Name
-                                                )
-                                            )
-                                            {
-                                                int needSun = -1;
-
-                                                updateCardCD.OK =
-                                                    false;
-
-                                                if (
-                                                    plantSpawn.SPcode == 2
-                                                )
-                                                {
-                                                    newPlant.InitForCreate(
-                                                        inGrid: false,
-                                                        null,
-                                                        isBlcWhi: false
-                                                    );
-
-                                                    needSun =
-                                                        SeedBank.Instance
-                                                            .GetPlantNc(
-                                                                newPlant
-                                                                    .GetPlantType()
-                                                            )
-                                                            .NeedNum;
-                                                }
-
-                                                SeedBank.Instance.PlantConfirm(
-                                                    newPlant,
-                                                    gridByWorldPos,
-                                                    needSun,
-                                                    plantSpawn.SPcode,
-                                                    playerInfo.Name
-                                                );
-
-                                                SendMsg(
-                                                    2,
-                                                    4,
-                                                    JsonUtility.ToJson(
-                                                        updateCardCD
-                                                    )
-                                                );
-
-                                                BattlePlayerList.Instance
-                                                    .UpdateCardCD(
-                                                        updateCardCD.name,
-                                                        updateCardCD.CardId,
-                                                        updateCardCD.OK
-                                                    );
-                                            }
-                                            else
-                                            {
-                                                updateCardCD.OK =
-                                                    true;
-
-                                                SendMsg(
-                                                    2,
-                                                    4,
-                                                    JsonUtility.ToJson(
-                                                        updateCardCD
-                                                    ),
-                                                    TxSocket
-                                                );
-
-                                                UnityEngine.Object.Destroy(
-                                                    newPlant.gameObject
-                                                );
-                                            }
-
-                                            SeedBank.Instance.LikeColumnPlace(
-                                                gridByWorldPos,
-                                                plantSpawn.plantType,
-                                                ZombieType.Nope,
-                                                -1,
-                                                playerInfo.Name,
-                                                isRat: false
-                                            );
-                                        });
-                                        break;
-
-                                    case 1:
-                                        actions.Add(() =>
-                                        {
-                                            ToolApply toolApply =
-                                                JsonUtility.FromJson<ToolApply>(
-                                                    getmsg
-                                                );
-
-                                            toolApply.User =
-                                                playerInfo.Name;
-
-                                            Grid gridByWorldPos =
-                                                MapManager.Instance
-                                                    .GetGridByWorldPos(
-                                                        toolApply.GridPos
-                                                    );
-
-                                            if (
-                                                toolApply.type ==
-                                                ToolType.Shovel
-                                            )
-                                            {
-                                                if (
-                                                    Shovel.Instance.ClearPlant(
-                                                        gridByWorldPos,
-                                                        toolApply.GridPos,
-                                                        playerInfo.Name
-                                                    )
-                                                )
-                                                {
-                                                    BattlePlayerList.Instance
-                                                        .PlayShovelAnimation(
-                                                            gridByWorldPos.Position,
-                                                            toolApply.Sound,
-                                                            playerInfo.Name
-                                                        );
-                                                }
-
-                                                SendMsg(
-                                                    2,
-                                                    6,
-                                                    JsonUtility.ToJson(
-                                                        toolApply
-                                                    )
-                                                );
-                                            }
-                                            else if (
-                                                toolApply.type ==
-                                                ToolType.Glove
-                                            )
-                                            {
-                                                Glove.Instance.SynClient(
-                                                    toolApply.OnlineId,
-                                                    toolApply.GridPos
-                                                );
-                                            }
-                                        });
-                                        break;
-
-                                    case 2:
-                                        actions.Add(() =>
-                                        {
-                                            ClickedSun sun =
-                                                JsonUtility.FromJson<ClickedSun>(
-                                                    getmsg
-                                                );
-
-                                            SkyManager.Instance
-                                                .OnlineCollectSun(
-                                                    sun
-                                                );
-                                        });
-                                        break;
-
-                                    case 3:
-                                        actions.Add(() =>
-                                        {
-                                            PlayerMap playerMap =
-                                                JsonUtility.FromJson<PlayerMap>(
-                                                    getmsg
-                                                );
-
-                                            playerMap.PlayerName =
-                                                playerInfo.Name;
-
-                                            ChangeMap(playerMap);
-
-                                            BattlePlayerList.Instance
-                                                .UpdateMapSprite(
-                                                    playerMap.PlayerName,
-                                                    playerMap.Pos
-                                                );
-                                        });
-                                        break;
-
-                                    case 4:
-                                        actions.Add(() =>
-                                        {
-                                            SelectCard selectCard =
-                                                JsonUtility.FromJson<SelectCard>(
-                                                    getmsg
-                                                );
-
-                                            selectCard.PlayerName =
-                                                playerInfo.Name;
-
-                                            SelectCard(selectCard);
-
-                                            if (
-                                                selectCard.isBack
-                                            )
-                                            {
-                                                BattlePlayerList.Instance
-                                                    .CancelCard(
-                                                        selectCard.PlayerName,
-                                                        selectCard.cardId
-                                                    );
-                                            }
-                                            else
-                                            {
-                                                BattlePlayerList.Instance
-                                                    .SelectCard(
-                                                        selectCard.PlayerName,
-                                                        selectCard.plantType,
-                                                        selectCard.zombieType,
-                                                        selectCard.noAnim
-                                                    );
-                                            }
-                                        });
-                                        break;
-
-                                    case 5:
-                                        actions.Add(() =>
-                                        {
-                                            SelectPrepare selectPrepare =
-                                                JsonUtility.FromJson<SelectPrepare>(
-                                                    getmsg
-                                                );
-
-                                            selectPrepare.PlayerName =
-                                                playerInfo.Name;
-
-                                            SelectPrepare(
-                                                selectPrepare
-                                            );
-
-                                            BattlePlayerList.Instance
-                                                .UpdateState(
-                                                    selectPrepare.PlayerName,
-                                                    selectPrepare.isPrepare
-                                                );
-                                        });
-                                        break;
-
-                                    case 6:
-                                        actions.Add(() =>
-                                        {
-                                            SynItem syn =
-                                                JsonUtility.FromJson<SynItem>(
-                                                    getmsg
-                                                );
-
-                                            SynItem(syn);
-                                        });
-                                        break;
-
-                                    case 7:
-                                        actions.Add(() =>
-                                        {
-                                            PlantPreview plantPreview =
-                                                JsonUtility.FromJson<PlantPreview>(
-                                                    getmsg
-                                                );
-
-                                            BattlePlayerList.Instance
-                                                .PreviewPlant(
-                                                    plantPreview
-                                                );
-
-                                            PlacePreview(
-                                                plantPreview,
-                                                TxSocket
-                                            );
-                                        });
-                                        break;
-
-                                    case 8:
-                                        actions.Add(() =>
-                                        {
-                                            UpdateCardCD updateCardCD =
-                                                JsonUtility.FromJson<UpdateCardCD>(
-                                                    getmsg
-                                                );
-
-                                            updateCardCD.name =
-                                                playerInfo.Name;
-
-                                            BattlePlayerList.Instance
-                                                .UpdateCardCD(
-                                                    updateCardCD.name,
-                                                    updateCardCD.CardId,
-                                                    updateCardCD.OK
-                                                );
-
-                                            SendMsg(
-                                                2,
-                                                4,
-                                                JsonUtility.ToJson(
-                                                    updateCardCD
-                                                ),
-                                                TxSocket,
-                                                OutThis: true
-                                            );
-                                        });
-                                        break;
-
-                                    case 9:
-                                        actions.Add(() =>
-                                        {
-                                            ShovelPreview shovelPreview =
-                                                JsonUtility.FromJson<ShovelPreview>(
-                                                    getmsg
-                                                );
-
-                                            BattlePlayerList.Instance
-                                                .PreviewShovel(
-                                                    shovelPreview.PlayerName,
-                                                    shovelPreview.GridPos,
-                                                    shovelPreview.isShow
-                                                );
-
-                                            ShovelPreview(
-                                                shovelPreview,
-                                                TxSocket
-                                            );
-                                        });
-                                        break;
-
-                                    case 10:
-                                        actions.Add(() =>
-                                        {
-                                            ZombieSpawnApply zombieSpawnApply =
-                                                JsonUtility.FromJson<ZombieSpawnApply>(
-                                                    getmsg
-                                                );
-
-                                            UpdateCardCD updateCardCD =
-                                                new UpdateCardCD
-                                                {
-                                                    CardId =
-                                                        zombieSpawnApply.CardId,
-                                                    name =
-                                                        playerInfo.Name
-                                                };
-
-                                            if (
-                                                LV.Instance.CurrLVType ==
-                                                    LVType.PvP &&
-                                                !PvPSelector.Instance
-                                                    .IsSameTeam(
-                                                        playerInfo.Name
-                                                    )
-                                            )
-                                            {
-                                                zombieSpawnApply.GridPos =
-                                                    new Vector2(
-                                                        0f -
-                                                        zombieSpawnApply.GridPos.x,
-                                                        zombieSpawnApply.GridPos.y
-                                                    );
-                                            }
-
-                                            ZombieBase newZombie =
-                                                ZombieManager.Instance
-                                                    .GetNewZombie(
-                                                        zombieSpawnApply.Type
-                                                    );
-
-                                            Grid gridByWorldPos =
-                                                MapManager.Instance
-                                                    .GetGridByWorldPos(
-                                                        zombieSpawnApply.GridPos
-                                                    );
-
-                                            if (
-                                                SeedBank.Instance.CheckZombie(
-                                                    zombieSpawnApply.Type,
-                                                    gridByWorldPos,
-                                                    -1,
-                                                    playerInfo.Name
-                                                )
-                                            )
-                                            {
-                                                updateCardCD.OK =
-                                                    false;
-
-                                                SeedBank.Instance.ZombieConfirm(
-                                                    zombieSpawnApply.Type,
-                                                    newZombie,
-                                                    gridByWorldPos,
-                                                    -1,
-                                                    playerInfo.Name,
-                                                    zombieSpawnApply.isRat
-                                                );
-
-                                                SendMsg(
-                                                    2,
-                                                    4,
-                                                    JsonUtility.ToJson(
-                                                        updateCardCD
-                                                    )
-                                                );
-
-                                                BattlePlayerList.Instance
-                                                    .UpdateCardCD(
-                                                        updateCardCD.name,
-                                                        updateCardCD.CardId,
-                                                        updateCardCD.OK
-                                                    );
-                                            }
-                                            else
-                                            {
-                                                updateCardCD.OK =
-                                                    true;
-
-                                                SendMsg(
-                                                    2,
-                                                    4,
-                                                    JsonUtility.ToJson(
-                                                        updateCardCD
-                                                    ),
-                                                    TxSocket
-                                                );
-
-                                                UnityEngine.Object.Destroy(
-                                                    newZombie.gameObject
-                                                );
-                                            }
-
-                                            SeedBank.Instance.LikeColumnPlace(
-                                                gridByWorldPos,
-                                                PlantType.Nope,
-                                                zombieSpawnApply.Type,
-                                                -1,
-                                                playerInfo.Name,
-                                                zombieSpawnApply.isRat
-                                            );
-                                        });
-                                        break;
-
-                                    case 11:
-                                        actions.Add(() =>
-                                        {
-                                            ZombiePreview zombiePreview =
-                                                JsonUtility.FromJson<ZombiePreview>(
-                                                    getmsg
-                                                );
-
-                                            BattlePlayerList.Instance
-                                                .PreviewZombie(
-                                                    zombiePreview
-                                                );
-
-                                            ZombiePreview(
-                                                zombiePreview,
-                                                TxSocket
-                                            );
-                                        });
-                                        break;
-
-                                    case 12:
-                                        actions.Add(() =>
-                                        {
-                                            JoinTeamApply joinTeamApply =
-                                                JsonUtility.FromJson<JoinTeamApply>(
-                                                    getmsg
-                                                );
-
-                                            if (
-                                                joinTeamApply.isRed
-                                            )
-                                            {
-                                                PvPSelector.Instance
-                                                    .JoinRed(
-                                                        playerInfo.Name
-                                                    );
-                                            }
-                                            else
-                                            {
-                                                PvPSelector.Instance
-                                                    .JoinBlue(
-                                                        playerInfo.Name
-                                                    );
-                                            }
-                                        });
-                                        break;
-
-                                    case 13:
-                                        actions.Add(() =>
-                                        {
-                                            JoinSpecApply joinSpecApply =
-                                                JsonUtility.FromJson<JoinSpecApply>(
-                                                    getmsg
-                                                );
-
-                                            SpectatorList.Instance
-                                                .ClientJoinSpect(
-                                                    playerInfo.Name,
-                                                    joinSpecApply.isJoin
-                                                );
-                                        });
-                                        break;
-
-                                    case 14:
-                                        actions.Add(() =>
-                                        {
-                                            SlotMchBag bag =
-                                                JsonUtility.FromJson<SlotMchBag>(
-                                                    getmsg
-                                                );
-
-                                            SlotMachine.Instance
-                                                .ClientSyn(
-                                                    bag
-                                                );
-                                        });
-                                        break;
-                                }
-
-                                break;
-
-                            case 2:
-
-                                switch (b2)
-                                {
-                                    case 0:
-                                        actions.Add(() =>
-                                        {
-                                            ChatInput.Instance
-                                                .AddMessage(
-                                                    getmsg
-                                                );
-
-                                            SendMsg(
-                                                4,
-                                                0,
-                                                getmsg,
-                                                TxSocket,
-                                                OutThis: true
-                                            );
-                                        });
-                                        break;
-
-                                    case 1:
-                                        actions.Add(() =>
-                                        {
-                                            PrivateChatMsg privateChatMsg =
-                                                JsonUtility.FromJson<PrivateChatMsg>(
-                                                    getmsg
-                                                );
-
-                                            if (
-                                                privateChatMsg.PlayerName ==
-                                                GameManager.Instance
-                                                    .LocalPlayerSave
-                                                    .playerName
-                                            )
-                                            {
-                                                string content =
-                                                    "玩家" +
-                                                    playerInfo.Name +
-                                                    "悄悄对你说:" +
-                                                    privateChatMsg.content;
-
-                                                ChatInput.Instance
-                                                    .AddMessage(
-                                                        content,
-                                                        new Color32(
-                                                            123,
-                                                            123,
-                                                            123,
-                                                            byte.MaxValue
-                                                        )
-                                                    );
-                                            }
-                                            else
-                                            {
-                                                SendPrivateChatMsg(
-                                                    privateChatMsg.PlayerName,
-                                                    privateChatMsg.content,
-                                                    playerInfo.Name
-                                                );
-                                            }
-                                        });
-                                        break;
-                                }
-
-                                break;
-                        }
-
-                        continue;
-
-                    end_IL_0817:
-                        break;
-                    }
-                }
-                catch (ObjectDisposedException)
-                {
-                    break;
-                }
-                catch (SocketException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Debug.Log(ex);
-
-                    sockets.Remove(TxSocket);
+                    byte[] buffer = new byte[MaxPacketSize];
+                    int received;
 
                     try
                     {
-                        TxSocket.Close();
+                        received = TxSocket.Receive(buffer);
                     }
-                    catch
-                    {
-                    }
+                    catch (SocketException) { break; }
+                    catch (ObjectDisposedException) { break; }
 
-                    if (
-                        playerInfo != null &&
-                        !string.IsNullOrEmpty(
-                            playerInfo.Name
-                        )
-                    )
+                    if (received <= 0)
+                        break;
+
+                    int offset = 0;
+
+                    while (offset < received)
                     {
-                        actions.Add(() =>
+                        int available = received - offset;
+
+                        if (remainingData.Length > 0)
                         {
-                            RemovePlayer(
-                                playerInfo
-                            );
-                        });
-                    }
+                            byte[] combined = new byte[remainingData.Length + available];
+                            Buffer.BlockCopy(remainingData, 0, combined, 0, remainingData.Length);
+                            Buffer.BlockCopy(buffer, offset, combined, remainingData.Length, available);
 
-                    break;
+                            int result = ProcessPacket(
+                                combined,
+                                combined.Length,
+                                ref playerInfo,
+                                TxSocket
+                            );
+
+                            if (result < 0)
+                                return;
+
+                            if (result == 0)
+                            {
+                                remainingData = combined;
+                                break;
+                            }
+
+                            remainingData = Array.Empty<byte>();
+                            offset += result - remainingData.Length;
+                            continue;
+                        }
+
+                        if (available < 4)
+                        {
+                            remainingData = new byte[available];
+                            Buffer.BlockCopy(buffer, offset, remainingData, 0, available);
+                            break;
+                        }
+
+                        int packetLength = BitConverter.ToInt32(buffer, offset);
+
+                        if (packetLength < 2 || packetLength > MaxPacketSize)
+                        {
+                            Debug.LogError("Paquete inválido: " + packetLength);
+                            return;
+                        }
+
+                        int totalLength = packetLength + 4;
+
+                        if (available < totalLength)
+                        {
+                            remainingData = new byte[available];
+                            Buffer.BlockCopy(buffer, offset, remainingData, 0, available);
+                            break;
+                        }
+
+                        if (!ProcessPacket(
+                            buffer,
+                            offset,
+                            totalLength,
+                            ref playerInfo,
+                            TxSocket))
+                        {
+                            return;
+                        }
+
+                        offset += totalLength;
+                    }
                 }
             }
-        });
+            catch (Exception ex)
+            {
+                if (isServerOpen)
+                    Debug.Log("Error de conexión con el servidor: " + ex);
+            }
+            finally
+            {
+                RemoveSocket(TxSocket);
 
-        thread.IsBackground = true;
+                if (playerInfo != null &&
+                    !string.IsNullOrEmpty(playerInfo.Name) &&
+                    GameManager.Instance != null &&
+                    playerInfo.VersionCode == GameManager.Instance.VersionCode)
+                {
+                    PlayerInfo disconnected = playerInfo;
+                    Enqueue(() => RemovePlayer(disconnected));
+                }
+            }
+        })
+        {
+            IsBackground = true
+        };
+
         thread.Start();
+    }
+
+    private int ProcessPacket(
+        byte[] data,
+        int length,
+        ref PlayerInfo playerInfo,
+        Socket socket)
+    {
+        if (length < 4)
+            return 0;
+
+        int packetLength = BitConverter.ToInt32(data, 0);
+
+        if (packetLength < 2 || packetLength > MaxPacketSize)
+            return -1;
+
+        int totalLength = packetLength + 4;
+
+        if (length < totalLength)
+            return 0;
+
+        if (!ProcessPacket(data, 0, totalLength, ref playerInfo, socket))
+            return -1;
+
+        return totalLength;
+    }
+
+    private bool ProcessPacket(
+        byte[] data,
+        int offset,
+        int totalLength,
+        ref PlayerInfo playerInfo,
+        Socket socket)
+    {
+        if (totalLength < 6)
+            return true;
+
+        byte type1 = data[offset + 4];
+        byte type2 = data[offset + 5];
+
+        string msg = Encoding.UTF8.GetString(
+            data,
+            offset + 6,
+            totalLength - 6
+        );
+
+        switch (type1)
+        {
+            case 0:
+                return HandleConnectionMessage(
+                    type2,
+                    msg,
+                    ref playerInfo,
+                    socket
+                );
+
+            case 1:
+                HandleGameMessage(type2, msg, playerInfo, socket);
+                break;
+
+            case 2:
+                HandleChatMessage(type2, msg, playerInfo, socket);
+                break;
+        }
+
+        return true;
+    }
+
+    private bool HandleConnectionMessage(
+        byte type,
+        string msg,
+        ref PlayerInfo playerInfo,
+        Socket socket)
+    {
+        switch (type)
+        {
+            case 1:
+                PlayerInfo info;
+
+                try
+                {
+                    info = JsonUtility.FromJson<PlayerInfo>(msg);
+                }
+                catch
+                {
+                    info = null;
+                }
+
+                if (!ValidatePlayer(info, socket))
+                    return false;
+
+                playerInfo = info;
+
+                lock (socketListLock)
+                {
+                    if (!sockets.Contains(socket))
+                        sockets.Add(socket);
+
+                    socketPlayers[socket] = info;
+                }
+
+                PlayerInfo accepted = info;
+
+                Enqueue(() =>
+                {
+                    accepted.Heartbeat = true;
+
+                    if (CanReConnect(accepted))
+                    {
+                        players.Add(accepted);
+
+                        for (int i = ReConnectPlayer.Count - 1; i >= 0; i--)
+                        {
+                            if (ReConnectPlayer[i]?.Name == accepted.Name)
+                            {
+                                ReConnectPlayer.RemoveAt(i);
+                                break;
+                            }
+                        }
+
+                        ReConnectListChange();
+                    }
+                    else
+                    {
+                        AddNewPlayer(accepted);
+                        SendCommandBag(socket);
+                        SynPvPMode(
+                            new PvPModeSyn
+                            {
+                                Mode = PvPSelector.Instance.CurrMode
+                            },
+                            socket
+                        );
+
+                        PvPSelector.Instance.ServerSynTeam();
+                        SpectatorList.Instance.ServerSynSpectList();
+                    }
+                });
+
+                return true;
+
+            case 2:
+                HandQuitPlayer.Add(playerInfo);
+                RemoveSocket(socket);
+                return false;
+
+            case byte.MaxValue:
+                playerInfo.Heartbeat = true;
+                return true;
+        }
+
+        return true;
+    }
+
+    private bool ValidatePlayer(PlayerInfo info, Socket socket)
+    {
+        if (info == null)
+        {
+            Reject(socket, "Información del jugador no válida.");
+            return false;
+        }
+
+        if (info.VersionCode != GameManager.Instance.VersionCode)
+        {
+            Reject(
+                socket,
+                "Diferente a la versión del juego del servidor. Versión del juego del servidor :v" +
+                GameManager.Instance.VersionCode
+            );
+            return false;
+        }
+
+        if (CanReConnect(info))
+        {
+            if (ReConnectCode != info.ReCntCode)
+            {
+                Reject(socket, "Error de código de reconexión.");
+                return false;
+            }
+
+            return true;
+        }
+
+        string password =
+            UIManager.Instance.HostPasswordInput.text;
+
+        if (password != "" && info.Password != password)
+        {
+            Reject(socket, "Contraseña incorrecta; no se pudo unir.");
+            return false;
+        }
+
+        if (players.Count >= 3)
+        {
+            Reject(socket, "Server lleno; error al unirse.");
+            return false;
+        }
+
+        if (HostPlayer != null && HostPlayer.Name == info.Name)
+        {
+            Reject(socket, "El nombre entra en conflicto con el de un jugador en línea; no se pudo unir a la partida.");
+            return false;
+        }
+
+        if (LVManager.Instance.InGame)
+        {
+            Reject(socket, "La partida ya ha comenzado; no se pudo unir.");
+            return false;
+        }
+
+        if (info.CmdEnable != GameManager.Instance.LocalPlayerSave.CmdEnable)
+        {
+            Reject(
+                socket,
+                info.CmdEnable
+                    ? "Has habilitado los comandos, pero el servidor no; no puedes unirte"
+                    : "No has habilitado los comandos, pero el servidor sí; no puedes unirte"
+            );
+            return false;
+        }
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i]?.Name == info.Name)
+            {
+                Reject(socket, "El nombre entra en conflicto con el de un jugador en línea; no se pudo unir a la partida.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void Reject(Socket socket, string message)
+    {
+        SendFailConnectMsg(message, socket);
+        SafeCloseSocket(socket);
+    }
+
+    private void HandleGameMessage(
+        byte type,
+        string msg,
+        PlayerInfo player,
+        Socket socket)
+    {
+        switch (type)
+        {
+            case 0:
+                Enqueue(() =>
+                {
+                    PlantSpawn spawn = JsonUtility.FromJson<PlantSpawn>(msg);
+                    UpdateCardCD cd = new UpdateCardCD
+                    {
+                        CardId = spawn.CardId,
+                        name = player.Name
+                    };
+
+                    if (LV.Instance.CurrLVType == LVType.PvP &&
+                        !PvPSelector.Instance.IsSameTeam(player.Name))
+                        spawn.GridPos = new Vector2(-spawn.GridPos.x, spawn.GridPos.y);
+
+                    PlantBase plant =
+                        PlantManager.Instance.GetNewPlant(spawn.plantType);
+
+                    Grid grid =
+                        MapManager.Instance.GetGridByWorldPos(spawn.GridPos);
+
+                    if (SeedBank.Instance.CheckPlant(
+                        plant, grid, -1, player.Name))
+                    {
+                        int needSun = -1;
+                        cd.OK = false;
+
+                        if (spawn.SPcode == 2)
+                        {
+                            plant.InitForCreate(false, null, false);
+                            needSun = SeedBank.Instance
+                                .GetPlantNc(plant.GetPlantType())
+                                .NeedNum;
+                        }
+
+                        SeedBank.Instance.PlantConfirm(
+                            plant,
+                            grid,
+                            needSun,
+                            spawn.SPcode,
+                            player.Name
+                        );
+
+                        SendJson(2, 4, cd);
+
+                        BattlePlayerList.Instance.UpdateCardCD(
+                            cd.name,
+                            cd.CardId,
+                            cd.OK
+                        );
+                    }
+                    else
+                    {
+                        cd.OK = true;
+                        SendJson(2, 4, cd, socket);
+                        Destroy(plant.gameObject);
+                    }
+
+                    SeedBank.Instance.LikeColumnPlace(
+                        grid,
+                        spawn.plantType,
+                        ZombieType.Nope,
+                        -1,
+                        player.Name,
+                        false
+                    );
+                });
+                break;
+
+            case 1:
+                Enqueue(() =>
+                {
+                    ToolApply apply =
+                        JsonUtility.FromJson<ToolApply>(msg);
+
+                    apply.User = player.Name;
+
+                    Grid grid =
+                        MapManager.Instance.GetGridByWorldPos(apply.GridPos);
+
+                    if (apply.type == ToolType.Shovel)
+                    {
+                        if (Shovel.Instance.ClearPlant(
+                            grid,
+                            apply.GridPos,
+                            player.Name))
+                        {
+                            BattlePlayerList.Instance.PlayShovelAnimation(
+                                grid.Position,
+                                apply.Sound,
+                                player.Name
+                            );
+                        }
+
+                        SendJson(2, 6, apply);
+                    }
+                    else if (apply.type == ToolType.Glove)
+                    {
+                        Glove.Instance.SynClient(
+                            apply.OnlineId,
+                            apply.GridPos
+                        );
+                    }
+                });
+                break;
+
+            case 2:
+                Enqueue(() =>
+                    SkyManager.Instance.OnlineCollectSun(
+                        JsonUtility.FromJson<ClickedSun>(msg)
+                    )
+                );
+                break;
+
+            case 3:
+                Enqueue(() =>
+                {
+                    PlayerMap map =
+                        JsonUtility.FromJson<PlayerMap>(msg);
+
+                    map.PlayerName = player.Name;
+                    ChangeMap(map);
+
+                    BattlePlayerList.Instance.UpdateMapSprite(
+                        map.PlayerName,
+                        map.Pos
+                    );
+                });
+                break;
+
+            case 4:
+                Enqueue(() =>
+                {
+                    SelectCard card =
+                        JsonUtility.FromJson<SelectCard>(msg);
+
+                    card.PlayerName = player.Name;
+                    SelectCard(card);
+
+                    if (card.isBack)
+                        BattlePlayerList.Instance.CancelCard(
+                            card.PlayerName,
+                            card.cardId
+                        );
+                    else
+                        BattlePlayerList.Instance.SelectCard(
+                            card.PlayerName,
+                            card.plantType,
+                            card.zombieType,
+                            card.noAnim
+                        );
+                });
+                break;
+
+            case 5:
+                Enqueue(() =>
+                {
+                    SelectPrepare prepare =
+                        JsonUtility.FromJson<SelectPrepare>(msg);
+
+                    prepare.PlayerName = player.Name;
+                    SelectPrepare(prepare);
+
+                    BattlePlayerList.Instance.UpdateState(
+                        prepare.PlayerName,
+                        prepare.isPrepare
+                    );
+                });
+                break;
+
+            case 6:
+                Enqueue(() =>
+                    SynItem(JsonUtility.FromJson<SynItem>(msg))
+                );
+                break;
+
+            case 7:
+                Enqueue(() =>
+                {
+                    PlantPreview preview =
+                        JsonUtility.FromJson<PlantPreview>(msg);
+
+                    BattlePlayerList.Instance.PreviewPlant(preview);
+                    PlacePreview(preview, socket);
+                });
+                break;
+
+            case 8:
+                Enqueue(() =>
+                {
+                    UpdateCardCD cd =
+                        JsonUtility.FromJson<UpdateCardCD>(msg);
+
+                    cd.name = player.Name;
+
+                    BattlePlayerList.Instance.UpdateCardCD(
+                        cd.name,
+                        cd.CardId,
+                        cd.OK
+                    );
+
+                    SendJson(2, 4, cd, socket, true);
+                });
+                break;
+
+            case 9:
+                Enqueue(() =>
+                {
+                    ShovelPreview preview =
+                        JsonUtility.FromJson<ShovelPreview>(msg);
+
+                    BattlePlayerList.Instance.PreviewShovel(
+                        preview.PlayerName,
+                        preview.GridPos,
+                        preview.isShow
+                    );
+
+                    ShovelPreview(preview, socket);
+                });
+                break;
+
+            case 10:
+                Enqueue(() =>
+                {
+                    ZombieSpawnApply spawn =
+                        JsonUtility.FromJson<ZombieSpawnApply>(msg);
+
+                    UpdateCardCD cd = new UpdateCardCD
+                    {
+                        CardId = spawn.CardId,
+                        name = player.Name
+                    };
+
+                    if (LV.Instance.CurrLVType == LVType.PvP &&
+                        !PvPSelector.Instance.IsSameTeam(player.Name))
+                        spawn.GridPos = new Vector2(-spawn.GridPos.x, spawn.GridPos.y);
+
+                    ZombieBase zombie =
+                        ZombieManager.Instance.GetNewZombie(spawn.Type);
+
+                    Grid grid =
+                        MapManager.Instance.GetGridByWorldPos(spawn.GridPos);
+
+                    if (SeedBank.Instance.CheckZombie(
+                        spawn.Type,
+                        grid,
+                        -1,
+                        player.Name))
+                    {
+                        cd.OK = false;
+
+                        SeedBank.Instance.ZombieConfirm(
+                            spawn.Type,
+                            zombie,
+                            grid,
+                            -1,
+                            player.Name,
+                            spawn.isRat
+                        );
+
+                        SendJson(2, 4, cd);
+
+                        BattlePlayerList.Instance.UpdateCardCD(
+                            cd.name,
+                            cd.CardId,
+                            cd.OK
+                        );
+                    }
+                    else
+                    {
+                        cd.OK = true;
+                        SendJson(2, 4, cd, socket);
+                        Destroy(zombie.gameObject);
+                    }
+
+                    SeedBank.Instance.LikeColumnPlace(
+                        grid,
+                        PlantType.Nope,
+                        spawn.Type,
+                        -1,
+                        player.Name,
+                        spawn.isRat
+                    );
+                });
+                break;
+
+            case 11:
+                Enqueue(() =>
+                {
+                    ZombiePreview preview =
+                        JsonUtility.FromJson<ZombiePreview>(msg);
+
+                    BattlePlayerList.Instance.PreviewZombie(preview);
+                    ZombiePreview(preview, socket);
+                });
+                break;
+
+            case 12:
+                Enqueue(() =>
+                {
+                    JoinTeamApply join =
+                        JsonUtility.FromJson<JoinTeamApply>(msg);
+
+                    if (join.isRed)
+                        PvPSelector.Instance.JoinRed(player.Name);
+                    else
+                        PvPSelector.Instance.JoinBlue(player.Name);
+                });
+                break;
+
+            case 13:
+                Enqueue(() =>
+                {
+                    JoinSpecApply join =
+                        JsonUtility.FromJson<JoinSpecApply>(msg);
+
+                    SpectatorList.Instance.ClientJoinSpect(
+                        player.Name,
+                        join.isJoin
+                    );
+                });
+                break;
+
+            case 14:
+                Enqueue(() =>
+                    SlotMachine.Instance.ClientSyn(
+                        JsonUtility.FromJson<SlotMchBag>(msg)
+                    )
+                );
+                break;
+        }
+    }
+
+    private void HandleChatMessage(
+        byte type,
+        string msg,
+        PlayerInfo player,
+        Socket socket)
+    {
+        switch (type)
+        {
+            case 0:
+                Enqueue(() =>
+                {
+                    ChatInput.Instance.AddMessage(msg);
+                    SendMsg(4, 0, msg, socket, true);
+                });
+                break;
+
+            case 1:
+                Enqueue(() =>
+                {
+                    PrivateChatMsg chat =
+                        JsonUtility.FromJson<PrivateChatMsg>(msg);
+
+                    if (chat.PlayerName ==
+                        GameManager.Instance.LocalPlayerSave.playerName)
+                    {
+                        ChatInput.Instance.AddMessage(
+                            "Jugador" + player.Name +
+                            "Susurro:" + chat.content,
+                            new Color32(123, 123, 123, byte.MaxValue)
+                        );
+                    }
+                    else
+                    {
+                        SendPrivateChatMsg(
+                            chat.PlayerName,
+                            chat.content,
+                            player.Name
+                        );
+                    }
+                });
+                break;
+        }
+    }
+
+    private void RemoveSocket(Socket socket)
+    {
+        if (socket == null)
+            return;
+
+        lock (socketListLock)
+        {
+            sockets.Remove(socket);
+            socketPlayers.Remove(socket);
+        }
+
+        SafeCloseSocket(socket);
+    }
+
+    private void SafeCloseSocket(Socket socket)
+    {
+        if (socket == null)
+            return;
+
+        try { socket.Shutdown(SocketShutdown.Both); } catch { }
+        try { socket.Close(); } catch { }
+        try { socket.Dispose(); } catch { }
     }
 
     private void SendMsg(
@@ -1377,194 +961,145 @@ public class SocketServer : MonoBehaviour
         Socket socket = null,
         bool OutThis = false)
     {
-        List<byte> list =
-            new List<byte>();
-
-        list.Add(type1);
-        list.Add(type2);
-
-        if (!string.IsNullOrEmpty(content))
-        {
-            list.AddRange(
-                Encoding.UTF8.GetBytes(
-                    content
-                )
-            );
-        }
-
-        list.InsertRange(
-            0,
-            BitConverter.GetBytes(
-                list.Count
-            )
-        );
+        byte[] payload =
+            Encoding.UTF8.GetBytes(content ?? "");
 
         byte[] buffer =
-            list.ToArray();
+            new byte[payload.Length + 6];
+
+        Buffer.BlockCopy(
+            BitConverter.GetBytes(payload.Length + 2),
+            0,
+            buffer,
+            0,
+            4
+        );
+
+        buffer[4] = type1;
+        buffer[5] = type2;
+
+        if (payload.Length > 0)
+            Buffer.BlockCopy(payload, 0, buffer, 6, payload.Length);
+
+        Socket[] targets;
+
+        lock (socketListLock)
+            targets = sockets.ToArray();
 
         if (socket == null)
         {
-            for (int i = sockets.Count - 1; i >= 0; i--)
-            {
-                Socket currentSocket =
-                    sockets[i];
-
-                if (currentSocket == null)
-                {
-                    sockets.RemoveAt(i);
-                    continue;
-                }
-
-                try
-                {
-                    currentSocket.Send(
-                        buffer
-                    );
-                }
-                catch (Exception)
-                {
-                    PlayerInfo playerInfo =
-                        null;
-
-                    int playerIndex =
-                        sockets.IndexOf(
-                            currentSocket
-                        );
-
-                    if (
-                        playerIndex >= 0 &&
-                        playerIndex < players.Count
-                    )
-                    {
-                        playerInfo =
-                            players[playerIndex];
-                    }
-
-                    try
-                    {
-                        currentSocket.Close();
-                    }
-                    catch
-                    {
-                    }
-
-                    sockets.RemoveAt(i);
-
-                    if (
-                        playerInfo != null &&
-                        !string.IsNullOrEmpty(
-                            playerInfo.Name
-                        )
-                    )
-                    {
-                        actions.Add(() =>
-                        {
-                            RemovePlayer(
-                                playerInfo
-                            );
-                        });
-                    }
-
-                    Debug.Log(
-                        "677" +
-                        (
-                            playerInfo != null
-                                ? playerInfo.Name
-                                : "Unknown"
-                        )
-                    );
-                }
-            }
+            for (int i = 0; i < targets.Length; i++)
+                SendToSocket(targets[i], buffer);
 
             return;
         }
 
+        for (int i = 0; i < targets.Length; i++)
+        {
+            if (!OutThis && targets[i] == socket)
+            {
+                SendToSocket(socket, buffer);
+                return;
+            }
+
+            if (OutThis && targets[i] != null && targets[i] != socket)
+                SendToSocket(targets[i], buffer);
+        }
+    }
+
+    private void SendJson(
+        byte type1,
+        byte type2,
+        object value,
+        Socket socket = null,
+        bool OutThis = false)
+    {
+        SendMsg(
+            type1,
+            type2,
+            JsonUtility.ToJson(value),
+            socket,
+            OutThis
+        );
+    }
+
+    private void SendJson(
+        byte type1,
+        byte type2,
+        object value,
+        string playerName)
+    {
+        Socket socket = GetSocketByPlayer(playerName);
+
+        if (socket != null)
+            SendJson(type1, type2, value, socket);
+    }
+
+    private void SendToSocket(Socket socket, byte[] buffer)
+    {
+        if (socket == null || buffer == null)
+            return;
+
         try
         {
-            if (OutThis)
-            {
-                for (
-                    int num = sockets.Count - 1;
-                    num >= 0;
-                    num--
-                )
-                {
-                    if (
-                        sockets[num] == null
-                    )
-                    {
-                        sockets.RemoveAt(
-                            num
-                        );
-                        continue;
-                    }
+            int sent = 0;
 
-                    if (
-                        sockets[num] != socket
-                    )
-                    {
-                        sockets[num].Send(
-                            buffer
-                        );
-                    }
-                }
-            }
-            else
+            while (sent < buffer.Length)
             {
-                socket.Send(
-                    buffer
+                int count = socket.Send(
+                    buffer,
+                    sent,
+                    buffer.Length - sent,
+                    SocketFlags.None
                 );
+
+                if (count <= 0)
+                    throw new SocketException();
+
+                sent += count;
             }
         }
-        catch (Exception)
+        catch
         {
-            int playerIndex =
-                sockets.IndexOf(
-                    socket
-                );
+            PlayerInfo disconnected = GetPlayerBySocket(socket);
+            RemoveSocket(socket);
 
-            PlayerInfo playerInfo2 =
-                null;
+            if (disconnected != null)
+                Enqueue(() => RemovePlayer(disconnected));
+        }
+    }
 
-            if (
-                playerIndex >= 0 &&
-                playerIndex < players.Count
-            )
-            {
-                playerInfo2 =
-                    players[playerIndex];
-            }
+    private PlayerInfo GetPlayerBySocket(Socket socket)
+    {
+        if (socket == null)
+            return null;
 
-            try
-            {
-                socket.Close();
-            }
-            catch
-            {
-            }
+        lock (socketListLock)
+        {
+            socketPlayers.TryGetValue(
+                socket,
+                out PlayerInfo player
+            );
 
-            if (playerIndex >= 0)
-            {
-                sockets.RemoveAt(
-                    playerIndex
-                );
-            }
+            return player;
+        }
+    }
 
-            if (
-                playerInfo2 != null &&
-                !string.IsNullOrEmpty(
-                    playerInfo2.Name
-                )
-            )
+    private Socket GetSocketByPlayer(string playerName)
+    {
+        if (string.IsNullOrEmpty(playerName))
+            return null;
+
+        lock (socketListLock)
+        {
+            foreach (var pair in socketPlayers)
             {
-                actions.Add(() =>
-                {
-                    RemovePlayer(
-                        playerInfo2
-                    );
-                });
+                if (pair.Value?.Name == playerName)
+                    return pair.Key;
             }
         }
+
+        return null;
     }
 
     private void SendMsg(
@@ -1573,398 +1108,203 @@ public class SocketServer : MonoBehaviour
         string content,
         string playerName)
     {
-        for (
-            int i = 0;
-            i < players.Count;
-            i++
-        )
-        {
-            if (
-                players[i].Name == playerName &&
-                sockets.Count > i
-            )
-            {
-                SendMsg(
-                    type1,
-                    type2,
-                    content,
-                    sockets[i]
-                );
+        Socket socket = GetSocketByPlayer(playerName);
 
-                break;
-            }
-        }
+        if (socket != null)
+            SendMsg(type1, type2, content, socket);
     }
 
     private IEnumerator SendHeartbeat()
     {
-        float startT =
-            Time.realtimeSinceStartup;
+        float timer = Time.realtimeSinceStartup;
 
-        while (
-            GameManager.Instance.isOnline
-        )
+        while (isServerOpen && GameManager.Instance.isOnline)
         {
             yield return null;
 
-            if (
-                Time.realtimeSinceStartup -
-                startT > 0.5f
-            )
+            if (Time.realtimeSinceStartup - timer > 0.5f)
             {
-                SendMsg(
-                    0,
-                    byte.MaxValue
-                );
-
-                startT =
-                    Time.realtimeSinceStartup;
+                SendMsg(0, byte.MaxValue);
+                timer = Time.realtimeSinceStartup;
             }
         }
     }
 
     private IEnumerator CheckConnect()
     {
-        float startT =
-            Time.realtimeSinceStartup;
+        float timer = Time.realtimeSinceStartup;
 
-        while (
-            GameManager.Instance.isOnline
-        )
+        while (isServerOpen && GameManager.Instance.isOnline)
         {
             yield return null;
 
-            if (
-                Time.realtimeSinceStartup -
-                startT <= 3f
-            )
-            {
+            if (Time.realtimeSinceStartup - timer <= 3f)
                 continue;
-            }
 
-            for (
-                int i = 0;
-                i < players.Count;
-                i++
-            )
+            for (int i = players.Count - 1; i >= 0; i--)
             {
-                if (!players[i].Heartbeat)
+                PlayerInfo player = players[i];
+
+                if (player == null)
                 {
-                    if (
-                        sockets.Count > i &&
-                        sockets[i] != null
-                    )
-                    {
-                        Debug.LogError(
-                            players[i].Name +
-                            "无心跳断开"
-                        );
+                    players.RemoveAt(i);
+                    continue;
+                }
 
-                        try
-                        {
-                            sockets[i].Close();
-                        }
-                        catch
-                        {
-                        }
+                if (!player.Heartbeat)
+                {
+                    Socket socket = GetSocketByPlayer(player.Name);
 
-                        sockets.RemoveAt(i);
+                    if (socket != null)
+                        RemoveSocket(socket);
 
-                        PlayerInfo player =
-                            players[i];
-
-                        actions.Add(() =>
-                        {
-                            RemovePlayer(
-                                player
-                            );
-                        });
-
-                        break;
-                    }
+                    Debug.LogError(player.Name + "Desconexión por tiempo de espera");
+                    RemovePlayer(player);
                 }
                 else
                 {
-                    players[i].Heartbeat =
-                        false;
+                    player.Heartbeat = false;
                 }
             }
 
-            startT =
-                Time.realtimeSinceStartup;
+            timer = Time.realtimeSinceStartup;
         }
     }
 
     public void CloseServer()
     {
-        HostPlayer = null;
-
-        for (
-            int i = 0;
-            i < sockets.Count;
-            i++
-        )
-        {
-            if (sockets[i] != null)
-            {
-                try
-                {
-                    sockets[i].Close();
-                }
-                catch
-                {
-                }
-            }
-        }
-
-        sockets.Clear();
-
-        if (socketWatch != null)
-        {
-            try
-            {
-                socketWatch.Close();
-            }
-            catch
-            {
-            }
-
-            socketWatch = null;
-        }
-
-        isServerOpen = false;
-
-        GameManager.Instance.isOnline =
-            false;
-
-        BattlePlayerList.Instance
-            .UpdatePlayerList(
-                null,
-                players
-            );
-
-        PlayerList.Instance
-            .UpdatePlayerList(
-                null,
-                players
-            );
-
         StopAllCoroutines();
+        ClearServerState(true);
+        Debug.Log("Servidor cerrado y estado limpiado.");
+    }
+
+    private void OnApplicationQuit()
+    {
+        try
+        {
+            StopAllCoroutines();
+            ClearServerState(false);
+        }
+        catch { }
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance != this)
+            return;
+
+        try
+        {
+            StopAllCoroutines();
+            ClearServerState(false);
+        }
+        catch { }
+
+        Instance = null;
     }
 
     public void SynItem(SynItem syn)
     {
-        if (
-            syn.Type ==
-                SynItemType.AllItem ||
-            syn.Type ==
-                SynItemType.Plant
-        )
+        if (syn.Type == SynItemType.AllItem ||
+            syn.Type == SynItemType.Plant)
         {
-            PlantBase plantBase =
-                PlantManager.Instance
-                    .OnlineGetPlant(
-                        syn.OnlineId
-                    );
+            PlantBase plant =
+                PlantManager.Instance.OnlineGetPlant(syn.OnlineId);
 
-            if (plantBase != null)
-            {
-                plantBase.OnlineSynPlant(
-                    syn
-                );
-            }
+            plant?.OnlineSynPlant(syn);
         }
 
-        if (
-            syn.Type ==
-                SynItemType.AllItem ||
-            syn.Type ==
-                SynItemType.Zombie
-        )
+        if (syn.Type == SynItemType.AllItem ||
+            syn.Type == SynItemType.Zombie)
         {
-            ZombieBase zombieBase =
-                ZombieManager.Instance
-                    .OnlineGetZombie(
-                        syn.OnlineId
-                    );
+            ZombieBase zombie =
+                ZombieManager.Instance.OnlineGetZombie(syn.OnlineId);
 
-            if (zombieBase != null)
-            {
-                zombieBase.OnlineSynZombie(
-                    syn
-                );
-            }
+            zombie?.OnlineSynZombie(syn);
         }
 
-        if (
-            syn.Type ==
-                SynItemType.AllItem ||
-            syn.Type ==
-                SynItemType.Puddle
-        )
+        if (syn.Type == SynItemType.AllItem ||
+            syn.Type == SynItemType.Puddle)
         {
-            List<Puddle> puddles =
-                MapManager.Instance.puddles;
+            List<Puddle> puddles = MapManager.Instance.puddles;
 
-            for (
-                int i = 0;
-                i < puddles.Count;
-                i++
-            )
+            for (int i = 0; i < puddles.Count; i++)
             {
-                if (
-                    puddles[i].OnlineId ==
-                    syn.OnlineId
-                )
+                if (puddles[i].OnlineId == syn.OnlineId)
                 {
-                    puddles[i]
-                        .StartDisappear();
-
+                    puddles[i].StartDisappear();
                     break;
                 }
             }
         }
 
-        if (
-            syn.Type ==
-                SynItemType.AllItem ||
-            syn.Type ==
-                SynItemType.Portal
-        )
+        if (syn.Type == SynItemType.AllItem ||
+            syn.Type == SynItemType.Portal)
         {
-            List<PortalController> portalCs =
-                MapManager.Instance.portalCs;
+            List<PortalController> portals = MapManager.Instance.portalCs;
 
-            for (
-                int j = 0;
-                j < portalCs.Count;
-                j++
-            )
+            for (int i = 0; i < portals.Count; i++)
             {
-                if (
-                    portalCs[j].OnlineId ==
-                    syn.OnlineId
-                )
+                if (portals[i].OnlineId == syn.OnlineId)
                 {
-                    portalCs[j]
-                        .ClientReset(
-                            syn
-                        );
-
+                    portals[i].ClientReset(syn);
                     break;
                 }
             }
         }
 
-        if (
-            syn.Type ==
-                SynItemType.AllItem ||
-            syn.Type ==
-                SynItemType.Vase
-        )
-        {
-            LvItemManager.Instance
-                .SynVase(syn);
-        }
+        if (syn.Type == SynItemType.AllItem ||
+            syn.Type == SynItemType.Vase)
+            LvItemManager.Instance.SynVase(syn);
 
-        if (
-            syn.Type ==
-                SynItemType.AllItem ||
-            syn.Type ==
-                SynItemType.Card
-        )
-        {
-            SeedBank.Instance
-                .SynDropCard(syn);
-        }
+        if (syn.Type == SynItemType.AllItem ||
+            syn.Type == SynItemType.Card)
+            SeedBank.Instance.SynDropCard(syn);
     }
 
     public List<string> GetAllPlayerNameList()
     {
-        List<string> list =
-            new List<string>();
+        List<string> names = new List<string>();
 
         if (HostPlayer != null)
+            names.Add(HostPlayer.Name);
+
+        for (int i = 0; i < players.Count; i++)
         {
-            list.Add(
-                HostPlayer.Name
-            );
+            if (players[i] != null)
+                names.Add(players[i].Name);
         }
 
-        for (
-            int i = 0;
-            i < players.Count;
-            i++
-        )
-        {
-            list.Add(
-                players[i].Name
-            );
-        }
-
-        return list;
+        return names;
     }
 
-    public void SendFailConnectMsg(
-        string msg,
-        Socket socket)
+    public void SendFailConnectMsg(string msg, Socket socket)
     {
-        if (socket == null)
-        {
-            return;
-        }
-
-        ConnectInfo connectInfo =
-            new ConnectInfo();
-
-        connectInfo.msg =
-            msg;
-
-        SendMsg(
+        SendJson(
             0,
             1,
-            JsonUtility.ToJson(
-                connectInfo
-            ),
+            new ConnectInfo { msg = msg },
             socket
         );
     }
 
-    public void SendHostCD(
-        int CardID,
-        bool isOK)
+    public void SendHostCD(int CardID, bool isOK)
     {
-        UpdateCardCD updateCardCD =
-            new UpdateCardCD();
-
-        updateCardCD.name =
-            GameManager.Instance
-                .LocalPlayerSave
-                .playerName;
-
-        updateCardCD.CardId =
-            CardID;
-
-        updateCardCD.OK =
-            isOK;
-
-        SendMsg(
+        SendJson(
             2,
             4,
-            JsonUtility.ToJson(
-                updateCardCD
-            )
+            new UpdateCardCD
+            {
+                name = GameManager.Instance.LocalPlayerSave.playerName,
+                CardId = CardID,
+                OK = isOK
+            }
         );
     }
 
-    public void SendChatMsg(
-        string content)
+    public void SendChatMsg(string content)
     {
-        SendMsg(
-            4,
-            0,
-            content
-        );
+        SendMsg(4, 0, content);
     }
 
     public void SendPrivateChatMsg(
@@ -1972,672 +1312,316 @@ public class SocketServer : MonoBehaviour
         string content,
         string sender)
     {
-        PrivateChatMsg privateChatMsg =
-            new PrivateChatMsg();
-
-        privateChatMsg.PlayerName =
-            sender;
-
-        privateChatMsg.content =
-            content;
-
-        SendMsg(
+        SendJson(
             4,
             2,
-            JsonUtility.ToJson(
-                privateChatMsg
-            ),
+            new PrivateChatMsg
+            {
+                PlayerName = sender,
+                content = content
+            },
             name
         );
     }
 
-    public void KickPlayer(
-        string name)
+    public void KickPlayer(string name)
     {
-        for (
-            int i = 0;
-            i < players.Count;
-            i++
-        )
+        PlayerInfo player =
+            players.FirstOrDefault(p => p?.Name == name);
+
+        if (player == null)
+            return;
+
+        HandQuitPlayer.Add(player);
+
+        Socket socket = GetSocketByPlayer(name);
+
+        if (socket != null)
         {
-            if (
-                players[i].Name == name &&
-                sockets.Count > i
-            )
-            {
-                HandQuitPlayer.Add(
-                    players[i]
-                );
-
-                SendFailConnectMsg(
-                    "你被踢出了游戏。",
-                    sockets[i]
-                );
-
-                try
-                {
-                    sockets[i].Close();
-                }
-                catch
-                {
-                }
-
-                break;
-            }
+            SendFailConnectMsg("Has sido expulsado de la partida", socket);
+            SafeCloseSocket(socket);
         }
     }
 
-    public void LoadLv(
-        LoadLVBag loadLV)
+    public void LoadLv(LoadLVBag loadLV)
     {
         ReConnectCode =
-            UnityEngine.Random.Range(
-                100000,
-                999999
-            );
+            UnityEngine.Random.Range(100000, 999999);
 
-        loadLV.ReCntCode =
-            ReConnectCode;
+        loadLV.ReCntCode = ReConnectCode;
 
-        Debug.Log(
-            JsonUtility.ToJson(
-                loadLV
-            )
-        );
-
-        SendMsg(
-            1,
-            0,
-            JsonUtility.ToJson(
-                loadLV
-            )
-        );
+        Debug.Log(JsonUtility.ToJson(loadLV));
+        SendJson(1, 0, loadLV);
     }
 
     public void SendAddCard(
         AddCardBag cardBag,
         string playerName)
     {
-        SendMsg(
-            1,
-            12,
-            JsonUtility.ToJson(
-                cardBag
-            ),
-            playerName
-        );
+        SendJson(1, 12, cardBag, playerName);
     }
 
     public void StartRunLv()
     {
-        SendMsg(
-            1,
-            1
-        );
+        SendMsg(1, 1);
     }
 
-    public void BigWaveComing(
-        WaveComing bigWave)
+    public void BigWaveComing(WaveComing bigWave)
     {
-        SendMsg(
-            1,
-            2,
-            JsonUtility.ToJson(
-                bigWave
-            )
-        );
+        SendJson(1, 2, bigWave);
     }
 
-    public void UpdateSunNum(
-        SunNumBag SunNum)
+    public void UpdateSunNum(SunNumBag SunNum)
     {
-        SendMsg(
-            1,
-            3,
-            JsonUtility.ToJson(
-                SunNum
-            )
-        );
+        SendJson(1, 3, SunNum);
     }
 
-    public void SendSynBag(
-        SynItem syn)
+    public void SendSynBag(SynItem syn)
     {
-        SendMsg(
-            1,
-            4,
-            JsonUtility.ToJson(
-                syn
-            )
-        );
+        SendJson(1, 4, syn);
     }
 
-    public void ChangeMap(
-        PlayerMap map)
+    public void ChangeMap(PlayerMap map)
     {
-        SendMsg(
-            1,
-            5,
-            JsonUtility.ToJson(
-                map
-            )
-        );
+        SendJson(1, 5, map);
     }
 
-    public void SelectCard(
-        SelectCard card)
+    public void SelectCard(SelectCard card)
     {
-        SendMsg(
-            1,
-            6,
-            JsonUtility.ToJson(
-                card
-            )
-        );
+        SendJson(1, 6, card);
     }
 
-    public void SelectPrepare(
-        SelectPrepare prepare)
+    public void SelectPrepare(SelectPrepare prepare)
     {
-        SendMsg(
-            1,
-            7,
-            JsonUtility.ToJson(
-                prepare
-            )
-        );
+        SendJson(1, 7, prepare);
     }
 
-    public void GameOver(
-        GameOver over)
+    public void GameOver(GameOver over)
     {
-        SendMsg(
-            1,
-            8,
-            JsonUtility.ToJson(
-                over
-            )
-        );
+        SendJson(1, 8, over);
     }
 
-    public void SynTeamList(
-        PvPTeamList over)
+    public void SynTeamList(PvPTeamList over)
     {
-        SendMsg(
-            1,
-            9,
-            JsonUtility.ToJson(
-                over
-            )
-        );
+        SendJson(1, 9, over);
     }
 
     public void SynPvPMode(
         PvPModeSyn syn,
         Socket socket = null)
     {
-        SendMsg(
-            1,
-            10,
-            JsonUtility.ToJson(
-                syn
-            ),
-            socket
-        );
+        SendJson(1, 10, syn, socket);
     }
 
-    public void SynSpectList(
-        SpectList over)
+    public void SynSpectList(SpectList over)
     {
-        SendMsg(
-            1,
-            11,
-            JsonUtility.ToJson(
-                over
-            )
-        );
+        SendJson(1, 11, over);
     }
 
-    public void SynFlagMeter(
-        FlagMeterSyn syn)
+    public void SynFlagMeter(FlagMeterSyn syn)
     {
-        SendMsg(
-            1,
-            13,
-            JsonUtility.ToJson(
-                syn
-            )
-        );
+        SendJson(1, 13, syn);
     }
 
-    public void SynTimeTable(
-        TimetableSyn syn)
+    public void SynTimeTable(TimetableSyn syn)
     {
-        SendMsg(
-            1,
-            14,
-            JsonUtility.ToJson(
-                syn
-            )
-        );
+        SendJson(1, 14, syn);
     }
 
-    public void SpawnSun(
-        SunSpawn spawn)
+    public void SpawnSun(SunSpawn spawn)
     {
-        SendMsg(
-            2,
-            1,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(2, 1, spawn);
     }
 
-    public void ClickedSun(
-        ClickedSun sun)
+    public void ClickedSun(ClickedSun sun)
     {
-        SendMsg(
-            2,
-            2,
-            JsonUtility.ToJson(
-                sun
-            )
-        );
+        SendJson(2, 2, sun);
     }
 
-    public void SpawnPlant(
-        PlantSpawn spawn)
+    public void SpawnPlant(PlantSpawn spawn)
     {
-        SendMsg(
-            2,
-            0,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(2, 0, spawn);
     }
 
     public void PlacePreview(
         PlantPreview spawn,
         Socket socket)
     {
-        SendMsg(
-            2,
-            3,
-            JsonUtility.ToJson(
-                spawn
-            ),
-            socket,
-            OutThis: true
-        );
+        SendJson(2, 3, spawn, socket, true);
     }
 
     public void ZombiePreview(
         ZombiePreview spawn,
         Socket socket)
     {
-        SendMsg(
-            3,
-            5,
-            JsonUtility.ToJson(
-                spawn
-            ),
-            socket,
-            OutThis: true
-        );
+        SendJson(3, 5, spawn, socket, true);
     }
 
     public void ShovelPreview(
         ShovelPreview spawn,
         Socket socket)
     {
-        SendMsg(
-            2,
-            5,
-            JsonUtility.ToJson(
-                spawn
-            ),
-            socket,
-            OutThis: true
-        );
+        SendJson(2, 5, spawn, socket, true);
     }
 
-    public void SpawnZombie(
-        ZombieSpawn spawn)
+    public void SpawnZombie(ZombieSpawn spawn)
     {
-        SendMsg(
-            3,
-            0,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 0, spawn);
     }
 
-    public void SpawnGraveStone(
-        GraveStoneSpawn spawn)
+    public void SpawnGraveStone(GraveStoneSpawn spawn)
     {
-        SendMsg(
-            3,
-            1,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 1, spawn);
     }
 
-    public void SpawnPuddle(
-        PuddleSpawn spawn)
+    public void SpawnPuddle(PuddleSpawn spawn)
     {
-        SendMsg(
-            3,
-            2,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 2, spawn);
     }
 
-    public void SpawnPortal(
-        PortalSpawn spawn)
+    public void SpawnPortal(PortalSpawn spawn)
     {
-        SendMsg(
-            3,
-            6,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 6, spawn);
     }
 
-    public void SpawnVase(
-        VaseSpawn spawn)
+    public void SpawnVase(VaseSpawn spawn)
     {
-        SendMsg(
-            3,
-            9,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 9, spawn);
     }
 
-    public void SpawnDropCard(
-        CardSpawn spawn)
+    public void SpawnDropCard(CardSpawn spawn)
     {
-        SendMsg(
-            3,
-            10,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 10, spawn);
     }
 
-    public void SpawnMelt(
-        MeltSpawn spawn)
+    public void SpawnMelt(MeltSpawn spawn)
     {
-        SendMsg(
-            3,
-            11,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 11, spawn);
     }
 
-    public void SpawnFallHail(
-        FallHailSpawn spawn)
+    public void SpawnFallHail(FallHailSpawn spawn)
     {
-        SendMsg(
-            3,
-            12,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 12, spawn);
     }
 
-    public void SpawnLightning(
-        LightingSpawn spawn)
+    public void SpawnLightning(LightingSpawn spawn)
     {
-        SendMsg(
-            3,
-            3,
-            JsonUtility.ToJson(
-                spawn
-            )
-        );
+        SendJson(3, 3, spawn);
     }
 
-    public void SendShovelAnim(
-        ToolApply apply)
+    public void SendShovelAnim(ToolApply apply)
     {
-        SendMsg(
-            2,
-            6,
-            JsonUtility.ToJson(
-                apply
-            )
-        );
+        SendJson(2, 6, apply);
     }
 
-    public void SendGridState(
-        SynGrid apply)
+    public void SendGridState(SynGrid apply)
     {
-        SendMsg(
-            3,
-            7,
-            JsonUtility.ToJson(
-                apply
-            )
-        );
+        SendJson(3, 7, apply);
     }
 
-    public void SendCommandBag(
-        Socket socket = null)
+    public void SendCommandBag(Socket socket = null)
     {
-        CommandBag commandBag =
-            new CommandBag();
-
-        commandBag.Pinv =
-            PlantManager.Instance
-                .PlantInvincible;
-
-        commandBag.Zinv =
-            ZombieManager.Instance
-                .ZombieInvincible;
-
-        commandBag.DLiCy =
-            SkyManager.Instance
-                .DayLightCycle;
-
-        commandBag.SnInf =
-            PlayerManager.Instance
-                .SunInfinite;
-
-        commandBag.CdCle =
-            SeedBank.Instance
-                .isNoCD;
-
-        commandBag.ZomStop =
-            ZombieManager.Instance
-                .ZombieDontMove;
-
-        commandBag.VaseXray =
-            LvItemManager.Instance
-                .VaseAlwaysLight;
-
-        SendMsg(
+        SendJson(
             4,
             3,
-            JsonUtility.ToJson(
-                commandBag
-            ),
+            new CommandBag
+            {
+                Pinv = PlantManager.Instance.PlantInvincible,
+                Zinv = ZombieManager.Instance.ZombieInvincible,
+                DLiCy = SkyManager.Instance.DayLightCycle,
+                SnInf = PlayerManager.Instance.SunInfinite,
+                CdCle = SeedBank.Instance.isNoCD,
+                ZomStop = ZombieManager.Instance.ZombieDontMove,
+                VaseXray = LvItemManager.Instance.VaseAlwaysLight
+            },
             socket
         );
     }
 
-    public void SendWeatherCmd(
-        WeatherChange cmd)
+    public void SendWeatherCmd(WeatherChange cmd)
     {
-        SendMsg(
-            4,
-            4,
-            JsonUtility.ToJson(
-                cmd
-            )
-        );
+        SendJson(4, 4, cmd);
     }
 
-    public void SendTimeCmd(
-        TimeCmd cmd)
+    public void SendTimeCmd(TimeCmd cmd)
     {
-        SendMsg(
-            4,
-            5,
-            JsonUtility.ToJson(
-                cmd
-            )
-        );
+        SendJson(4, 5, cmd);
     }
 
-    public void SendMapSyn(
-        SynMap cmd)
+    public void SendMapSyn(SynMap cmd)
     {
-        SendMsg(
-            3,
-            4,
-            JsonUtility.ToJson(
-                cmd
-            )
-        );
+        SendJson(3, 4, cmd);
     }
 
-    public void SendSynBooty(
-        SynBooty Syn)
+    public void SendSynBooty(SynBooty Syn)
     {
-        SendMsg(
-            3,
-            8,
-            JsonUtility.ToJson(
-                Syn
-            )
-        );
+        SendJson(3, 8, Syn);
     }
 
     public void SendAcvmentGet(
         Acvname acvname,
         string playerName)
     {
-        GetAcvment getAcvment =
-            new GetAcvment();
-
-        getAcvment.acv =
-            acvname;
-
-        SendMsg(
+        SendJson(
             4,
             6,
-            JsonUtility.ToJson(
-                getAcvment
-            ),
+            new GetAcvment { acv = acvname },
             playerName
         );
     }
 
-    private void SendWaitReConnect(
-        bool isWait)
+    private void SendWaitReConnect(bool isWait)
     {
-        List<string> list =
-            new List<string>();
+        List<string> names = new List<string>();
 
-        for (
-            int i = 0;
-            i < ReConnectPlayer.Count;
-            i++
-        )
+        for (int i = 0; i < ReConnectPlayer.Count; i++)
         {
-            list.Add(
-                ReConnectPlayer[i].Name
-            );
+            if (ReConnectPlayer[i] != null)
+                names.Add(ReConnectPlayer[i].Name);
         }
 
-        ReConnectInfo reConnectInfo =
-            new ReConnectInfo();
-
-        reConnectInfo.isWait =
-            isWait;
-
-        reConnectInfo.names =
-            list;
-
-        SendMsg(
+        SendJson(
             0,
             3,
-            JsonUtility.ToJson(
-                reConnectInfo
-            )
+            new ReConnectInfo
+            {
+                isWait = isWait,
+                names = names
+            }
         );
     }
 
     private void ReConnectListChange()
     {
-        if (
-            ReConnectPlayer.Count > 0
-        )
+        if (ReConnectPlayer.Count > 0)
         {
-            List<string> list =
-                new List<string>();
+            List<string> names = new List<string>();
 
-            for (
-                int i = 0;
-                i < ReConnectPlayer.Count;
-                i++
-            )
+            for (int i = 0; i < ReConnectPlayer.Count; i++)
             {
-                list.Add(
-                    ReConnectPlayer[i].Name
-                );
+                if (ReConnectPlayer[i] != null)
+                    names.Add(ReConnectPlayer[i].Name);
             }
 
-            ReConnect.Instance
-                .LoadPlayerList(
-                    list
-                );
-
-            SendWaitReConnect(
-                isWait: true
-            );
+            ReConnect.Instance.LoadPlayerList(names);
+            SendWaitReConnect(true);
         }
         else
         {
-            SendWaitReConnect(
-                isWait: false
-            );
-
-            ReConnect.Instance
-                .OverClose();
+            SendWaitReConnect(false);
+            ReConnect.Instance.OverClose();
         }
     }
 
-    private bool CanReConnect(
-        PlayerInfo info)
+    private bool CanReConnect(PlayerInfo info)
     {
-        for (
-            int i = 0;
-            i < ReConnectPlayer.Count;
-            i++
-        )
+        if (info == null)
+            return false;
+
+        for (int i = 0; i < ReConnectPlayer.Count; i++)
         {
-            if (
-                ReConnectPlayer[i].Name ==
-                info.Name
-            )
-            {
+            if (ReConnectPlayer[i]?.Name == info.Name)
                 return true;
-            }
         }
 
         return false;
@@ -2645,197 +1629,133 @@ public class SocketServer : MonoBehaviour
 
     public void GiveUpReConnect()
     {
-        for (
-            int i = 0;
-            i < ReConnectPlayer.Count;
-            i++
-        )
-        {
-            RemoveDone(
-                ReConnectPlayer[i]
-            );
-        }
+        for (int i = 0; i < ReConnectPlayer.Count; i++)
+            RemoveDone(ReConnectPlayer[i]);
 
         ReConnectPlayer.Clear();
-
         ReConnectListChange();
     }
 
-    private void AddNewPlayer(
-        PlayerInfo player)
+    private void AddNewPlayer(PlayerInfo player)
     {
-        players.Add(
-            player
+        if (player == null ||
+            players.Any(p => p?.Name == player.Name))
+            return;
+
+        players.Add(player);
+        UpdatePlayerLists();
+
+        string content = player.Name + "Te has unido a la partida";
+
+        ChatInput.Instance.AddMessage(
+            content,
+            new Color32(
+                byte.MaxValue,
+                byte.MaxValue,
+                0,
+                byte.MaxValue
+            )
         );
 
-        BattlePlayerList.Instance
-            .UpdatePlayerList(
-                HostPlayer,
-                players
-            );
+        SendMsg(4, 1, content);
 
-        PlayerList.Instance
-            .UpdatePlayerList(
-                HostPlayer,
-                players
-            );
-
-        string content =
-            player.Name +
-            "加入了游戏";
-
-        ChatInput.Instance
-            .AddMessage(
-                content,
-                new Color32(
-                    byte.MaxValue,
-                    byte.MaxValue,
-                    0,
-                    byte.MaxValue
-                )
-            );
-
-        SendMsg(
-            4,
-            1,
-            content
-        );
-
-        OnlinePlayerInfo onlinePlayerInfo =
-            new OnlinePlayerInfo();
-
-        onlinePlayerInfo.HostPlayer =
-            HostPlayer;
-
-        onlinePlayerInfo.players =
-            players;
-
-        SendMsg(
+        SendJson(
             0,
             2,
-            JsonUtility.ToJson(
-                onlinePlayerInfo
-            )
+            new OnlinePlayerInfo
+            {
+                HostPlayer = HostPlayer,
+                players = players
+            }
         );
     }
 
-    private void RemovePlayer(
-        PlayerInfo player)
+    private void RemovePlayer(PlayerInfo player)
     {
-        if (
-            player == null ||
-            !players.Contains(player)
-        )
-        {
+        if (player == null)
             return;
+
+        int index = players.IndexOf(player);
+
+        if (index < 0)
+        {
+            index = players.FindIndex(
+                p => p?.Name == player.Name
+            );
+
+            if (index >= 0)
+                player = players[index];
         }
 
-        players.Remove(
-            player
-        );
+        if (index < 0)
+            return;
 
-        if (
-            LVManager.Instance.InGame
-        )
+        players.RemoveAt(index);
+
+        if (LVManager.Instance.InGame)
         {
-            if (
-                HandQuitPlayer.Remove(
-                    player
-                )
-            )
+            if (HandQuitPlayer.Remove(player))
             {
-                RemoveDone(
-                    player
-                );
-
+                RemoveDone(player);
                 return;
             }
 
-            ReConnectPlayer.Add(
-                player
-            );
+            if (!ReConnectPlayer.Contains(player))
+                ReConnectPlayer.Add(player);
 
-            ReConnect.Instance
-                .OpenInit(
-                    needCnt: false
-                );
-
+            ReConnect.Instance.OpenInit(false);
             ReConnectListChange();
         }
         else
         {
-            RemoveDone(
-                player
-            );
+            RemoveDone(player);
         }
     }
 
-    private void RemoveDone(
-        PlayerInfo player)
+    private void RemoveDone(PlayerInfo player)
     {
         if (player == null)
-        {
             return;
-        }
 
-        string content =
-            player.Name +
-            "退出了游戏";
+        string content = player.Name + "Saliste del juego";
 
-        ChatInput.Instance
-            .AddMessage(
-                content,
-                new Color32(
-                    byte.MaxValue,
-                    byte.MaxValue,
-                    0,
-                    byte.MaxValue
-                )
-            );
-
-        SendMsg(
-            4,
-            1,
-            content
+        ChatInput.Instance.AddMessage(
+            content,
+            new Color32(
+                byte.MaxValue,
+                byte.MaxValue,
+                0,
+                byte.MaxValue
+            )
         );
 
-        BattlePlayerList.Instance
-            .UpdatePlayerList(
-                HostPlayer,
-                players
-            );
+        SendMsg(4, 1, content);
+        UpdatePlayerLists();
 
-        PlayerList.Instance
-            .UpdatePlayerList(
-                HostPlayer,
-                players
-            );
+        PvPSelector.Instance.ClearQuitPlayer(player.Name);
+        SpectatorList.Instance.ClearPlayer(player.Name);
 
-        PvPSelector.Instance
-            .ClearQuitPlayer(
-                player.Name
-            );
-
-        SpectatorList.Instance
-            .ClearPlayer(
-                player.Name
-            );
-
-        OnlinePlayerInfo onlinePlayerInfo =
-            new OnlinePlayerInfo();
-
-        onlinePlayerInfo.HostPlayer =
-            HostPlayer;
-
-        onlinePlayerInfo.players =
-            players;
-
-        SendMsg(
+        SendJson(
             0,
             2,
-            JsonUtility.ToJson(
-                onlinePlayerInfo
-            )
+            new OnlinePlayerInfo
+            {
+                HostPlayer = HostPlayer,
+                players = players
+            }
+        );
+    }
+
+    private void UpdatePlayerLists()
+    {
+        BattlePlayerList.Instance.UpdatePlayerList(
+            HostPlayer,
+            players
+        );
+
+        PlayerList.Instance.UpdatePlayerList(
+            HostPlayer,
+            players
         );
     }
 }
