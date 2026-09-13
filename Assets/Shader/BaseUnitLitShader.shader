@@ -1,5 +1,7 @@
-Shader "BaseUnitLitShader" {
-	Properties {
+Shader "BaseUnitLitShader"
+{
+	Properties
+	{
 		_MainTex ("Diffuse", 2D) = "white" {}
 		_MaskTex ("Mask", 2D) = "white" {}
 		_NormalMap ("Normal Map", 2D) = "bump" {}
@@ -18,57 +20,112 @@ Shader "BaseUnitLitShader" {
 		_Alpha ("Alpha", Float) = 1
 		_IsVisible ("IsVisible", Range(-1, 0)) = 0
 	}
-	//DummyShaderTextExporter
-	SubShader{
-		Tags { "RenderType"="Opaque" }
-		LOD 200
+
+	SubShader
+	{
+		Tags
+		{
+			"Queue"="Transparent"
+			"RenderType"="Transparent"
+			"IgnoreProjector"="True"
+			"CanUseSpriteAtlas"="True"
+			"PreviewType"="Plane"
+		}
+
+		Cull Off
+		Lighting Off
+		ZWrite Off
+		Blend SrcAlpha OneMinusSrcAlpha
 
 		Pass
 		{
 			HLSLPROGRAM
+
 			#pragma vertex vert
 			#pragma fragment frag
 
-			float4x4 unity_ObjectToWorld;
-			float4x4 unity_MatrixVP;
+			#include "UnityCG.cginc"
+
+			struct VertexInput
+			{
+				float4 vertex : POSITION;
+				float4 color : COLOR;
+				float2 uv : TEXCOORD0;
+			};
+
+			struct VertexOutput
+			{
+				float4 vertex : SV_POSITION;
+				float4 color : COLOR;
+				float2 uv : TEXCOORD0;
+			};
+
+			sampler2D _MainTex;
+			sampler2D _MaskTex;
+			sampler2D _NormalMap;
+			sampler2D _AlphaTex;
+
 			float4 _MainTex_ST;
+			float4 _Color;
+			float4 _RendererColor;
+			float4 _Flip;
 
-			struct Vertex_Stage_Input
-			{
-				float4 pos : POSITION;
-				float2 uv : TEXCOORD0;
-			};
+			float _GrayScale;
+			float _Brightness;
+			float _OpenGray;
 
-			struct Vertex_Stage_Output
-			{
-				float2 uv : TEXCOORD0;
-				float4 pos : SV_POSITION;
-			};
+			float _AngleX;
+			float _AngleY;
+			float _ScaleX;
+			float _ScaleY;
+			float _Alpha;
+			float _IsVisible;
 
-			Vertex_Stage_Output vert(Vertex_Stage_Input input)
+			float _EnableExternalAlpha;
+
+			VertexOutput vert(VertexInput input)
 			{
-				Vertex_Stage_Output output;
-				output.uv = (input.uv.xy * _MainTex_ST.xy) + _MainTex_ST.zw;
-				output.pos = mul(unity_MatrixVP, mul(unity_ObjectToWorld, input.pos));
+				VertexOutput output;
+
+				float4 vertex = input.vertex;
+
+				vertex.x *= _ScaleX;
+				vertex.y *= _ScaleY;
+
+				output.vertex = UnityObjectToClipPos(vertex);
+				output.uv = TRANSFORM_TEX(input.uv, _MainTex);
+				output.color = input.color * _Color * _RendererColor;
+
 				return output;
 			}
 
-			Texture2D<float4> _MainTex;
-			SamplerState sampler_MainTex;
-			float4 _Color;
-
-			struct Fragment_Stage_Input
+			float4 frag(VertexOutput input) : SV_Target
 			{
-				float2 uv : TEXCOORD0;
-			};
+				float4 color = tex2D(_MainTex, input.uv);
 
-			float4 frag(Fragment_Stage_Input input) : SV_TARGET
-			{
-				return _MainTex.Sample(sampler_MainTex, input.uv.xy) * _Color;
+				color *= input.color;
+
+				if (_OpenGray > 0.5)
+				{
+					float gray = dot(color.rgb, float3(0.299, 0.587, 0.114));
+					color.rgb = lerp(color.rgb, gray.xxx, saturate(_GrayScale));
+				}
+
+				color.rgb *= _Brightness;
+
+				color.a *= _Alpha;
+
+				if (_EnableExternalAlpha > 0.5)
+				{
+					color.a *= tex2D(_AlphaTex, input.uv).r;
+				}
+
+				return color;
 			}
 
 			ENDHLSL
 		}
 	}
+
 	Fallback "Sprites/Default"
 }
