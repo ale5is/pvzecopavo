@@ -6,7 +6,14 @@ public class MultiplayerButton : MonoBehaviour
 
     private void OnMouseEnter()
     {
-        REnderer.material.SetFloat("_Brightness", 1.3f);
+        if (MyTool.IsPointerOverGameObject())
+            return;
+
+        REnderer.material.SetFloat(
+            "_Brightness",
+            1.3f
+        );
+
         AudioManager.Instance.PlayEFAudio(
             GameManager.Instance.AudioConf.Bleep,
             transform.position,
@@ -16,12 +23,22 @@ public class MultiplayerButton : MonoBehaviour
 
     private void OnMouseExit()
     {
-        REnderer.material.SetFloat("_Brightness", 1f);
+        REnderer.material.SetFloat(
+            "_Brightness",
+            1f
+        );
     }
 
     private void OnMouseDown()
     {
-        CameraControl.Instance.MoveTo(new Vector2(-21.3f, -30f), null);
+        if (MyTool.IsPointerOverGameObject())
+            return;
+
+        CameraControl.Instance.MoveTo(
+            new Vector2(-21.3f, -30f),
+            null
+        );
+
         AudioManager.Instance.PlayEFAudio(
             GameManager.Instance.AudioConf.GraveButton,
             transform.position,

@@ -42,7 +42,7 @@ public class EditUser : MonoBehaviour
 		{
 			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.ButtonClick, base.transform.position, isAll: true);
 			DeleteConfirm();
-		}, "确定删除该玩家？", ChooseSave.Instance.SelectedSaveOption.userSave.playerName, "*删除后将不可恢复*");
+		}, "Seguro de eliminar？", ChooseSave.Instance.SelectedSaveOption.userSave.playerName, "No se puede revertir.");
 	}
 
 	public void DeleteConfirm()

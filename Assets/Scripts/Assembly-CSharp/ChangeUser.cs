@@ -2,51 +2,108 @@ using UnityEngine;
 
 public class ChangeUser : MonoBehaviour
 {
-	public Sprite Normal;
+    public Sprite Normal;
+    public Sprite EnterGreen;
+    public Animator clipController;
+    public TextMesh NameText;
+    public Collider2D Collider;
+    public SpriteRenderer SignRe;
 
-	public Sprite EnterGreen;
+    public GameObject ChooseSaveObject;
 
-	public Animator clipController;
+    public void AnimAction()
+    {
+        if (Collider != null)
+            Collider.enabled = true;
+    }
 
-	public TextMesh NameText;
+    public void PlayAnimation()
+    {
+        if (Collider != null)
+            Collider.enabled = false;
 
-	public Collider2D Collider;
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.woodSignRoll_in,
+                transform.position,
+                isAll: true
+            );
+        }
 
-	public SpriteRenderer SignRe;
+        if (clipController != null)
+            clipController.Play(
+                "anim_drop",
+                0,
+                0f
+            );
+    }
 
-	public void AnimAction()
-	{
-		Collider.enabled = true;
-	}
+    private void OnMouseEnter()
+    {
+        if (MyTool.IsPointerOverGameObject())
+            return;
 
-	public void PlayAnimation()
-	{
-		Collider.enabled = false;
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.woodSignRoll_in, base.transform.position, isAll: true);
-		clipController.Play("anim_drop", 0, 0f);
-	}
+        if (SignRe != null)
+            SignRe.sprite = EnterGreen;
 
-	private void OnMouseEnter()
-	{
-		if (!MyTool.IsPointerOverGameObject())
-		{
-			SignRe.sprite = EnterGreen;
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.Bleep, base.transform.position, isAll: true);
-		}
-	}
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.Bleep,
+                transform.position,
+                isAll: true
+            );
+        }
+    }
 
-	private void OnMouseExit()
-	{
-		SignRe.sprite = Normal;
-	}
+    private void OnMouseExit()
+    {
+        if (SignRe != null)
+            SignRe.sprite = Normal;
+    }
 
-	private void OnMouseDown()
-	{
-		if (!GameManager.Instance.isOnline && !MyTool.IsPointerOverGameObject())
-		{
-			ChooseSave.Instance.gameObject.SetActive(value: true);
-			ChooseSave.Instance.LoadSavegroup();
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.ButtonClick, base.transform.position, isAll: true);
-		}
-	}
+    private void OnMouseDown()
+    {
+        if (GameManager.Instance == null)
+            return;
+
+        if (GameManager.Instance.isOnline)
+            return;
+
+        if (MyTool.IsPointerOverGameObject())
+            return;
+
+        ChooseSave chooseSave =
+            ChooseSave.Instance;
+
+        if (chooseSave == null)
+        {
+            Debug.LogError(
+                "ChangeUser: ChooseSave.Instance es NULL."
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            "ChangeUser: llamando LoadSavegroup()."
+        );
+
+        chooseSave.LoadSavegroup();
+
+        if (AudioManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.ButtonClick,
+                transform.position,
+                isAll: true
+            );
+        }
+    }
 }
