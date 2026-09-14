@@ -44,7 +44,6 @@ public class ChangeUser : MonoBehaviour
 	{
 		if (!GameManager.Instance.isOnline && !MyTool.IsPointerOverGameObject())
 		{
-			ChooseSave.Instance.transform.localScale = Vector3.one;
 			ChooseSave.Instance.gameObject.SetActive(value: true);
 			ChooseSave.Instance.LoadSavegroup();
 			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.ButtonClick, base.transform.position, isAll: true);

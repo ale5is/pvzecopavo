@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using SaveClass;
@@ -27,6 +28,9 @@ public class GameManager : MonoBehaviour
     public GameConf GameConf { get; private set; }
     public AudioConf AudioConf { get; private set; }
 
+    public bool IsStartupReady { get; private set; }
+    public float StartupProgress { get; private set; }
+
     private const string PlayerSaveFileName = "Player.config";
     private const string StatsSaveFileName = "SAAInfo.config";
 
@@ -43,6 +47,32 @@ public class GameManager : MonoBehaviour
     public MapStoneBase SelectedStone =>
         SelectMap.Instance.SelectedStone;
 
+    private bool IsMobilePlatform =>
+        Application.platform == RuntimePlatform.Android ||
+        Application.platform == RuntimePlatform.IPhonePlayer;
+
+    private string SaveRootPath
+    {
+        get
+        {
+            if (IsMobilePlatform)
+            {
+                return Path.Combine(
+                    Application.persistentDataPath,
+                    "saves"
+                );
+            }
+
+            DirectoryInfo directory =
+                Directory.GetParent(Application.dataPath);
+
+            return Path.Combine(
+                directory.FullName,
+                "saves"
+            );
+        }
+    }
+
     public static string Encrypt(string data)
     {
         if (string.IsNullOrEmpty(data))
@@ -52,7 +82,9 @@ public class GameManager : MonoBehaviour
 
         for (int i = 0; i < chars.Length; i++)
         {
-            chars[i] = (char)(chars[i] ^ keyChars[i % keyChars.Length]);
+            chars[i] =
+                (char)(chars[i] ^
+                keyChars[i % keyChars.Length]);
         }
 
         return new string(chars);
@@ -73,26 +105,37 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
 
-        GameConf = Resources.Load<GameConf>("GameConf");
-        AudioConf = Resources.Load<AudioConf>("AudioConf");
+        SavePath = SaveRootPath;
 
-        DirectoryInfo directorio =
-            Directory.GetParent(Application.dataPath);
-
-        SavePath = Path.Combine(
-            directorio.FullName,
-            "saves"
-        );
+        isAndroid =
+            Application.platform == RuntimePlatform.Android;
 
         DontDestroyOnLoad(gameObject);
+
+        GameConf =
+            Resources.Load<GameConf>("GameConf");
+
+        AudioConf =
+            Resources.Load<AudioConf>("AudioConf");
+
+        IsStartupReady = false;
+        StartupProgress = 0f;
     }
 
     private void Start()
     {
-        if (isAndroid)
-            Screen.SetResolution(1920, 1080, false);
+        StartCoroutine(InitializeStartup());
+    }
+
+    private IEnumerator InitializeStartup()
+    {
+        yield return null;
+
+        StartupProgress = 0.1f;
 
         LoadSetting();
+
+        StartupProgress = 0.2f;
 
         bool loaded = false;
 
@@ -104,23 +147,39 @@ public class GameManager : MonoBehaviour
                     PlayerSaveFileName
                 );
 
-            if (File.Exists(file) &&
-                MyTool.TryParseJson<UserSave>(
-                    Decrypt(File.ReadAllText(file)),
-                    out var save))
+            if (File.Exists(file))
             {
-                LoadSave(save, lastSavePath);
-                loaded = true;
+                string data =
+                    File.ReadAllText(file);
+
+                if (MyTool.TryParseJson<UserSave>(
+                    Decrypt(data),
+                    out var save))
+                {
+                    LoadSaveInternal(
+                        save,
+                        lastSavePath,
+                        true
+                    );
+
+                    loaded = true;
+                }
             }
         }
 
+        StartupProgress = 0.5f;
+
         if (!loaded)
         {
+            lastSavePath = "";
+
             if (!Directory.Exists(SavePath))
                 Directory.CreateDirectory(SavePath);
 
-            foreach (DirectoryInfo dir in
-                     new DirectoryInfo(SavePath).GetDirectories())
+            DirectoryInfo[] directories =
+                new DirectoryInfo(SavePath).GetDirectories();
+
+            foreach (DirectoryInfo dir in directories)
             {
                 string file =
                     Path.Combine(
@@ -131,44 +190,165 @@ public class GameManager : MonoBehaviour
                 if (!File.Exists(file))
                     continue;
 
+                string data =
+                    File.ReadAllText(file);
+
                 if (MyTool.TryParseJson<UserSave>(
-                    Decrypt(File.ReadAllText(file)),
+                    Decrypt(data),
                     out var save))
                 {
-                    LoadSave(save, dir.FullName);
+                    LoadSaveInternal(
+                        save,
+                        dir.FullName,
+                        true
+                    );
+
                     loaded = true;
                     break;
                 }
             }
         }
 
+        StartupProgress = 0.65f;
+
         if (!loaded)
         {
+            LocalPlayerSave = null;
+            CurrLvSeries = null;
+            StatsAcvSave = new StatsAndAcvSave();
+            lastSavePath = "";
+
+            if (StatsManager.Instance != null)
+                StatsManager.Instance.LoadStatsSave();
+
+            if (AcvmentManager.Instance != null)
+                AcvmentManager.Instance.LoadAcvSave();
+
+            StartupProgress = 1f;
+            IsStartupReady = true;
+
+            yield return null;
+
             if (ChooseSave.Instance != null &&
                 ChooseSave.Instance.AddUser != null)
             {
                 ChooseSave.Instance.AddUser.Display(false);
             }
 
-            return;
+            yield break;
         }
+
+        yield return null;
+
+        FirstLoadLvSeries();
+
+        StartupProgress = 0.75f;
+
+        yield return null;
+
+        LoadStatsAndAchievements();
+
+        StartupProgress = 0.95f;
+        IsStartupReady = true;
+
+        yield return null;
+
+        SaveUserInfo();
 
         if (StatsManager.Instance != null)
         {
             StatsManager.Instance.AddStatsNum(
-                StatsEnum.GameOpenNum);
+                StatsEnum.GameOpenNum
+            );
+        }
+
+        yield return null;
+
+        SaveSAInfo();
+
+        StartupProgress = 1f;
+    }
+
+    private void LoadStatsAndAchievements()
+    {
+        if (string.IsNullOrEmpty(lastSavePath))
+        {
+            StatsAcvSave =
+                new StatsAndAcvSave();
+
+            if (StatsManager.Instance != null)
+                StatsManager.Instance.LoadStatsSave();
+
+            if (AcvmentManager.Instance != null)
+                AcvmentManager.Instance.LoadAcvSave();
+
+            return;
+        }
+
+        string file =
+            Path.Combine(
+                lastSavePath,
+                StatsSaveFileName
+            );
+
+        if (File.Exists(file) &&
+            MyTool.TryParseJson<StatsAndAcvSave>(
+                Decrypt(
+                    File.ReadAllText(file)
+                ),
+                out var stats))
+        {
+            StatsAcvSave = stats;
+        }
+        else
+        {
+            StatsAcvSave =
+                new StatsAndAcvSave();
+        }
+
+        if (StatsManager.Instance != null)
+        {
+            StatsManager.Instance.LoadStatsSave();
+        }
+
+        if (AcvmentManager.Instance != null)
+        {
+            AcvmentManager.Instance.LoadAcvSave();
+        }
+
+        if (LocalPlayerSave != null &&
+            LocalPlayerSave.UnlockedPlants != null &&
+            LocalPlayerSave.UnlockedPlants.Count >= 49 &&
+            AcvmentManager.Instance != null)
+        {
+            AcvmentManager.Instance.GetAchievement(
+                Acvname.Plant49
+            );
         }
     }
 
     private void FirstLoadLvSeries()
     {
+        if (LocalPlayerSave == null)
+            return;
+
+        if (SelectMap.Instance == null ||
+            SelectMap.Instance.Stones == null ||
+            SelectMap.Instance.Stones.Count == 0)
+        {
+            return;
+        }
+
         int series =
             LocalPlayerSave.LastAdventureId / 10000;
 
         if (series > 0 &&
             series <= SelectMap.Instance.Stones.Count)
         {
-            SelectMap.Instance.Stones[series - 1].SelectThis();
+            SelectMap.Instance.Stones[
+                series - 1
+            ].SelectThis();
+
             LoadLvInfo(series);
         }
         else
@@ -177,10 +357,27 @@ public class GameManager : MonoBehaviour
             LoadLvInfo(1);
         }
 
-        LevelSelector.Instance.LoadLastLv();
+        if (LevelSelector.Instance != null)
+        {
+            LevelSelector.Instance.LoadLastLv();
+        }
     }
 
-    public void LoadSave(UserSave save, string path)
+    public void LoadSave(
+        UserSave save,
+        string path)
+    {
+        LoadSaveInternal(
+            save,
+            path,
+            false
+        );
+    }
+
+    private void LoadSaveInternal(
+        UserSave save,
+        string path,
+        bool startupLoad)
     {
         if (save == null)
             return;
@@ -196,18 +393,26 @@ public class GameManager : MonoBehaviour
         if (ChatInput.Instance != null)
             ChatInput.Instance.ResetAllCmd();
 
+        if (LocalPlayerSave.UnlockedPlants == null)
+        {
+            LocalPlayerSave.UnlockedPlants =
+                new List<PlantType>();
+        }
+
         if (!LocalPlayerSave.UnlockedPlants.Contains(
                 PlantType.PeaShooter))
         {
             LocalPlayerSave.UnlockedPlants.Add(
-                PlantType.PeaShooter);
+                PlantType.PeaShooter
+            );
         }
 
         if (!LocalPlayerSave.UnlockedPlants.Contains(
                 PlantType.SunFlower))
         {
             LocalPlayerSave.UnlockedPlants.Add(
-                PlantType.SunFlower);
+                PlantType.SunFlower
+            );
         }
 
         if (LocalPlayerSave.CardSlotNum < 6)
@@ -222,16 +427,29 @@ public class GameManager : MonoBehaviour
         if (LocalPlayerSave.LastPuzzleId <= 12000)
             LocalPlayerSave.LastPuzzleId = 12001;
 
+        if (LocalPlayerSave.MoreOptions == null)
+        {
+            LocalPlayerSave.MoreOptions =
+                new List<bool>();
+        }
+
         if (LocalPlayerSave.MoreOptions.Count == 0)
         {
             for (int i = 0; i < 10; i++)
                 LocalPlayerSave.MoreOptions.Add(false);
         }
 
+        if (LocalPlayerSave.QuickChat == null)
+        {
+            LocalPlayerSave.QuickChat =
+                new List<string>();
+        }
+
         if (PlayerManager.Instance != null)
         {
             PlayerManager.Instance.ReadSave(
-                LocalPlayerSave.MoneyNum);
+                LocalPlayerSave.MoneyNum
+            );
         }
 
         if (StartSceneManager.Instance != null &&
@@ -248,7 +466,8 @@ public class GameManager : MonoBehaviour
             UIManager.Instance.SetPanel.MoreOptionRead(
                 LocalPlayerSave.MoreOptions,
                 LocalPlayerSave.OpenQuickChat,
-                LocalPlayerSave.QuickChat);
+                LocalPlayerSave.QuickChat
+            );
         }
 
         if (SeedBank.Instance != null)
@@ -257,48 +476,18 @@ public class GameManager : MonoBehaviour
                 LocalPlayerSave.LastSelectedCard;
         }
 
-        SaveUserInfo();
-
         if (StartSceneManager.Instance != null)
         {
             StartSceneManager.Instance.LoadStartScence(false);
         }
 
-        FirstLoadLvSeries();
-
-        string file =
-            Path.Combine(
-                lastSavePath,
-                StatsSaveFileName
-            );
-
-        if (File.Exists(file) &&
-            MyTool.TryParseJson<StatsAndAcvSave>(
-                Decrypt(File.ReadAllText(file)),
-                out var stats))
+        if (!startupLoad)
         {
-            StatsAcvSave = stats;
-        }
-        else
-        {
-            StatsAcvSave = new StatsAndAcvSave();
-        }
+            SaveUserInfo();
 
-        if (StatsManager.Instance != null)
-        {
-            StatsManager.Instance.LoadStatsSave();
-        }
+            FirstLoadLvSeries();
 
-        if (AcvmentManager.Instance != null)
-        {
-            AcvmentManager.Instance.LoadAcvSave();
-        }
-
-        if (LocalPlayerSave.UnlockedPlants.Count >= 49 &&
-            AcvmentManager.Instance != null)
-        {
-            AcvmentManager.Instance.GetAchievement(
-                Acvname.Plant49);
+            LoadStatsAndAchievements();
         }
     }
 
@@ -307,43 +496,108 @@ public class GameManager : MonoBehaviour
         if (LocalPlayerSave == null)
             return;
 
-        LocalPlayerSave.MoneyNum =
-            PlayerManager.Instance.Money;
+        if (PlayerManager.Instance != null)
+        {
+            LocalPlayerSave.MoneyNum =
+                PlayerManager.Instance.Money;
+        }
 
         LocalPlayerSave.VersionCode =
             VersionCode;
 
+        if (LocalPlayerSave.MoreOptions == null)
+        {
+            LocalPlayerSave.MoreOptions =
+                new List<bool>();
+        }
+
         LocalPlayerSave.MoreOptions.Clear();
 
-        LocalPlayerSave.MoreOptions.Add(
-            GobalLight.Instance.LightingNotDark);
+        if (GobalLight.Instance != null)
+        {
+            LocalPlayerSave.MoreOptions.Add(
+                GobalLight.Instance.LightingNotDark
+            );
+        }
+        else
+        {
+            LocalPlayerSave.MoreOptions.Add(false);
+        }
 
-        LocalPlayerSave.MoreOptions.Add(
-            SeedBank.Instance.IsCdDown);
+        if (SeedBank.Instance != null)
+        {
+            LocalPlayerSave.MoreOptions.Add(
+                SeedBank.Instance.IsCdDown
+            );
 
-        LocalPlayerSave.MoreOptions.Add(
-            PlayerManager.Instance.NormalSunUp);
+            LocalPlayerSave.LastSelectedCard =
+                new List<CardType>(
+                    SeedBank.Instance.LastSelectCard
+                );
+        }
+        else
+        {
+            LocalPlayerSave.MoreOptions.Add(false);
+        }
 
-        LocalPlayerSave.MoreOptions.Add(
-            PlayerManager.Instance.GetSunUp);
+        if (PlayerManager.Instance != null)
+        {
+            LocalPlayerSave.MoreOptions.Add(
+                PlayerManager.Instance.NormalSunUp
+            );
 
-        LocalPlayerSave.MoreOptions.Add(
-            SkyManager.Instance.SlowSunAutoCollect);
+            LocalPlayerSave.MoreOptions.Add(
+                PlayerManager.Instance.GetSunUp
+            );
+        }
+        else
+        {
+            LocalPlayerSave.MoreOptions.Add(false);
+            LocalPlayerSave.MoreOptions.Add(false);
+        }
 
-        LocalPlayerSave.LastSelectedCard =
-            new List<CardType>(
-                SeedBank.Instance.LastSelectCard);
+        if (SkyManager.Instance != null)
+        {
+            LocalPlayerSave.MoreOptions.Add(
+                SkyManager.Instance.SlowSunAutoCollect
+            );
+        }
+        else
+        {
+            LocalPlayerSave.MoreOptions.Add(false);
+        }
 
-        LocalPlayerSave.OpenQuickChat =
-            UIManager.Instance.SetPanel.OpenQuickChat;
+        if (UIManager.Instance != null &&
+            UIManager.Instance.SetPanel != null)
+        {
+            LocalPlayerSave.OpenQuickChat =
+                UIManager.Instance.SetPanel.OpenQuickChat;
 
-        LocalPlayerSave.QuickChat.Clear();
+            if (LocalPlayerSave.QuickChat == null)
+            {
+                LocalPlayerSave.QuickChat =
+                    new List<string>();
+            }
 
-        LocalPlayerSave.QuickChat.Add(
-            UIManager.Instance.SetPanel.QuickChat1.text);
+            LocalPlayerSave.QuickChat.Clear();
 
-        LocalPlayerSave.QuickChat.Add(
-            UIManager.Instance.SetPanel.QuickChat2.text);
+            if (UIManager.Instance.SetPanel.QuickChat1 != null)
+            {
+                LocalPlayerSave.QuickChat.Add(
+                    UIManager.Instance.SetPanel.QuickChat1.text
+                );
+            }
+
+            if (UIManager.Instance.SetPanel.QuickChat2 != null)
+            {
+                LocalPlayerSave.QuickChat.Add(
+                    UIManager.Instance.SetPanel.QuickChat2.text
+                );
+            }
+        }
+
+        if (string.IsNullOrEmpty(lastSavePath))
+            return;
 
         if (!Directory.Exists(lastSavePath))
             Directory.CreateDirectory(lastSavePath);
@@ -356,14 +610,21 @@ public class GameManager : MonoBehaviour
 
         File.WriteAllText(
             file,
-            Encrypt(JsonUtility.ToJson(LocalPlayerSave)));
+            Encrypt(
+                JsonUtility.ToJson(
+                    LocalPlayerSave
+                )
+            )
+        );
     }
 
     public void SaveSAInfo()
     {
         if (StatsAcvSave == null ||
             string.IsNullOrEmpty(lastSavePath))
+        {
             return;
+        }
 
         string file =
             Path.Combine(
@@ -373,10 +634,16 @@ public class GameManager : MonoBehaviour
 
         File.WriteAllText(
             file,
-            Encrypt(JsonUtility.ToJson(StatsAcvSave)));
+            Encrypt(
+                JsonUtility.ToJson(
+                    StatsAcvSave
+                )
+            )
+        );
     }
 
-    public void AddNewPlant(PlantType plantType)
+    public void AddNewPlant(
+        PlantType plantType)
     {
         if (LocalPlayerSave == null)
             return;
@@ -386,12 +653,15 @@ public class GameManager : MonoBehaviour
             plantType == PlantType.RepeaterReverse ||
             plantType == PlantType.ExplodeNut ||
             plantType == PlantType.HugeNut ||
-            LocalPlayerSave.UnlockedPlants.Contains(plantType))
+            LocalPlayerSave.UnlockedPlants.Contains(
+                plantType))
         {
             return;
         }
 
-        LocalPlayerSave.UnlockedPlants.Add(plantType);
+        LocalPlayerSave.UnlockedPlants.Add(
+            plantType
+        );
 
         SaveUserInfo();
 
@@ -399,7 +669,8 @@ public class GameManager : MonoBehaviour
             AcvmentManager.Instance != null)
         {
             AcvmentManager.Instance.GetAchievement(
-                Acvname.Plant49);
+                Acvname.Plant49
+            );
         }
     }
 
@@ -412,7 +683,8 @@ public class GameManager : MonoBehaviour
             return null;
         }
 
-        int series = LVid / 10000;
+        int series =
+            LVid / 10000;
 
         int currentSeries =
             CurrLvSeries.LvSaves[0].LvId / 10000;
@@ -438,6 +710,9 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        if (string.IsNullOrEmpty(lastSavePath))
+            return;
+
         string file =
             Path.Combine(
                 lastSavePath,
@@ -448,7 +723,9 @@ public class GameManager : MonoBehaviour
 
         if (File.Exists(file) &&
             MyTool.TryParseJson<LvSeries>(
-                Decrypt(File.ReadAllText(file)),
+                Decrypt(
+                    File.ReadAllText(file)
+                ),
                 out var series))
         {
             CurrLvSeries = series;
@@ -457,6 +734,18 @@ public class GameManager : MonoBehaviour
 
         if (!loaded)
             CurrLvSeries = new LvSeries();
+
+        if (CurrLvSeries.LvSaves == null)
+            CurrLvSeries.LvSaves =
+                new List<LvSave>();
+
+        if (CurrLvSeries.LvSavesMiniGame == null)
+            CurrLvSeries.LvSavesMiniGame =
+                new List<LvSave>();
+
+        if (CurrLvSeries.LvSavesPuzzle == null)
+            CurrLvSeries.LvSavesPuzzle =
+                new List<LvSave>();
 
         int adventure =
             SelectMap.Instance.SelectedStone.AdventureLvNum;
@@ -475,7 +764,8 @@ public class GameManager : MonoBehaviour
                     LvId =
                         SeriesId * 10000 +
                         CurrLvSeries.LvSaves.Count + 1
-                });
+                }
+            );
         }
 
         while (CurrLvSeries.LvSavesMiniGame.Count < miniGame)
@@ -486,7 +776,8 @@ public class GameManager : MonoBehaviour
                     LvId =
                         SeriesId * 11000 +
                         CurrLvSeries.LvSavesMiniGame.Count + 1
-                });
+                }
+            );
         }
 
         while (CurrLvSeries.LvSavesPuzzle.Count < puzzle)
@@ -497,19 +788,22 @@ public class GameManager : MonoBehaviour
                     LvId =
                         SeriesId * 12000 +
                         CurrLvSeries.LvSavesPuzzle.Count + 1
-                });
+                }
+            );
         }
 
         while (CurrLvSeries.LvSavesMiniGame.Count > miniGame)
         {
             CurrLvSeries.LvSavesMiniGame.RemoveAt(
-                CurrLvSeries.LvSavesMiniGame.Count - 1);
+                CurrLvSeries.LvSavesMiniGame.Count - 1
+            );
         }
 
         while (CurrLvSeries.LvSavesPuzzle.Count > puzzle)
         {
             CurrLvSeries.LvSavesPuzzle.RemoveAt(
-                CurrLvSeries.LvSavesPuzzle.Count - 1);
+                CurrLvSeries.LvSavesPuzzle.Count - 1
+            );
         }
     }
 
@@ -522,10 +816,15 @@ public class GameManager : MonoBehaviour
         }
 
         List<LvSave> saves =
-            GetLvSaves(LV.Instance.CurrLvId);
+            GetLvSaves(
+                LV.Instance.CurrLvId
+            );
 
-        if (saves == null || saves.Count == 0)
+        if (saves == null ||
+            saves.Count == 0)
+        {
             return;
+        }
 
         if (saveCurrLv)
         {
@@ -537,7 +836,8 @@ public class GameManager : MonoBehaviour
                 if (LV.Instance.IsEasy)
                 {
                     if ((save.PassTime <= 10 ||
-                         LVManager.Instance.PassTime < save.PassTime) &&
+                         LVManager.Instance.PassTime <
+                         save.PassTime) &&
                         LVManager.Instance.PassTime > 10)
                     {
                         save.PassTime =
@@ -549,7 +849,8 @@ public class GameManager : MonoBehaviour
                 else
                 {
                     if ((save.HardPTime <= 10 ||
-                         LVManager.Instance.PassTime < save.HardPTime) &&
+                         LVManager.Instance.PassTime <
+                         save.HardPTime) &&
                         LVManager.Instance.PassTime > 10)
                     {
                         save.HardPTime =
@@ -574,22 +875,26 @@ public class GameManager : MonoBehaviour
 
         File.WriteAllText(
             file,
-            Encrypt(JsonUtility.ToJson(CurrLvSeries)));
+            Encrypt(
+                JsonUtility.ToJson(
+                    CurrLvSeries
+                )
+            )
+        );
     }
 
     private List<LvSave> GetLvSaves(int lvid)
     {
-        switch ((lvid % 10000) / 1000)
-        {
-            case 1:
-                return CurrLvSeries.LvSavesMiniGame;
+        int type =
+            (lvid % 10000) / 1000;
 
-            case 2:
-                return CurrLvSeries.LvSavesPuzzle;
+        if (type == 1)
+            return CurrLvSeries.LvSavesMiniGame;
 
-            default:
-                return CurrLvSeries.LvSaves;
-        }
+        if (type == 2)
+            return CurrLvSeries.LvSavesPuzzle;
+
+        return CurrLvSeries.LvSaves;
     }
 
     private void LoadSetting()
@@ -610,7 +915,9 @@ public class GameManager : MonoBehaviour
             if (UIManager.Instance != null &&
                 UIManager.Instance.SetPanel != null)
             {
-                UIManager.Instance.SetPanel.SaveInit(setting);
+                UIManager.Instance.SetPanel.SaveInit(
+                    setting
+                );
             }
 
             lastSavePath =
@@ -626,45 +933,47 @@ public class GameManager : MonoBehaviour
         if (!Directory.Exists(SavePath))
             Directory.CreateDirectory(SavePath);
 
-        SettingSave setting = new SettingSave
-        {
-            bgmVolume =
-                AudioManager.Instance.BgmVolume,
+        SettingSave setting =
+            new SettingSave
+            {
+                bgmVolume =
+                    AudioManager.Instance.BgmVolume,
 
-            soundVolume =
-                AudioManager.Instance.SoundVolume,
+                soundVolume =
+                    AudioManager.Instance.SoundVolume,
 
-            lastLoadSavePath =
-                lastSavePath,
+                lastLoadSavePath =
+                    lastSavePath,
 
-            isFullScreen =
-                Screen.fullScreen,
+                isFullScreen =
+                    Screen.fullScreen,
 
-            isF1080P =
-                UIManager.Instance.SetPanel.is1080P,
+                isF1080P =
+                    UIManager.Instance.SetPanel.is1080P,
 
-            isRainFog =
-                SkyManager.Instance.isRainFog,
+                isRainFog =
+                    SkyManager.Instance.isRainFog,
 
-            isCardSelector =
-                SeedBank.Instance.CardSelector,
+                isCardSelector =
+                    SeedBank.Instance.CardSelector,
 
-            FrameType =
-                UIManager.Instance.SetPanel.FrameType,
+                FrameType =
+                    UIManager.Instance.SetPanel.FrameType,
 
-            isVsync =
-                UIManager.Instance.SetPanel.isVsync,
+                isVsync =
+                    UIManager.Instance.SetPanel.isVsync,
 
-            isDisFrame =
-                UIManager.Instance.SetPanel.isDisFrame
-        };
+                isDisFrame =
+                    UIManager.Instance.SetPanel.isDisFrame
+            };
 
         File.WriteAllText(
             Path.Combine(
                 SavePath,
                 FixedInfo.SettingInfoName
             ),
-            JsonUtility.ToJson(setting));
+            JsonUtility.ToJson(setting)
+        );
     }
 
     public List<CustomMapSave> LoadCustomMapFile()
@@ -674,7 +983,9 @@ public class GameManager : MonoBehaviour
 
         string path =
             Path.Combine(
-                Directory.GetParent(Application.dataPath).FullName,
+                Directory.GetParent(
+                    Application.dataPath
+                ).FullName,
                 "custom",
                 "maps"
             );
@@ -683,7 +994,10 @@ public class GameManager : MonoBehaviour
             Directory.CreateDirectory(path);
 
         string[] files =
-            Directory.GetFiles(path, "*.config");
+            Directory.GetFiles(
+                path,
+                "*.config"
+            );
 
         foreach (string file in files)
         {
@@ -691,7 +1005,9 @@ public class GameManager : MonoBehaviour
                 continue;
 
             if (MyTool.TryParseJson<CustomMapSave>(
-                Decrypt(File.ReadAllText(file)),
+                Decrypt(
+                    File.ReadAllText(file)
+                ),
                 out var map))
             {
                 map.SavePath = file;
@@ -712,7 +1028,9 @@ public class GameManager : MonoBehaviour
     {
         string path =
             Path.Combine(
-                Directory.GetParent(Application.dataPath).FullName,
+                Directory.GetParent(
+                    Application.dataPath
+                ).FullName,
                 "custom",
                 "maps"
             );
@@ -720,33 +1038,50 @@ public class GameManager : MonoBehaviour
         if (!Directory.Exists(path))
             Directory.CreateDirectory(path);
 
-        CustomMapSave map = new CustomMapSave
-        {
-            MapBrief = "一个新的自定义地图",
-            mapType = MapType.CustomYard,
-            VerticalNum = 5,
-            HorizontalNum = 9,
-            MapName = "newmap"
-        };
+        CustomMapSave map =
+            new CustomMapSave
+            {
+                MapBrief =
+                    "Un nuevo mapa personalizado",
+
+                mapType =
+                    MapType.CustomYard,
+
+                VerticalNum = 5,
+                HorizontalNum = 9,
+                MapName = "newmap"
+            };
 
         for (int i = 0; i < 45; i++)
-            map.tileTypes.Add(TileType.Grass);
+            map.tileTypes.Add(
+                TileType.Grass
+            );
 
         int n = 0;
         string name = map.MapName;
 
         while (File.Exists(
-            Path.Combine(path, name + ".config")))
+            Path.Combine(
+                path,
+                name + ".config"
+            )))
         {
             n++;
-            name = "newmap" + n;
+            name =
+                "newmap" + n;
         }
 
         map.MapName = name;
 
         File.WriteAllText(
-            Path.Combine(path, name + ".config"),
-            Encrypt(JsonUtility.ToJson(map)));
+            Path.Combine(
+                path,
+                name + ".config"
+            ),
+            Encrypt(
+                JsonUtility.ToJson(map)
+            )
+        );
     }
 
     public List<CustomLevelSave> LoadCustomLevelFile()
@@ -756,7 +1091,9 @@ public class GameManager : MonoBehaviour
 
         string path =
             Path.Combine(
-                Directory.GetParent(Application.dataPath).FullName,
+                Directory.GetParent(
+                    Application.dataPath
+                ).FullName,
                 "custom",
                 "levels"
             );
@@ -765,7 +1102,10 @@ public class GameManager : MonoBehaviour
             Directory.CreateDirectory(path);
 
         string[] files =
-            Directory.GetFiles(path, "*.config");
+            Directory.GetFiles(
+                path,
+                "*.config"
+            );
 
         foreach (string file in files)
         {
@@ -773,7 +1113,9 @@ public class GameManager : MonoBehaviour
                 continue;
 
             if (MyTool.TryParseJson<CustomLevelSave>(
-                Decrypt(File.ReadAllText(file)),
+                Decrypt(
+                    File.ReadAllText(file)
+                ),
                 out var level))
             {
                 level.SavePath = file;
@@ -794,7 +1136,9 @@ public class GameManager : MonoBehaviour
     {
         string path =
             Path.Combine(
-                Directory.GetParent(Application.dataPath).FullName,
+                Directory.GetParent(
+                    Application.dataPath
+                ).FullName,
                 "custom",
                 "levels"
             );
@@ -802,32 +1146,51 @@ public class GameManager : MonoBehaviour
         if (!Directory.Exists(path))
             Directory.CreateDirectory(path);
 
-        CustomLevelSave level = new CustomLevelSave
-        {
-            LvBrief = "一个新的自定义关卡",
-            lVType = LVType.Normal,
-            series = MapSeries.Yard,
-            mapTypes = new List<MapType>
+        CustomLevelSave level =
+            new CustomLevelSave
             {
-                MapType.FrontYard
-            },
-            LvName = "newlv"
-        };
+                LvBrief =
+                    "Un nuevo nivel personalizado",
+
+                lVType =
+                    LVType.Normal,
+
+                series =
+                    MapSeries.Yard,
+
+                mapTypes =
+                    new List<MapType>
+                    {
+                        MapType.FrontYard
+                    },
+
+                LvName = "newlv"
+            };
 
         int n = 0;
         string name = level.LvName;
 
         while (File.Exists(
-            Path.Combine(path, name + ".config")))
+            Path.Combine(
+                path,
+                name + ".config"
+            )))
         {
             n++;
-            name = "newlv" + n;
+            name =
+                "newlv" + n;
         }
 
         level.LvName = name;
 
         File.WriteAllText(
-            Path.Combine(path, name + ".config"),
-            Encrypt(JsonUtility.ToJson(level)));
+            Path.Combine(
+                path,
+                name + ".config"
+            ),
+            Encrypt(
+                JsonUtility.ToJson(level)
+            )
+        );
     }
 }

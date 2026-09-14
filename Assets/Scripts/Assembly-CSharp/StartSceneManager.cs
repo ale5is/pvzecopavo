@@ -7,7 +7,9 @@ public class StartSceneManager : MonoBehaviour
     public Animator BackLeft;
     public Animator BackCenter;
     public Animator BackRight;
+
     public ChangeUser changeUser;
+
     public Transform AlmanacTransform;
     public Transform StoreTransform;
 
@@ -18,11 +20,7 @@ public class StartSceneManager : MonoBehaviour
 
     private void Start()
     {
-        if (GameManager.Instance != null &&
-            GameManager.Instance.LocalPlayerSave != null)
-        {
-            LoadStartScence(true);
-        }
+        // La inicialización del jugador ahora la controla GameManager.
     }
 
     public void LoadStartScence(bool PlayAnim)
@@ -35,38 +33,66 @@ public class StartSceneManager : MonoBehaviour
 
         if (GameManager.Instance.LocalPlayerSave.StoreLvl > 0)
         {
-            StoreTransform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
+            if (StoreTransform != null)
+            {
+                StoreTransform.localScale =
+                    new Vector3(0.6f, 0.6f, 0.6f);
+            }
         }
         else
         {
-            StoreTransform.localScale = Vector3.zero;
+            if (StoreTransform != null)
+            {
+                StoreTransform.localScale =
+                    Vector3.zero;
+            }
         }
 
         if (GameManager.Instance.LocalPlayerSave.AlmanacUnLock)
         {
-            AlmanacTransform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
+            if (AlmanacTransform != null)
+            {
+                AlmanacTransform.localScale =
+                    new Vector3(0.6f, 0.6f, 0.6f);
+            }
         }
         else
         {
-            AlmanacTransform.localScale = Vector3.zero;
+            if (AlmanacTransform != null)
+            {
+                AlmanacTransform.localScale =
+                    Vector3.zero;
+            }
         }
 
-        if (PlayAnim)
-        {
+        if (!PlayAnim)
+            return;
+
+        if (BackLeft != null)
             BackLeft.Play("", 0, 0f);
+
+        if (BackCenter != null)
             BackCenter.Play("", 0, 0f);
+
+        if (BackRight != null)
             BackRight.Play("", 0, 0f);
+
+        if (changeUser != null)
             changeUser.PlayAnimation();
-        }
     }
 
     public void GoEndLess()
     {
-        AudioManager.Instance.PlayEFAudio(
-            GameManager.Instance.AudioConf.ButtonClick,
-            transform.position,
-            isAll: true
-        );
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.ButtonClick,
+                transform.position,
+                isAll: true
+            );
+        }
 
         Invoke(nameof(DoGoEndLess), 0.5f);
     }

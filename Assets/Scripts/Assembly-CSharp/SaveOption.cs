@@ -6,52 +6,113 @@ using UnityEngine.UI;
 
 public class SaveOption : MonoBehaviour, IPointerEnterHandler, IEventSystemHandler, IPointerExitHandler, IPointerClickHandler
 {
-	public Text SaveNameText;
+    public Text SaveNameText;
 
-	public Image BackGround;
+    public Image BackGround;
 
-	public UserSave userSave;
+    public UserSave userSave;
 
-	public DirectoryInfo Path;
+    public DirectoryInfo Path;
 
-	public void GetSaveinfo(UserSave saveUser, DirectoryInfo path)
-	{
-		Path = path;
-		userSave = saveUser;
-		SaveNameText.text = saveUser.playerName;
-	}
+    public void GetSaveinfo(
+        UserSave saveUser,
+        DirectoryInfo path)
+    {
+        Path = path;
+        userSave = saveUser;
 
-	public void RenewSelect()
-	{
-		BackGround.color = new Color32(30, 30, 44, byte.MaxValue);
-	}
+        if (SaveNameText != null &&
+            saveUser != null)
+        {
+            SaveNameText.text =
+                saveUser.playerName;
+        }
+    }
 
-	public void DeleteSave()
-	{
-		if (Path.Exists)
-		{
-			DirectoryInfo[] directories = Path.GetDirectories();
-			for (int i = 0; i < directories.Length; i++)
-			{
-				directories[i].Delete(recursive: true);
-			}
-			Path.Delete(recursive: true);
-		}
-	}
+    public void RenewSelect()
+    {
+        if (BackGround != null)
+        {
+            BackGround.color =
+                new Color32(
+                    30,
+                    30,
+                    44,
+                    byte.MaxValue
+                );
+        }
+    }
 
-	public void OnPointerClick(PointerEventData eventData)
-	{
-		ChooseSave.Instance.RenewSelect(this);
-		BackGround.color = new Color32(20, 180, 15, byte.MaxValue);
-	}
+    public void DeleteSave()
+    {
+        if (Path == null ||
+            !Path.Exists)
+        {
+            return;
+        }
 
-	public void OnPointerEnter(PointerEventData eventData)
-	{
-		SaveNameText.color = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
-	}
+        DirectoryInfo[] directories =
+            Path.GetDirectories();
 
-	public void OnPointerExit(PointerEventData eventData)
-	{
-		SaveNameText.color = new Color32(250, 220, 80, byte.MaxValue);
-	}
+        for (int i = 0; i < directories.Length; i++)
+        {
+            directories[i].Delete(
+                recursive: true
+            );
+        }
+
+        Path.Delete(
+            recursive: true
+        );
+    }
+
+    public void OnPointerClick(
+        PointerEventData eventData)
+    {
+        if (ChooseSave.Instance == null)
+            return;
+
+        ChooseSave.Instance.RenewSelect(this);
+
+        if (BackGround != null)
+        {
+            BackGround.color =
+                new Color32(
+                    20,
+                    180,
+                    15,
+                    byte.MaxValue
+                );
+        }
+    }
+
+    public void OnPointerEnter(
+        PointerEventData eventData)
+    {
+        if (SaveNameText != null)
+        {
+            SaveNameText.color =
+                new Color32(
+                    byte.MaxValue,
+                    byte.MaxValue,
+                    byte.MaxValue,
+                    byte.MaxValue
+                );
+        }
+    }
+
+    public void OnPointerExit(
+        PointerEventData eventData)
+    {
+        if (SaveNameText != null)
+        {
+            SaveNameText.color =
+                new Color32(
+                    250,
+                    220,
+                    80,
+                    byte.MaxValue
+                );
+        }
+    }
 }

@@ -5,140 +5,326 @@ using UnityEngine;
 
 public class ChooseSave : MonoBehaviour
 {
-	public static ChooseSave Instance;
+    public static ChooseSave Instance;
 
-	public GameObject SaveOption;
+    public GameObject SaveOption;
 
-	public GameObject Content;
+    public GameObject Content;
 
-	public AddUser AddUser;
+    public AddUser AddUser;
 
-	public EditUser EditUser;
+    public EditUser EditUser;
 
-	public SaveOption SelectedSaveOption;
+    public SaveOption SelectedSaveOption;
 
-	private List<SaveOption> saveOptions = new List<SaveOption>();
+    private List<SaveOption> saveOptions =
+        new List<SaveOption>();
 
-	private void Awake()
-	{
-		Instance = this;
-	}
+    private void Awake()
+    {
+        Instance = this;
+    }
 
-	private void Start()
-	{
-		AddUser.gameObject.SetActive(value: false);
-		EditUser.gameObject.SetActive(value: false);
-		base.transform.localScale = new Vector3(0f, 0f, 0f);
-	}
+    private void Start()
+    {
+        if (AddUser != null)
+            AddUser.gameObject.SetActive(false);
 
-	public bool CheckNameRepeat(string Name)
-	{
-		bool result = false;
-		for (int i = 0; i < saveOptions.Count; i++)
-		{
-			if (saveOptions[i].SaveNameText.text == Name)
-			{
-				result = true;
-				break;
-			}
-		}
-		return result;
-	}
+        if (EditUser != null)
+            EditUser.gameObject.SetActive(false);
 
-	public void ShowEditUser()
-	{
-		if (!(SelectedSaveOption == null))
-		{
-			EditUser.gameObject.SetActive(value: true);
-			EditUser.inputField.text = SelectedSaveOption.userSave.playerName;
-		}
-	}
+        gameObject.SetActive(false);
+    }
 
-	public void ShowAddUser()
-	{
-		AddUser.Display(canCancel: true);
-	}
+    public bool CheckNameRepeat(string Name)
+    {
+        for (int i = 0; i < saveOptions.Count; i++)
+        {
+            if (saveOptions[i] != null &&
+                saveOptions[i].SaveNameText != null &&
+                saveOptions[i].SaveNameText.text == Name)
+            {
+                return true;
+            }
+        }
 
-	public void LoadSave(UserSave saveUser, string path)
-	{
-		GameManager.Instance.LoadSave(saveUser, path);
-		Cancel();
-	}
+        return false;
+    }
 
-	public void Confirm()
-	{
-		LoadSave(SelectedSaveOption.userSave, SelectedSaveOption.Path.ToString());
-	}
+    public void ShowEditUser()
+    {
+        if (SelectedSaveOption == null ||
+            EditUser == null)
+        {
+            return;
+        }
 
-	public void Cancel()
-	{
-		ClearOptions();
-		base.transform.localScale = Vector3.zero;
-	}
+        gameObject.SetActive(true);
+        EditUser.gameObject.SetActive(true);
 
-	private void ClearOptions()
-	{
-		for (int i = 0; i < saveOptions.Count; i++)
-		{
-			Object.Destroy(saveOptions[i].gameObject);
-		}
-		saveOptions.Clear();
-		Content.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, 20f);
-		SelectedSaveOption = null;
-	}
+        if (EditUser.inputField != null &&
+            SelectedSaveOption.userSave != null)
+        {
+            EditUser.inputField.text =
+                SelectedSaveOption.userSave.playerName;
+        }
+    }
 
-	public void LoadSavegroup()
-	{
-		ClearOptions();
-		DirectoryInfo[] directories = new DirectoryInfo(GameManager.Instance.SavePath).GetDirectories();
-		for (int i = 0; i < directories.Length; i++)
-		{
-			if (File.Exists(directories[i]?.ToString() + "/" + FixedInfo.PlayerInfoName))
-			{
-				StreamReader streamReader = new StreamReader(directories[i]?.ToString() + "/" + FixedInfo.PlayerInfoName);
-				string json = GameManager.Decrypt(streamReader.ReadToEnd());
-				streamReader.Close();
-				UserSave saveUser = JsonUtility.FromJson<UserSave>(json);
-				SaveOption component = Object.Instantiate(SaveOption).GetComponent<SaveOption>();
-				saveOptions.Add(component);
-				component.GetSaveinfo(saveUser, directories[i]);
-				component.transform.SetParent(Content.transform);
-				component.transform.localScale = new Vector3(1f, 1f, 1f);
-			}
-		}
-		Content.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, 45 * saveOptions.Count);
-		bool flag = false;
-		for (int j = 0; j < saveOptions.Count; j++)
-		{
-			if (saveOptions[j].userSave.playerName == GameManager.Instance.LocalPlayerSave.playerName)
-			{
-				flag = true;
-				SelectedSaveOption = saveOptions[j];
-				SelectedSaveOption.OnPointerClick(null);
-				SelectedSaveOption.transform.SetSiblingIndex(0);
-				break;
-			}
-		}
-		if (saveOptions.Count == 0)
-		{
-			Cancel();
-			AddUser.Display(canCancel: false);
-		}
-		else if (!flag)
-		{
-			SelectedSaveOption = saveOptions[0];
-			SelectedSaveOption.OnPointerClick(null);
-			SelectedSaveOption.transform.SetSiblingIndex(0);
-			LoadSave(SelectedSaveOption.userSave, SelectedSaveOption.Path.ToString());
-		}
-	}
+    public void ShowAddUser()
+    {
+        if (AddUser == null)
+            return;
 
-	public void RenewSelect(SaveOption saveOption)
-	{
-		SelectedSaveOption = saveOption;
-		for (int i = 0; i < saveOptions.Count; i++)
-		{
-			saveOptions[i].RenewSelect();
-		}
-	}
+        gameObject.SetActive(true);
+        AddUser.Display(true);
+    }
+
+    public void ShowFirstAddUser()
+    {
+        ClearOptions();
+
+        gameObject.SetActive(true);
+
+        if (AddUser != null)
+            AddUser.Display(false);
+    }
+
+    public void LoadSave(
+        UserSave saveUser,
+        string path)
+    {
+        if (GameManager.Instance == null ||
+            saveUser == null ||
+            string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        GameManager.Instance.LoadSave(
+            saveUser,
+            path
+        );
+
+        Cancel();
+    }
+
+    public void Confirm()
+    {
+        if (SelectedSaveOption == null ||
+            SelectedSaveOption.userSave == null ||
+            SelectedSaveOption.Path == null)
+        {
+            return;
+        }
+
+        LoadSave(
+            SelectedSaveOption.userSave,
+            SelectedSaveOption.Path.FullName
+        );
+    }
+
+    public void Cancel()
+    {
+        ClearOptions();
+
+        if (AddUser != null)
+            AddUser.gameObject.SetActive(false);
+
+        if (EditUser != null)
+            EditUser.gameObject.SetActive(false);
+
+        gameObject.SetActive(false);
+    }
+
+    private void ClearOptions()
+    {
+        for (int i = 0; i < saveOptions.Count; i++)
+        {
+            if (saveOptions[i] != null)
+                Destroy(saveOptions[i].gameObject);
+        }
+
+        saveOptions.Clear();
+
+        if (Content != null)
+        {
+            RectTransform rect =
+                Content.GetComponent<RectTransform>();
+
+            if (rect != null)
+                rect.sizeDelta =
+                    new Vector2(0f, 20f);
+        }
+
+        SelectedSaveOption = null;
+    }
+
+    public void LoadSavegroup()
+    {
+        ClearOptions();
+
+        if (GameManager.Instance == null ||
+            string.IsNullOrEmpty(
+                GameManager.Instance.SavePath))
+        {
+            ShowFirstAddUser();
+            return;
+        }
+
+        if (!Directory.Exists(
+            GameManager.Instance.SavePath))
+        {
+            Directory.CreateDirectory(
+                GameManager.Instance.SavePath
+            );
+
+            ShowFirstAddUser();
+            return;
+        }
+
+        DirectoryInfo[] directories =
+            new DirectoryInfo(
+                GameManager.Instance.SavePath
+            ).GetDirectories();
+
+        for (int i = 0; i < directories.Length; i++)
+        {
+            string file =
+                Path.Combine(
+                    directories[i].FullName,
+                    FixedInfo.PlayerInfoName
+                );
+
+            if (!File.Exists(file))
+                continue;
+
+            try
+            {
+                string json =
+                    GameManager.Decrypt(
+                        File.ReadAllText(file)
+                    );
+
+                UserSave saveUser =
+                    JsonUtility.FromJson<UserSave>(
+                        json
+                    );
+
+                if (saveUser == null)
+                    continue;
+
+                if (SaveOption == null ||
+                    Content == null)
+                {
+                    continue;
+                }
+
+                SaveOption component =
+                    Instantiate(SaveOption)
+                        .GetComponent<SaveOption>();
+
+                if (component == null)
+                    continue;
+
+                saveOptions.Add(component);
+
+                component.GetSaveinfo(
+                    saveUser,
+                    directories[i]
+                );
+
+                component.transform.SetParent(
+                    Content.transform,
+                    false
+                );
+
+                component.gameObject.SetActive(true);
+            }
+            catch
+            {
+                continue;
+            }
+        }
+
+        if (Content != null)
+        {
+            RectTransform rect =
+                Content.GetComponent<RectTransform>();
+
+            if (rect != null)
+            {
+                rect.sizeDelta =
+                    new Vector2(
+                        0f,
+                        45f * saveOptions.Count
+                    );
+            }
+        }
+
+        if (saveOptions.Count == 0)
+        {
+            ShowFirstAddUser();
+            return;
+        }
+
+        bool foundCurrentPlayer = false;
+
+        if (GameManager.Instance.LocalPlayerSave != null)
+        {
+            for (int i = 0; i < saveOptions.Count; i++)
+            {
+                if (saveOptions[i] == null ||
+                    saveOptions[i].userSave == null)
+                {
+                    continue;
+                }
+
+                if (saveOptions[i].userSave.playerName ==
+                    GameManager.Instance.LocalPlayerSave.playerName)
+                {
+                    foundCurrentPlayer = true;
+
+                    SelectedSaveOption =
+                        saveOptions[i];
+
+                    SelectedSaveOption.OnPointerClick(null);
+
+                    SelectedSaveOption.transform.SetSiblingIndex(0);
+
+                    break;
+                }
+            }
+        }
+
+        if (!foundCurrentPlayer)
+        {
+            SelectedSaveOption =
+                saveOptions[0];
+
+            SelectedSaveOption.OnPointerClick(null);
+
+            SelectedSaveOption.transform.SetSiblingIndex(0);
+
+            LoadSave(
+                SelectedSaveOption.userSave,
+                SelectedSaveOption.Path.FullName
+            );
+        }
+    }
+
+    public void RenewSelect(
+        SaveOption saveOption)
+    {
+        if (saveOption == null)
+            return;
+
+        SelectedSaveOption =
+            saveOption;
+
+        for (int i = 0; i < saveOptions.Count; i++)
+        {
+            if (saveOptions[i] != null)
+                saveOptions[i].RenewSelect();
+        }
+    }
 }

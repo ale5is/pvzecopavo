@@ -6,79 +6,184 @@ using UnityEngine.UI;
 
 public class AddUser : MonoBehaviour
 {
-	public InputField inputField;
+    public InputField inputField;
 
-	public Text Errortext;
+    public Text Errortext;
 
-	private Coroutine ErrortextCoroutine;
+    private Coroutine ErrortextCoroutine;
 
-	private bool CanCancel;
+    private bool CanCancel;
 
-	private void Start()
-	{
-		Errortext.transform.localScale = new Vector3(0f, 0f, 0f);
-	}
+    private void Start()
+    {
+        if (Errortext != null)
+            Errortext.gameObject.SetActive(false);
+    }
 
-	public void Display(bool canCancel)
-	{
-		CanCancel = canCancel;
-		base.gameObject.SetActive(value: true);
-	}
+    public void Display(bool canCancel)
+    {
+        CanCancel = canCancel;
 
-	public void Confirm()
-	{
-		if (inputField.text == "")
-		{
-			return;
-		}
-		if (ChooseSave.Instance.CheckNameRepeat(inputField.text))
-		{
-			if (ErrortextCoroutine != null)
-			{
-				StopCoroutine(ErrortextCoroutine);
-			}
-			ErrortextCoroutine = StartCoroutine(RepeatLog());
-			return;
-		}
-		string text = GameManager.Instance.SavePath + "/" + inputField.text;
-		while (Directory.Exists(text))
-		{
-			text += "smf";
-		}
-		Directory.CreateDirectory(text);
-		UserSave userSave = new UserSave();
-		userSave.playerName = inputField.text;
-		string data = JsonUtility.ToJson(userSave);
-		StreamWriter streamWriter = new StreamWriter(text + "/" + FixedInfo.PlayerInfoName);
-		streamWriter.Write(GameManager.Encrypt(data));
-		streamWriter.Close();
-		inputField.text = "";
-		ChooseSave.Instance.LoadSave(userSave, text);
-		CanCancel = true;
-		Cancel();
-	}
+        if (ChooseSave.Instance != null)
+            ChooseSave.Instance.gameObject.SetActive(true);
 
-	public void Cancel()
-	{
-		if (CanCancel)
-		{
-			StopAllCoroutines();
-			Errortext.transform.localScale = new Vector3(0f, 0f, 0f);
-			inputField.text = "";
-			base.gameObject.SetActive(value: false);
-			ChooseSave.Instance.transform.gameObject.SetActive(value: true);
-		}
-		else
-		{
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.Buzzer, base.transform.position, isAll: true);
-		}
-	}
+        gameObject.SetActive(true);
 
-	private IEnumerator RepeatLog()
-	{
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.Buzzer, base.transform.position, isAll: true);
-		Errortext.transform.localScale = new Vector3(1f, 1f, 0f);
-		yield return new WaitForSeconds(3f);
-		Errortext.transform.localScale = new Vector3(0f, 0f, 0f);
-	}
+        if (Errortext != null)
+            Errortext.gameObject.SetActive(false);
+    }
+
+    public void Confirm()
+    {
+        if (GameManager.Instance == null ||
+            ChooseSave.Instance == null ||
+            inputField == null)
+        {
+            return;
+        }
+
+        string playerName =
+            inputField.text.Trim();
+
+        if (string.IsNullOrEmpty(playerName))
+            return;
+
+        if (ChooseSave.Instance.CheckNameRepeat(
+            playerName))
+        {
+            if (ErrortextCoroutine != null)
+                StopCoroutine(ErrortextCoroutine);
+
+            ErrortextCoroutine =
+                StartCoroutine(RepeatLog());
+
+            return;
+        }
+
+        if (string.IsNullOrEmpty(
+            GameManager.Instance.SavePath))
+        {
+            return;
+        }
+
+        if (!Directory.Exists(
+            GameManager.Instance.SavePath))
+        {
+            Directory.CreateDirectory(
+                GameManager.Instance.SavePath
+            );
+        }
+
+        string safeName =
+            playerName;
+
+        foreach (char invalidChar in
+            Path.GetInvalidFileNameChars())
+        {
+            safeName =
+                safeName.Replace(
+                    invalidChar.ToString(),
+                    "_"
+                );
+        }
+
+        string path =
+            Path.Combine(
+                GameManager.Instance.SavePath,
+                safeName
+            );
+
+        while (Directory.Exists(path))
+        {
+            path += "smf";
+        }
+
+        Directory.CreateDirectory(path);
+
+        UserSave userSave =
+            new UserSave();
+
+        userSave.playerName =
+            playerName;
+
+        string data =
+            JsonUtility.ToJson(userSave);
+
+        string file =
+            Path.Combine(
+                path,
+                FixedInfo.PlayerInfoName
+            );
+
+        File.WriteAllText(
+            file,
+            GameManager.Encrypt(data)
+        );
+
+        inputField.text = "";
+
+        CanCancel = true;
+
+        ChooseSave.Instance.LoadSave(
+            userSave,
+            path
+        );
+
+        gameObject.SetActive(false);
+    }
+
+    public void Cancel()
+    {
+        if (CanCancel)
+        {
+            if (ErrortextCoroutine != null)
+                StopCoroutine(ErrortextCoroutine);
+
+            if (Errortext != null)
+                Errortext.gameObject.SetActive(false);
+
+            if (inputField != null)
+                inputField.text = "";
+
+            gameObject.SetActive(false);
+
+            if (ChooseSave.Instance != null)
+                ChooseSave.Instance.gameObject.SetActive(true);
+        }
+        else
+        {
+            if (AudioManager.Instance != null &&
+                GameManager.Instance != null &&
+                GameManager.Instance.AudioConf != null)
+            {
+                AudioManager.Instance.PlayEFAudio(
+                    GameManager.Instance.AudioConf.Buzzer,
+                    transform.position,
+                    isAll: true
+                );
+            }
+        }
+    }
+
+    private IEnumerator RepeatLog()
+    {
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.Buzzer,
+                transform.position,
+                isAll: true
+            );
+        }
+
+        if (Errortext != null)
+            Errortext.gameObject.SetActive(true);
+
+        yield return new WaitForSeconds(3f);
+
+        if (Errortext != null)
+            Errortext.gameObject.SetActive(false);
+    }
 }
