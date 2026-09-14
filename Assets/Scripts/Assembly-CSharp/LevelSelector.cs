@@ -6,368 +6,584 @@ using UnityEngine.UI;
 
 public class LevelSelector : MonoBehaviour
 {
-	public static LevelSelector Instance;
+    public static LevelSelector Instance;
 
-	public LevelDisPlay DisPlay1;
+    public LevelDisPlay DisPlay1;
+    public LevelDisPlay DisPlay2;
+    public LevelDisPlay DisPlay3;
+    public LevelDisPlay DisPlay4;
 
-	public LevelDisPlay DisPlay2;
+    public Text Title;
+    public Text WeatherContent;
+    public Text PassNumContent;
+    public Text PassTimeContent;
+    public Text Difficulty;
 
-	public LevelDisPlay DisPlay3;
+    public GameObject IconPrefab;
+    public Transform IconGroup;
 
-	public LevelDisPlay DisPlay4;
+    public TextMesh AdventureText;
 
-	public Text Title;
+    public Image AdvcBtn;
+    public Image MiniGBtn;
+    public Image PuzzBtn;
 
-	public Text WeatherContent;
+    public bool IsEasy = true;
 
-	public Text PassNumContent;
+    private int CurrIndex;
+    private int CurrLvId;
+    private int CurrAdvcId;
 
-	public Text PassTimeContent;
+    private List<LvSave> lVInfoList;
 
-	public Text Difficulty;
+    public LvSave SelectedLvSave { get; private set; }
 
-	public GameObject IconPrefab;
+    private GameManager gameManager;
+    private MapInfoIcon[] loadedIcons;
 
-	public Transform IconGroup;
+    private void Awake()
+    {
+        Instance = this;
+        gameManager = GameManager.Instance;
 
-	public TextMesh AdventureText;
+        if (AdvcBtn != null && AdvcBtn.material != null)
+            AdvcBtn.material = new Material(AdvcBtn.material);
 
-	public Image AdvcBtn;
+        if (MiniGBtn != null && MiniGBtn.material != null)
+            MiniGBtn.material = new Material(MiniGBtn.material);
 
-	public Image MiniGBtn;
+        if (PuzzBtn != null && PuzzBtn.material != null)
+            PuzzBtn.material = new Material(PuzzBtn.material);
+    }
 
-	public Image PuzzBtn;
+    public void StartAdvcGame()
+    {
+        if (gameManager != null &&
+            !gameManager.isClient &&
+            LVManager.Instance != null)
+        {
+            LVManager.Instance.StartGame(null, CurrAdvcId);
+        }
+    }
 
-	public bool IsEasy = true;
+    public void StartCurrGame()
+    {
+        if (gameManager != null &&
+            !gameManager.isClient &&
+            LVManager.Instance != null)
+        {
+            LVManager.Instance.StartGame(null, CurrLvId);
+        }
+    }
 
-	private int CurrIndex;
+    public void ChangeHard()
+    {
+        IsEasy = !IsEasy;
 
-	private int CurrLvId;
+        if (Difficulty != null)
+        {
+            if (IsEasy)
+            {
+                Difficulty.text = "简单";
+                Difficulty.color = new Color32(101, 244, 36, 255);
+            }
+            else
+            {
+                Difficulty.text = "困难";
+                Difficulty.color = new Color32(244, 36, 39, 255);
+            }
+        }
 
-	private int CurrAdvcId;
+        if (SelectedLvSave != null)
+            DisLevelInfo(SelectedLvSave);
 
-	private List<LvSave> lVInfoList;
+        PlayButtonSound();
+    }
 
-	public LvSave SelectedLvSave { get; private set; }
+    public void OpenSelector()
+    {
+        UpdateLevelDis();
 
-	private void Awake()
-	{
-		Instance = this;
-		AdvcBtn.material = new Material(AdvcBtn.material);
-		MiniGBtn.material = new Material(MiniGBtn.material);
-		PuzzBtn.material = new Material(PuzzBtn.material);
-	}
+        transform.localScale = Vector3.one;
+        gameObject.SetActive(true);
+    }
 
-	public void StartAdvcGame()
-	{
-		if (!GameManager.Instance.isClient)
-		{
-			LVManager.Instance.StartGame(null, CurrAdvcId);
-		}
-	}
+    public void CloseSelector()
+    {
+        transform.localScale = Vector3.zero;
+    }
 
-	public void StartCurrGame()
-	{
-		if (!GameManager.Instance.isClient)
-		{
-			LVManager.Instance.StartGame(null, CurrLvId);
-		}
-	}
+    private void ClearBtn()
+    {
+        SetButtonBrightness(AdvcBtn, 1f);
+        SetButtonBrightness(MiniGBtn, 1f);
+        SetButtonBrightness(PuzzBtn, 1f);
+    }
 
-	public void ChangeHard()
-	{
-		IsEasy = !IsEasy;
-		if (IsEasy)
-		{
-			Difficulty.text = "简单";
-			Difficulty.color = new Color32(101, 244, 36, byte.MaxValue);
-		}
-		else
-		{
-			Difficulty.text = "困难";
-			Difficulty.color = new Color32(244, 36, 39, byte.MaxValue);
-		}
-		DisLevelInfo(SelectedLvSave);
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-	}
+    private void SetButtonBrightness(Image button, float value)
+    {
+        if (button != null && button.material != null)
+            button.material.SetFloat("_Brightness", value);
+    }
 
-	public void OpenSelector()
-	{
-		UpdateLevelDis();
-		base.transform.localScale = Vector3.one;
-		base.gameObject.SetActive(value: true);
-	}
+    public void LoadAdventureBtn()
+    {
+        ClearBtn();
+        SetButtonBrightness(AdvcBtn, 1.4f);
 
-	public void CloseSelector()
-	{
-		base.transform.localScale = Vector3.zero;
-	}
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
 
-	private void ClearBtn()
-	{
-		AdvcBtn.material.SetFloat("_Brightness", 1f);
-		MiniGBtn.material.SetFloat("_Brightness", 1f);
-		PuzzBtn.material.SetFloat("_Brightness", 1f);
-	}
+        if (gameManager == null ||
+            gameManager.CurrLvSeries == null ||
+            gameManager.LocalPlayerSave == null)
+        {
+            return;
+        }
 
-	public void LoadAdventureBtn()
-	{
-		ClearBtn();
-		AdvcBtn.material.SetFloat("_Brightness", 1.4f);
-		lVInfoList = GameManager.Instance.CurrLvSeries.LvSaves;
-		LoadLastLv(GameManager.Instance.LocalPlayerSave.LastAdventureId);
-		if (base.transform.localScale.x > 0f)
-		{
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		}
-	}
+        lVInfoList = gameManager.CurrLvSeries.LvSaves;
 
-	public void LoadMiniGameBtn()
-	{
-		ClearBtn();
-		MiniGBtn.material.SetFloat("_Brightness", 1.4f);
-		lVInfoList = GameManager.Instance.CurrLvSeries.LvSavesMiniGame;
-		LoadLastLv(GameManager.Instance.LocalPlayerSave.LastMiniGameId);
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-	}
+        LoadLastLv(gameManager.LocalPlayerSave.LastAdventureId);
 
-	public void LoadPuzzleBtn()
-	{
-		ClearBtn();
-		PuzzBtn.material.SetFloat("_Brightness", 1.4f);
-		lVInfoList = GameManager.Instance.CurrLvSeries.LvSavesPuzzle;
-		LoadLastLv(GameManager.Instance.LocalPlayerSave.LastPuzzleId);
-		AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-	}
+        if (transform.localScale.x > 0f)
+            PlayButtonSound();
+    }
 
-	public void LoadLastLv()
-	{
-		LoadAdventureBtn();
-	}
+    public void LoadMiniGameBtn()
+    {
+        ClearBtn();
+        SetButtonBrightness(MiniGBtn, 1.4f);
 
-	public void LoadLastLv(int lastId)
-	{
-		int num = lastId % 4;
-		if (SelectMap.Instance.CurrLvSeriesId != lastId / 10000)
-		{
-			CurrIndex = 1;
-			num = 1;
-		}
-		else
-		{
-			CurrIndex = lastId % 1000;
-		}
-		switch (num)
-		{
-		case 0:
-			CurrIndex -= 3;
-			if (CurrIndex < 1)
-			{
-				CurrIndex = 1;
-			}
-			UpdateLevelDis();
-			DisPlay4.OnPointerClick(null);
-			break;
-		case 1:
-			UpdateLevelDis();
-			DisPlay1.OnPointerClick(null);
-			break;
-		case 2:
-			CurrIndex--;
-			if (CurrIndex < 1)
-			{
-				CurrIndex = 1;
-			}
-			UpdateLevelDis();
-			DisPlay2.OnPointerClick(null);
-			break;
-		case 3:
-			CurrIndex -= 2;
-			if (CurrIndex < 1)
-			{
-				CurrIndex = 1;
-			}
-			UpdateLevelDis();
-			DisPlay3.OnPointerClick(null);
-			break;
-		}
-	}
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
 
-	public void SelectThis(LevelDisPlay levelDis)
-	{
-		SelectedLvSave = levelDis.lVInfo;
-		DisLevelInfo(SelectedLvSave);
-		DisPlay1.OnPointerExit(null);
-		DisPlay2.OnPointerExit(null);
-		DisPlay3.OnPointerExit(null);
-		DisPlay4.OnPointerExit(null);
-	}
+        if (gameManager == null ||
+            gameManager.CurrLvSeries == null ||
+            gameManager.LocalPlayerSave == null)
+        {
+            return;
+        }
 
-	private void DisLevelInfo(LvSave info)
-	{
-		LV.Instance.LoadLV(info.LvId, IsEasy, onlyInfo: true, isRun: false);
-		MapInfoIcon[] componentsInChildren = IconGroup.GetComponentsInChildren<MapInfoIcon>();
-		for (int i = 0; i < componentsInChildren.Length; i++)
-		{
-			Object.Destroy(componentsInChildren[i].gameObject);
-		}
-		for (int j = 0; j < LV.Instance.LoadMapTypes.Count; j++)
-		{
-			GameObject mapPrefab = MapManager.Instance.GetMapPrefab(LV.Instance.LoadMapTypes[j]);
-			if (mapPrefab != null)
-			{
-				MapInfoIcon component = Object.Instantiate(IconPrefab).GetComponent<MapInfoIcon>();
-				component.CreateInit(mapPrefab.GetComponent<MapBase>().GotoSprite, isYes: true);
-				component.transform.SetParent(IconGroup);
-				component.transform.localScale = Vector3.one;
-			}
-		}
-		string text = "";
-		if (HaveWeather(WeatherType.Rain))
-		{
-			text += " 有雨";
-		}
-		if (HaveWeather(WeatherType.Thunder))
-		{
-			text += " 有雷";
-		}
-		if (HaveWeather(WeatherType.Snow))
-		{
-			text += " 有雪";
-		}
-		if (HaveWeather(WeatherType.Hail))
-		{
-			text += " 冰雹";
-		}
-		if (HaveWeather(WeatherType.Wind))
-		{
-			text += " 有风";
-		}
-		if (text == "")
-		{
-			text = " 晴朗";
-		}
-		WeatherContent.text = text;
-		int num;
-		int num2;
-		if (IsEasy)
-		{
-			num = info.PassNum;
-			num2 = info.PassTime;
-		}
-		else
-		{
-			num = info.HardPNum;
-			num2 = info.HardPTime;
-		}
-		Title.text = LV.Instance.LvName;
-		if (num <= 0 || num2 < 5)
-		{
-			PassNumContent.text = "未通过";
-			PassTimeContent.text = "--:--";
-		}
-		else
-		{
-			PassNumContent.text = num + "次";
-			int num3 = num2 / 3600;
-			int num4 = num2 % 3600 / 60;
-			int num5 = num2 % 60;
-			string text2 = "";
-			if (num3 > 0)
-			{
-				text2 = text2 + num3 + "时";
-			}
-			if (num4 > 0)
-			{
-				text2 = text2 + num4 + "分";
-			}
-			text2 = text2 + num5 + "秒";
-			PassTimeContent.text = text2;
-		}
-		CurrLvId = info.LvId;
-		if (info.LvId % 10000 < 1000)
-		{
-			CurrAdvcId = info.LvId;
-			AdventureText.text = info.LvId / 10000 + "-" + info.LvId % 10000;
-		}
-	}
+        lVInfoList = gameManager.CurrLvSeries.LvSavesMiniGame;
 
-	private bool HaveWeather(WeatherType weatherType)
-	{
-		for (int i = 0; i < LV.Instance.LoadWeathers.Count; i++)
-		{
-			if (LV.Instance.LoadWeathers[i].type == weatherType)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
+        LoadLastLv(gameManager.LocalPlayerSave.LastMiniGameId);
 
-	private void UpdateLevelDis()
-	{
-		if (lVInfoList.Count >= CurrIndex)
-		{
-			if (CurrIndex >= 2)
-			{
-				DisPlay1.OpenInit(lVInfoList[CurrIndex - 1], lVInfoList[CurrIndex - 2]);
-			}
-			else
-			{
-				DisPlay1.OpenInit(lVInfoList[CurrIndex - 1], null);
-			}
-		}
-		else
-		{
-			DisPlay1.OpenInit(null, null);
-		}
-		if (lVInfoList.Count >= CurrIndex + 1)
-		{
-			DisPlay2.OpenInit(lVInfoList[CurrIndex], lVInfoList[CurrIndex - 1]);
-		}
-		else
-		{
-			DisPlay2.OpenInit(null, null);
-		}
-		if (lVInfoList.Count >= CurrIndex + 2)
-		{
-			DisPlay3.OpenInit(lVInfoList[CurrIndex + 1], lVInfoList[CurrIndex]);
-		}
-		else
-		{
-			DisPlay3.OpenInit(null, null);
-		}
-		if (lVInfoList.Count >= CurrIndex + 3)
-		{
-			DisPlay4.OpenInit(lVInfoList[CurrIndex + 2], lVInfoList[CurrIndex + 1]);
-		}
-		else
-		{
-			DisPlay4.OpenInit(null, null);
-		}
-		DisPlay1.OnPointerExit(null);
-		DisPlay2.OnPointerExit(null);
-		DisPlay3.OnPointerExit(null);
-		DisPlay4.OnPointerExit(null);
-	}
+        PlayButtonSound();
+    }
 
-	public void LevelUp()
-	{
-		if (CurrIndex >= 3)
-		{
-			CurrIndex -= 4;
-			UpdateLevelDis();
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		}
-	}
+    public void LoadPuzzleBtn()
+    {
+        ClearBtn();
+        SetButtonBrightness(PuzzBtn, 1.4f);
 
-	public void LevelDown()
-	{
-		if (CurrIndex <= lVInfoList.Count - 4)
-		{
-			CurrIndex += 4;
-			UpdateLevelDis();
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, base.transform.position, isAll: true);
-		}
-	}
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
+
+        if (gameManager == null ||
+            gameManager.CurrLvSeries == null ||
+            gameManager.LocalPlayerSave == null)
+        {
+            return;
+        }
+
+        lVInfoList = gameManager.CurrLvSeries.LvSavesPuzzle;
+
+        LoadLastLv(gameManager.LocalPlayerSave.LastPuzzleId);
+
+        PlayButtonSound();
+    }
+
+    public void LoadLastLv()
+    {
+        LoadAdventureBtn();
+    }
+
+    public void LoadLastLv(int lastId)
+    {
+        if (lVInfoList == null || lVInfoList.Count == 0)
+            return;
+
+        int num = lastId % 4;
+
+        if (SelectMap.Instance == null)
+            return;
+
+        if (SelectMap.Instance.CurrLvSeriesId != lastId / 10000)
+        {
+            CurrIndex = 1;
+            num = 1;
+        }
+        else
+        {
+            CurrIndex = lastId % 1000;
+
+            if (CurrIndex < 1)
+                CurrIndex = 1;
+        }
+
+        switch (num)
+        {
+            case 0:
+                CurrIndex -= 3;
+
+                if (CurrIndex < 1)
+                    CurrIndex = 1;
+
+                UpdateLevelDis();
+
+                if (DisPlay4 != null)
+                    DisPlay4.OnPointerClick(null);
+
+                break;
+
+            case 1:
+                UpdateLevelDis();
+
+                if (DisPlay1 != null)
+                    DisPlay1.OnPointerClick(null);
+
+                break;
+
+            case 2:
+                CurrIndex--;
+
+                if (CurrIndex < 1)
+                    CurrIndex = 1;
+
+                UpdateLevelDis();
+
+                if (DisPlay2 != null)
+                    DisPlay2.OnPointerClick(null);
+
+                break;
+
+            case 3:
+                CurrIndex -= 2;
+
+                if (CurrIndex < 1)
+                    CurrIndex = 1;
+
+                UpdateLevelDis();
+
+                if (DisPlay3 != null)
+                    DisPlay3.OnPointerClick(null);
+
+                break;
+        }
+    }
+
+    public void SelectThis(LevelDisPlay levelDis)
+    {
+        if (levelDis == null)
+            return;
+
+        SelectedLvSave = levelDis.lVInfo;
+
+        if (SelectedLvSave == null)
+            return;
+
+        DisLevelInfo(SelectedLvSave);
+
+        if (DisPlay1 != null)
+            DisPlay1.OnPointerExit(null);
+
+        if (DisPlay2 != null)
+            DisPlay2.OnPointerExit(null);
+
+        if (DisPlay3 != null)
+            DisPlay3.OnPointerExit(null);
+
+        if (DisPlay4 != null)
+            DisPlay4.OnPointerExit(null);
+    }
+
+    private void DisLevelInfo(LvSave info)
+    {
+        if (info == null ||
+            LV.Instance == null ||
+            MapManager.Instance == null)
+        {
+            return;
+        }
+
+        LV.Instance.LoadLV(
+            info.LvId,
+            IsEasy,
+            onlyInfo: true,
+            isRun: false
+        );
+
+        ClearMapIcons();
+        CreateMapIcons();
+        UpdateWeatherText();
+
+        int passNum;
+        int passTime;
+
+        if (IsEasy)
+        {
+            passNum = info.PassNum;
+            passTime = info.PassTime;
+        }
+        else
+        {
+            passNum = info.HardPNum;
+            passTime = info.HardPTime;
+        }
+
+        if (Title != null)
+            Title.text = LV.Instance.LvName;
+
+        if (passNum <= 0 || passTime < 5)
+        {
+            if (PassNumContent != null)
+                PassNumContent.text = "未通过";
+
+            if (PassTimeContent != null)
+                PassTimeContent.text = "--:--";
+        }
+        else
+        {
+            if (PassNumContent != null)
+                PassNumContent.text = passNum + "次";
+
+            if (PassTimeContent != null)
+                PassTimeContent.text = FormatPassTime(passTime);
+        }
+
+        CurrLvId = info.LvId;
+
+        if (info.LvId % 10000 < 1000)
+        {
+            CurrAdvcId = info.LvId;
+
+            if (AdventureText != null)
+            {
+                AdventureText.text =
+                    info.LvId / 10000 +
+                    "-" +
+                    info.LvId % 10000;
+            }
+        }
+    }
+
+    private void ClearMapIcons()
+    {
+        if (IconGroup == null)
+            return;
+
+        loadedIcons = IconGroup.GetComponentsInChildren<MapInfoIcon>(true);
+
+        for (int i = 0; i < loadedIcons.Length; i++)
+        {
+            MapInfoIcon icon = loadedIcons[i];
+
+            if (icon != null)
+                Destroy(icon.gameObject);
+        }
+
+        loadedIcons = null;
+    }
+
+    private void CreateMapIcons()
+    {
+        if (IconGroup == null ||
+            IconPrefab == null ||
+            LV.Instance == null ||
+            MapManager.Instance == null)
+        {
+            return;
+        }
+
+        List<MapType> mapTypes = LV.Instance.LoadMapTypes;
+
+        if (mapTypes == null)
+            return;
+
+        for (int i = 0; i < mapTypes.Count; i++)
+        {
+            GameObject mapPrefab =
+                MapManager.Instance.GetMapPrefab(mapTypes[i]);
+
+            if (mapPrefab == null)
+                continue;
+
+            MapBase mapBase = mapPrefab.GetComponent<MapBase>();
+
+            if (mapBase == null)
+                continue;
+
+            MapInfoIcon icon =
+                Instantiate(IconPrefab).GetComponent<MapInfoIcon>();
+
+            if (icon == null)
+                continue;
+
+            icon.CreateInit(
+                mapBase.GotoSprite,
+                isYes: true
+            );
+
+            icon.transform.SetParent(
+                IconGroup,
+                false
+            );
+
+            icon.transform.localScale = Vector3.one;
+        }
+    }
+
+    private void UpdateWeatherText()
+    {
+        if (WeatherContent == null ||
+            LV.Instance == null)
+        {
+            return;
+        }
+
+        string weatherText = string.Empty;
+
+        if (HaveWeather(WeatherType.Rain))
+            weatherText += " 有雨";
+
+        if (HaveWeather(WeatherType.Thunder))
+            weatherText += " 有雷";
+
+        if (HaveWeather(WeatherType.Snow))
+            weatherText += " 有雪";
+
+        if (HaveWeather(WeatherType.Hail))
+            weatherText += " 冰雹";
+
+        if (HaveWeather(WeatherType.Wind))
+            weatherText += " 有风";
+
+        if (string.IsNullOrEmpty(weatherText))
+            weatherText = " 晴朗";
+
+        WeatherContent.text = weatherText;
+    }
+
+    private string FormatPassTime(int seconds)
+    {
+        int hours = seconds / 3600;
+        int minutes = seconds % 3600 / 60;
+        int remainingSeconds = seconds % 60;
+
+        string result = string.Empty;
+
+        if (hours > 0)
+            result += hours + "时";
+
+        if (minutes > 0)
+            result += minutes + "分";
+
+        result += remainingSeconds + "秒";
+
+        return result;
+    }
+
+    private bool HaveWeather(WeatherType weatherType)
+    {
+        if (LV.Instance == null ||
+            LV.Instance.LoadWeathers == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < LV.Instance.LoadWeathers.Count; i++)
+        {
+            if (LV.Instance.LoadWeathers[i].type == weatherType)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void UpdateLevelDis()
+    {
+        if (lVInfoList == null)
+            return;
+
+        LvSave current = GetLvSave(CurrIndex);
+        LvSave previous = GetLvSave(CurrIndex - 1);
+        LvSave next = GetLvSave(CurrIndex + 1);
+        LvSave next2 = GetLvSave(CurrIndex + 2);
+        LvSave fourth = GetLvSave(CurrIndex + 3);
+
+        if (DisPlay1 != null)
+            DisPlay1.OpenInit(current, previous);
+
+        if (DisPlay2 != null)
+            DisPlay2.OpenInit(next, current);
+
+        if (DisPlay3 != null)
+            DisPlay3.OpenInit(next2, next);
+
+        if (DisPlay4 != null)
+            DisPlay4.OpenInit(fourth, next2);
+
+        if (DisPlay1 != null)
+            DisPlay1.OnPointerExit(null);
+
+        if (DisPlay2 != null)
+            DisPlay2.OnPointerExit(null);
+
+        if (DisPlay3 != null)
+            DisPlay3.OnPointerExit(null);
+
+        if (DisPlay4 != null)
+            DisPlay4.OnPointerExit(null);
+    }
+
+    private LvSave GetLvSave(int index)
+    {
+        if (lVInfoList == null ||
+            index < 1 ||
+            index > lVInfoList.Count)
+        {
+            return null;
+        }
+
+        return lVInfoList[index - 1];
+    }
+
+    public void LevelUp()
+    {
+        if (CurrIndex < 3)
+            return;
+
+        CurrIndex -= 4;
+
+        UpdateLevelDis();
+        PlayButtonSound();
+    }
+
+    public void LevelDown()
+    {
+        if (lVInfoList == null ||
+            CurrIndex > lVInfoList.Count - 4)
+        {
+            return;
+        }
+
+        CurrIndex += 4;
+
+        UpdateLevelDis();
+        PlayButtonSound();
+    }
+
+    private void PlayButtonSound()
+    {
+        if (AudioManager.Instance != null &&
+            gameManager != null &&
+            gameManager.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                gameManager.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
+    }
 }

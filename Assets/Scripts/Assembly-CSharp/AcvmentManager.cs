@@ -1,3 +1,4 @@
+using SaveClass;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,16 +8,13 @@ public class AcvmentManager : MonoBehaviour
     public static AcvmentManager Instance;
 
     public GameObject AchivPrefab;
-
     public Sprite EmptyIcon;
-
     public List<Sprite> AcvIcons = new List<Sprite>();
 
-    private List<TextMesh> LoadedAcvOverNum = new List<TextMesh>();
+    private readonly List<TextMesh> LoadedAcvOverNum = new List<TextMesh>();
+    private readonly List<SpriteRenderer> LoadedAcvRederer = new List<SpriteRenderer>();
 
-    private List<SpriteRenderer> LoadedAcvRederer = new List<SpriteRenderer>();
-
-    private List<Acvname> achievementList = new List<Acvname>
+    private readonly List<Acvname> achievementList = new List<Acvname>
     {
         Acvname.Potato5,
         Acvname.Cherry25,
@@ -37,15 +35,32 @@ public class AcvmentManager : MonoBehaviour
         Acvname.IceShroom20
     };
 
-    private List<Acvname> CurrLvOverAcv = new List<Acvname>();
+    private readonly List<Acvname> CurrLvOverAcv = new List<Acvname>();
 
-    private List<Acvname> GetOnlyOne = new List<Acvname>
+    private readonly List<Acvname> GetOnlyOne = new List<Acvname>
     {
         Acvname.Plant49,
         Acvname.Money100w
     };
 
-    private List<int> OverAcvmentNum => GameManager.Instance.StatsAcvSave.OverAcvNum;
+    private List<int> OverAcvmentNum
+    {
+        get
+        {
+            if (GameManager.Instance == null)
+                return null;
+
+            if (GameManager.Instance.StatsAcvSave == null)
+                GameManager.Instance.StatsAcvSave =
+                    new StatsAndAcvSave();
+
+            if (GameManager.Instance.StatsAcvSave.OverAcvNum == null)
+                GameManager.Instance.StatsAcvSave.OverAcvNum =
+                    new List<int>();
+
+            return GameManager.Instance.StatsAcvSave.OverAcvNum;
+        }
+    }
 
     private void Awake()
     {
@@ -54,11 +69,23 @@ public class AcvmentManager : MonoBehaviour
 
     public void LoadAcvSave()
     {
-        int length = Enum.GetValues(typeof(Acvname)).Length;
+        List<int> save = OverAcvmentNum;
 
-        while (OverAcvmentNum.Count < length)
+        if (save == null)
+            return;
+
+        int requiredCount =
+            Enum.GetValues(typeof(Acvname)).Length;
+
+        if (save.Count >= requiredCount)
+            return;
+
+        int missing =
+            requiredCount - save.Count;
+
+        for (int i = 0; i < missing; i++)
         {
-            OverAcvmentNum.Add(0);
+            save.Add(0);
         }
     }
 
@@ -67,245 +94,363 @@ public class AcvmentManager : MonoBehaviour
         CurrLvOverAcv.Clear();
     }
 
-    public void GetAchievement(Acvname achiv, string playerName)
+    public void GetAchievement(
+        Acvname achiv,
+        string playerName)
     {
-        if (playerName == GameManager.Instance.LocalPlayerSave.playerName)
+        if (GameManager.Instance == null)
+            return;
+
+        if (GameManager.Instance.LocalPlayerSave != null &&
+            playerName ==
+            GameManager.Instance.LocalPlayerSave.playerName)
         {
             GetAchievement(achiv);
+            return;
         }
-        else if (GameManager.Instance.isServer)
+
+        if (GameManager.Instance.isServer &&
+            SocketServer.Instance != null)
         {
-            SocketServer.Instance.SendAcvmentGet(achiv, playerName);
+            SocketServer.Instance.SendAcvmentGet(
+                achiv,
+                playerName
+            );
         }
     }
 
     public void GetAchievement(Acvname achiv)
     {
-        if (!CurrLvOverAcv.Contains(achiv))
+        if (GameManager.Instance == null)
+            return;
+
+        List<int> save = OverAcvmentNum;
+
+        if (save == null)
+            return;
+
+        int index = (int)achiv;
+
+        if (index < 0)
+            return;
+
+        while (save.Count <= index)
         {
-            CurrLvOverAcv.Add(achiv);
+            save.Add(0);
+        }
 
-            if (OverAcvmentNum[(int)achiv] == 0)
+        if (CurrLvOverAcv.Contains(achiv))
+            return;
+
+        CurrLvOverAcv.Add(achiv);
+
+        if (save[index] == 0)
+        {
+            if (StatsManager.Instance != null)
             {
-                StatsManager.Instance.AddStatsNum(StatsEnum.OverAcvNum);
+                StatsManager.Instance.AddStatsNum(
+                    StatsEnum.OverAcvNum
+                );
+            }
 
+            if (ChatInput.Instance != null &&
+                GameManager.Instance.LocalPlayerSave != null)
+            {
                 ChatInput.Instance.SendMessageToAll(
                     "Completó el logro <color=#41FF00>[" +
                     GetAchivName(achiv) +
                     "]</color>!",
                     needName: true
                 );
+            }
 
+            if (AudioManager.Instance != null &&
+                GameManager.Instance.AudioConf != null)
+            {
                 AudioManager.Instance.PlayEFAudio(
                     GameManager.Instance.AudioConf.Achivment,
                     Vector2.zero,
                     isAll: true
                 );
             }
+        }
 
-            OverAcvmentNum[(int)achiv]++;
+        save[index]++;
 
-            if (OverAcvmentNum[(int)achiv] == 1)
-            {
-                GameManager.Instance.SaveSAInfo();
-            }
+        if (save[index] == 1)
+        {
+            GameManager.Instance.SaveSAInfo();
+        }
 
-            if (GetOnlyOne.Contains(achiv))
-            {
-                OverAcvmentNum[(int)achiv] = 1;
-            }
+        if (GetOnlyOne.Contains(achiv))
+        {
+            save[index] = 1;
         }
     }
 
     public void InitAcvment()
     {
+        if (AchivPrefab == null)
+            return;
+
         if (LoadedAcvRederer.Count == 0)
         {
-            for (int i = 0; i < achievementList.Count; i++)
-            {
-                GameObject obj = UnityEngine.Object.Instantiate(AchivPrefab);
-
-                obj.transform.SetParent(base.transform);
-
-                obj.transform.localPosition =
-                    new Vector3(
-                        0f,
-                        -2.5f - 1.5f * (float)i
-                    );
-
-                SpriteRenderer component =
-                    obj.transform.Find("AcvIcons").GetComponent<SpriteRenderer>();
-
-                TextMesh component2 =
-                    obj.transform.Find("AcvTitle").GetComponent<TextMesh>();
-
-                TextMesh component3 =
-                    obj.transform.Find("AcvContent").GetComponent<TextMesh>();
-
-                TextMesh component4 =
-                    obj.transform.Find("AcvOverNum").GetComponent<TextMesh>();
-
-                LoadedAcvRederer.Add(component);
-                LoadedAcvOverNum.Add(component4);
-
-                component4.text = "";
-
-                component.color =
-                    new Color(1f, 1f, 1f, 0.4f);
-
-                component2.text =
-                    GetAchivName(achievementList[i]);
-
-                component3.text =
-                    GetAchivContent(achievementList[i]);
-
-                if (AcvIcons.Count > i)
-                {
-                    component.sprite = AcvIcons[i];
-                }
-                else
-                {
-                    component.sprite = EmptyIcon;
-                }
-            }
+            CreateAchievementUI();
         }
 
-        for (int j = 0; j < achievementList.Count; j++)
+        UpdateAchievementUI();
+    }
+
+    private void CreateAchievementUI()
+    {
+        for (int i = 0; i < achievementList.Count; i++)
         {
+            GameObject obj =
+                Instantiate(AchivPrefab, transform);
+
+            if (obj == null)
+                continue;
+
+            Transform iconTransform =
+                obj.transform.Find("AcvIcons");
+
+            Transform titleTransform =
+                obj.transform.Find("AcvTitle");
+
+            Transform contentTransform =
+                obj.transform.Find("AcvContent");
+
+            Transform overNumTransform =
+                obj.transform.Find("AcvOverNum");
+
+            if (iconTransform == null ||
+                titleTransform == null ||
+                contentTransform == null ||
+                overNumTransform == null)
+            {
+                Destroy(obj);
+                continue;
+            }
+
+            obj.transform.localPosition =
+                new Vector3(
+                    0f,
+                    -2.5f - 1.5f * i
+                );
+
+            SpriteRenderer icon =
+                iconTransform.GetComponent<SpriteRenderer>();
+
+            TextMesh title =
+                titleTransform.GetComponent<TextMesh>();
+
+            TextMesh content =
+                contentTransform.GetComponent<TextMesh>();
+
+            TextMesh overNum =
+                overNumTransform.GetComponent<TextMesh>();
+
+            if (icon == null ||
+                title == null ||
+                content == null ||
+                overNum == null)
+            {
+                Destroy(obj);
+                continue;
+            }
+
+            LoadedAcvRederer.Add(icon);
+            LoadedAcvOverNum.Add(overNum);
+
+            overNum.text = "";
+
+            icon.color =
+                new Color(
+                    1f,
+                    1f,
+                    1f,
+                    0.4f
+                );
+
+            Acvname achievement =
+                achievementList[i];
+
+            title.text =
+                GetAchivName(achievement);
+
+            content.text =
+                GetAchivContent(achievement);
+
+            if (AcvIcons != null &&
+                i < AcvIcons.Count &&
+                AcvIcons[i] != null)
+            {
+                icon.sprite = AcvIcons[i];
+            }
+            else
+            {
+                icon.sprite = EmptyIcon;
+            }
+        }
+    }
+
+    private void UpdateAchievementUI()
+    {
+        List<int> save = OverAcvmentNum;
+
+        if (save == null)
+            return;
+
+        int count =
+            Mathf.Min(
+                achievementList.Count,
+                LoadedAcvRederer.Count
+            );
+
+        for (int i = 0; i < count; i++)
+        {
+            int index =
+                (int)achievementList[i];
+
             int num =
-                OverAcvmentNum[(int)achievementList[j]];
+                index >= 0 && index < save.Count
+                    ? save[index]
+                    : 0;
 
-            if (num > 0)
-            {
-                LoadedAcvRederer[j].color = Color.white;
-            }
-            else
-            {
-                LoadedAcvRederer[j].color =
-                    new Color(1f, 1f, 1f, 0.4f);
-            }
+            LoadedAcvRederer[i].color =
+                num > 0
+                    ? Color.white
+                    : new Color(
+                        1f,
+                        1f,
+                        1f,
+                        0.4f
+                    );
 
-            if (num > 1)
-            {
-                LoadedAcvOverNum[j].text =
-                    num.ToString();
-            }
-            else
-            {
-                LoadedAcvOverNum[j].text = "";
-            }
+            LoadedAcvOverNum[i].text =
+                num > 1
+                    ? num.ToString()
+                    : "";
         }
     }
 
     private string GetAchivName(Acvname acvname)
     {
-        if (acvname == Acvname.Potato5)
-            return "Puréc de papa";
+        switch (acvname)
+        {
+            case Acvname.Potato5:
+                return "Puréc de papa";
 
-        if (acvname == Acvname.Cherry25)
-            return "Hermanos explosivos";
+            case Acvname.Cherry25:
+                return "Hermanos explosivos";
 
-        if (acvname == Acvname.Popcorn4)
-            return "Palomitas de maíz";
+            case Acvname.Popcorn4:
+                return "Palomitas de maíz";
 
-        if (acvname == Acvname.Squash10)
-            return "Golpe aplastante";
+            case Acvname.Squash10:
+                return "Golpe aplastante";
 
-        if (acvname == Acvname.ClickMoney100)
-            return "Tacaño";
+            case Acvname.ClickMoney100:
+                return "Tacaño";
 
-        if (acvname == Acvname.SunFull)
-            return "Casa llena de sol";
+            case Acvname.SunFull:
+                return "Casa llena de sol";
 
-        if (acvname == Acvname.RollNut5)
-            return "Cinco estrellas";
+            case Acvname.RollNut5:
+                return "Cinco estrellas";
 
-        if (acvname == Acvname.Plant49)
-            return "Cazador de plantas";
+            case Acvname.Plant49:
+                return "Cazador de plantas";
 
-        if (acvname == Acvname.UnitAsOne)
-            return "Todos como uno";
+            case Acvname.UnitAsOne:
+                return "Todos como uno";
 
-        if (acvname == Acvname.Sunflower200)
-            return "Brillo deslumbrante";
+            case Acvname.Sunflower200:
+                return "Brillo deslumbrante";
 
-        if (acvname == Acvname.Money100w)
-            return "Millonario";
+            case Acvname.Money100w:
+                return "Millonario";
 
-        if (acvname == Acvname.LuckCorn5)
-            return "Maíz de la suerte";
+            case Acvname.LuckCorn5:
+                return "Maíz de la suerte";
 
-        if (acvname == Acvname.UltimateKill)
-            return "Eliminación extrema";
+            case Acvname.UltimateKill:
+                return "Eliminación extrema";
 
-        if (acvname == Acvname.CheatSquash50)
-            return "El arte del engaño";
+            case Acvname.CheatSquash50:
+                return "El arte del engaño";
 
-        if (acvname == Acvname.ChaosZombie)
-            return "Zombi caótico";
+            case Acvname.ChaosZombie:
+                return "Zombi caótico";
 
-        if (acvname == Acvname.FlatSquash)
-            return "Aplastado al revés";
+            case Acvname.FlatSquash:
+                return "Aplastado al revés";
 
-        if (acvname == Acvname.IceShroom20)
-            return "Asesino de sangre fría";
+            case Acvname.IceShroom20:
+                return "Asesino de sangre fría";
 
-        return "???";
+            default:
+                return "???";
+        }
     }
 
     private string GetAchivContent(Acvname acvname)
     {
-        if (acvname == Acvname.Potato5)
-            return "Haz que una Mina de patata explote y lance por los aires a 5 zombis de una vez.";
+        switch (acvname)
+        {
+            case Acvname.Potato5:
+                return "Haz que una Mina de patata explote y lance por los aires a 5 zombis de una vez.";
 
-        if (acvname == Acvname.Cherry25)
-            return "Mata con una sola Bomba cereza a 25 zombis normales al mismo tiempo.";
+            case Acvname.Cherry25:
+                return "Mata con una sola Bomba cereza a 25 zombis normales al mismo tiempo.";
 
-        if (acvname == Acvname.Popcorn4)
-            return "Mata con un solo proyectil de Mazorcañón a 4 zombis gigantes al mismo tiempo.";
+            case Acvname.Popcorn4:
+                return "Mata con un solo proyectil de Mazorcañón a 4 zombis gigantes al mismo tiempo.";
 
-        if (acvname == Acvname.Squash10)
-            return "Aplasta a 10 zombis de una vez con una Calabaza.";
+            case Acvname.Squash10:
+                return "Aplasta a 10 zombis de una vez con una Calabaza.";
 
-        if (acvname == Acvname.ClickMoney100)
-            return "Recoge dinero 100 veces seguidas sin dejar que ninguna moneda desaparezca.";
+            case Acvname.ClickMoney100:
+                return "Recoge dinero 100 veces seguidas sin dejar que ninguna moneda desaparezca.";
 
-        if (acvname == Acvname.SunFull)
-            return "Gana un nivel teniendo 10000 o más soles restantes.";
+            case Acvname.SunFull:
+                return "Gana un nivel teniendo 10000 o más soles restantes.";
 
-        if (acvname == Acvname.RollNut5)
-            return "Haz que una Nuez derribe a 5 zombis.";
+            case Acvname.RollNut5:
+                return "Haz que una Nuez derribe a 5 zombis.";
 
-        if (acvname == Acvname.Plant49)
-            return "Consigue 49 plantas.";
+            case Acvname.Plant49:
+                return "Consigue 49 plantas.";
 
-        if (acvname == Acvname.UnitAsOne)
-            return "Completa un nivel de tres mapas junto con otros tres jugadores.";
+            case Acvname.UnitAsOne:
+                return "Completa un nivel de tres mapas junto con otros tres jugadores.";
 
-        if (acvname == Acvname.Sunflower200)
-            return "Haz que un Girasol produzca 200 soles o más de una vez.";
+            case Acvname.Sunflower200:
+                return "Haz que un Girasol produzca 200 soles o más de una vez.";
 
-        if (acvname == Acvname.Money100w)
-            return "Consigue un millón de monedas.";
+            case Acvname.Money100w:
+                return "Consigue un millón de monedas.";
 
-        if (acvname == Acvname.LuckCorn5)
-            return "Haz que un Lanzamaíz lance 5 proyectiles de mantequilla seguidos.";
+            case Acvname.LuckCorn5:
+                return "Haz que un Lanzamaíz lance 5 proyectiles de mantequilla seguidos.";
 
-        if (acvname == Acvname.UltimateKill)
-            return "Mata a un zombi justo cuando está a punto de entrar en tu casa. (Actualmente no disponible)";
+            case Acvname.UltimateKill:
+                return "Mata a un zombi justo cuando está a punto de entrar en tu casa. (Actualmente no disponible)";
 
-        if (acvname == Acvname.CheatSquash50)
-            return "Haz que una Calabaza sea engañada 50 veces. (Actualmente no disponible)";
+            case Acvname.CheatSquash50:
+                return "Haz que una Calabaza sea engañada 50 veces. (Actualmente no disponible)";
 
-        if (acvname == Acvname.ChaosZombie)
-            return "Haz que un zombi tenga al mismo tiempo los efectos de encantamiento, mantequilla, aturdimiento y congelación.";
+            case Acvname.ChaosZombie:
+                return "Haz que un zombi tenga al mismo tiempo los efectos de encantamiento, mantequilla, aturdimiento y congelación.";
 
-        if (acvname == Acvname.FlatSquash)
-            return "Haz que una Calabaza sea aplastada.";
+            case Acvname.FlatSquash:
+                return "Haz que una Calabaza sea aplastada.";
 
-        if (acvname == Acvname.IceShroom20)
-            return "Congela hasta la muerte a 20 zombis normales usando una Hielaguisante.";
+            case Acvname.IceShroom20:
+                return "Congela hasta la muerte a 20 zombis normales usando una Hielaguisante.";
 
-        return "???";
+            default:
+                return "???";
+        }
     }
 }

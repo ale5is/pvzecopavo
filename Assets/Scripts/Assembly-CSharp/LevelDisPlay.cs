@@ -3,105 +3,217 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class LevelDisPlay : MonoBehaviour, IPointerEnterHandler, IEventSystemHandler, IPointerExitHandler, IPointerClickHandler
+public class LevelDisPlay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
-	public Image MapImage;
+    public Image MapImage;
+    public Text LevelText;
+    public Image REnderer;
+    public Image LvCard;
+    public Transform LockImg;
 
-	public Text LevelText;
+    public LvSave lVInfo;
 
-	public Image REnderer;
+    private LevelSelector levelSelector;
+    private LV lv;
 
-	public Image LvCard;
+    private static readonly Color32 LockedColor = new Color32(100, 100, 100, 255);
+    private static readonly Color32 SelectedColor = new Color32(150, 150, 150, 255);
+    private static readonly Color32 WhiteColor = new Color32(255, 255, 255, 255);
 
-	public Transform LockImg;
+    private void Awake()
+    {
+        levelSelector = LevelSelector.Instance;
+        lv = LV.Instance;
+    }
 
-	public LvSave lVInfo;
+    public void OpenInit(LvSave info, LvSave lastInfo)
+    {
+        lVInfo = info;
 
-	public void OpenInit(LvSave info, LvSave lastInfo)
-	{
-		lVInfo = info;
-		LockImg.localScale = Vector3.one;
-		LvCard.color = new Color32(100, 100, 100, byte.MaxValue);
-		MapImage.color = new Color32(100, 100, 100, byte.MaxValue);
-		if (info == null)
-		{
-			LevelText.text = "暂无关卡";
-			LvCard.transform.localScale = Vector3.zero;
-			MapImage.sprite = NormalSprite.Instance.YardDay;
-			return;
-		}
-		LV.Instance.LoadLV(info.LvId, LevelSelector.Instance.IsEasy, onlyInfo: true, isRun: false);
-		MapImage.sprite = LV.Instance.GetLvSprite();
-		int num = info.LvId / 10000;
-		int num2 = info.LvId % 10000 / 1000;
-		int num3 = info.LvId % 1000 - 1;
-		if (num2 == 1)
-		{
-			if (num == 1 && num3 < NormalSprite.Instance.YardMiniGame.Count)
-			{
-				MapImage.sprite = NormalSprite.Instance.YardMiniGame[num3];
-			}
-		}
-		else
-		{
-			_ = 2;
-		}
-		if (LV.Instance.BootyPlant == PlantType.Nope)
-		{
-			LvCard.transform.localScale = Vector3.zero;
-		}
-		else
-		{
-			LvCard.sprite = SeedChooser.Instance.GetCardInfo(LV.Instance.BootyPlant).OwnerSprite;
-			LvCard.transform.localScale = Vector3.one;
-		}
-		LevelText.text = LV.Instance.LvName;
-		if (LevelSelector.Instance.SelectedLvSave != null && LevelSelector.Instance.SelectedLvSave.LvId == lVInfo.LvId)
-		{
-			REnderer.color = new Color32(150, 150, 150, byte.MaxValue);
-		}
-		if (lastInfo == null || lastInfo.PassNum > 0 || lastInfo.HardPNum > 0)
-		{
-			LockImg.localScale = Vector3.zero;
-			MapImage.color = Color.white;
-			LvCard.color = Color.white;
-		}
-	}
+        if (LockImg != null)
+            LockImg.localScale = Vector3.one;
 
-	public void OnPointerClick(PointerEventData eventData)
-	{
-		if (lVInfo == null)
-		{
-			return;
-		}
-		if (LockImg.localScale.x > 0f && LevelSelector.Instance.transform.localScale.x > 0f)
-		{
-			AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.Buzzer, base.transform.position, isAll: true);
-		}
-		else if (LevelSelector.Instance.SelectedLvSave == null || LevelSelector.Instance.SelectedLvSave.LvId != lVInfo.LvId)
-		{
-			if (eventData != null)
-			{
-				AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.ButtonClick, base.transform.position, isAll: true);
-			}
-			LevelSelector.Instance.SelectThis(this);
-			REnderer.color = new Color32(150, 150, 150, byte.MaxValue);
-		}
-	}
+        if (LvCard != null)
+            LvCard.color = LockedColor;
 
-	public void OnPointerEnter(PointerEventData eventData)
-	{
-		if (lVInfo != null && !(LockImg.localScale.x > 0f))
-		{
-			REnderer.color = new Color32(150, 150, 150, byte.MaxValue);
-		}
-	}
+        if (MapImage != null)
+            MapImage.color = LockedColor;
 
-	public void OnPointerExit(PointerEventData eventData)
-	{
-		if (lVInfo != null && (LevelSelector.Instance.SelectedLvSave == null || LevelSelector.Instance.SelectedLvSave.LvId != lVInfo.LvId))
-		{
-			REnderer.color = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
-		}
-	}
+        if (info == null)
+        {
+            if (LevelText != null)
+                LevelText.text = "暂无关卡";
+
+            if (LvCard != null)
+                LvCard.transform.localScale = Vector3.zero;
+
+            if (MapImage != null && NormalSprite.Instance != null)
+                MapImage.sprite = NormalSprite.Instance.YardDay;
+
+            return;
+        }
+
+        if (lv == null)
+            lv = LV.Instance;
+
+        if (levelSelector == null)
+            levelSelector = LevelSelector.Instance;
+
+        if (lv == null || levelSelector == null)
+            return;
+
+        lv.LoadLV(
+            info.LvId,
+            levelSelector.IsEasy,
+            onlyInfo: true,
+            isRun: false
+        );
+
+        if (MapImage != null)
+        {
+            MapImage.sprite = lv.GetLvSprite();
+
+            int seriesId = info.LvId / 10000;
+            int categoryId = info.LvId % 10000 / 1000;
+            int levelId = info.LvId % 1000 - 1;
+
+            if (categoryId == 1 &&
+                seriesId == 1 &&
+                NormalSprite.Instance != null &&
+                levelId >= 0 &&
+                levelId < NormalSprite.Instance.YardMiniGame.Count)
+            {
+                MapImage.sprite =
+                    NormalSprite.Instance.YardMiniGame[levelId];
+            }
+        }
+
+        if (lv.BootyPlant == PlantType.Nope)
+        {
+            if (LvCard != null)
+                LvCard.transform.localScale = Vector3.zero;
+        }
+        else
+        {
+            if (LvCard != null && SeedChooser.Instance != null)
+            {
+                var cardInfo =
+                    SeedChooser.Instance.GetCardInfo(lv.BootyPlant);
+
+                if (cardInfo != null)
+                {
+                    LvCard.sprite = cardInfo.OwnerSprite;
+                    LvCard.transform.localScale = Vector3.one;
+                }
+                else
+                {
+                    LvCard.transform.localScale = Vector3.zero;
+                }
+            }
+        }
+
+        if (LevelText != null)
+            LevelText.text = lv.LvName;
+
+        if (levelSelector.SelectedLvSave != null &&
+            levelSelector.SelectedLvSave.LvId == lVInfo.LvId)
+        {
+            if (REnderer != null)
+                REnderer.color = SelectedColor;
+        }
+        else if (REnderer != null)
+        {
+            REnderer.color = WhiteColor;
+        }
+
+        if (lastInfo == null ||
+            lastInfo.PassNum > 0 ||
+            lastInfo.HardPNum > 0)
+        {
+            if (LockImg != null)
+                LockImg.localScale = Vector3.zero;
+
+            if (MapImage != null)
+                MapImage.color = WhiteColor;
+
+            if (LvCard != null)
+                LvCard.color = WhiteColor;
+        }
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (lVInfo == null)
+            return;
+
+        if (levelSelector == null)
+            levelSelector = LevelSelector.Instance;
+
+        if (levelSelector == null)
+            return;
+
+        if (LockImg != null &&
+            LockImg.localScale.x > 0f &&
+            levelSelector.transform.localScale.x > 0f)
+        {
+            if (GameManager.Instance != null &&
+                GameManager.Instance.AudioConf != null)
+            {
+                PlayAudio(GameManager.Instance.AudioConf.Buzzer);
+            }
+
+            return;
+        }
+
+        if (levelSelector.SelectedLvSave == null ||
+            levelSelector.SelectedLvSave.LvId != lVInfo.LvId)
+        {
+            if (eventData != null &&
+                GameManager.Instance != null &&
+                GameManager.Instance.AudioConf != null)
+            {
+                PlayAudio(GameManager.Instance.AudioConf.ButtonClick);
+            }
+
+            levelSelector.SelectThis(this);
+
+            if (REnderer != null)
+                REnderer.color = SelectedColor;
+        }
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (lVInfo != null &&
+            LockImg != null &&
+            LockImg.localScale.x <= 0f)
+        {
+            if (REnderer != null)
+                REnderer.color = SelectedColor;
+        }
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (lVInfo != null &&
+            levelSelector != null &&
+            (levelSelector.SelectedLvSave == null ||
+             levelSelector.SelectedLvSave.LvId != lVInfo.LvId))
+        {
+            if (REnderer != null)
+                REnderer.color = WhiteColor;
+        }
+    }
+
+    private void PlayAudio(AudioClip clip)
+    {
+        if (clip == null || AudioManager.Instance == null)
+            return;
+
+        AudioManager.Instance.PlayEFAudio(
+            clip,
+            transform.position,
+            isAll: true
+        );
+    }
 }
