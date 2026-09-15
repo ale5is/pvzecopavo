@@ -18,6 +18,8 @@ public class EOSOnlineTransport : MonoBehaviour
     private ulong connectionInterruptedNotificationId;
     private ulong connectionClosedNotificationId;
 
+    private bool isApplicationQuitting;
+
     public bool IsInitialized { get; private set; }
     public bool IsHost { get; private set; }
     public bool IsClient { get; private set; }
@@ -36,21 +38,29 @@ public class EOSOnlineTransport : MonoBehaviour
         }
     }
 
-    public string SocketName => socketName;
+    public string SocketName =>
+        socketName;
 
-    public event Action<ProductUserId> OnPeerConnected;
-    public event Action<ProductUserId> OnPeerDisconnected;
-    public event Action<ProductUserId, byte[]> OnPacketReceived;
+    public event Action<ProductUserId>
+        OnPeerConnected;
+
+    public event Action<ProductUserId>
+        OnPeerDisconnected;
+
+    public event Action<ProductUserId, byte[]>
+        OnPacketReceived;
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
+        if (Instance != null &&
+            Instance != this)
         {
             Destroy(gameObject);
             return;
         }
 
         Instance = this;
+
         DontDestroyOnLoad(gameObject);
     }
 
@@ -239,6 +249,15 @@ public class EOSOnlineTransport : MonoBehaviour
             return false;
         }
 
+        if (IsHost)
+        {
+            Debug.Log(
+                "[EOS P2P] El host ya está iniciado."
+            );
+
+            return true;
+        }
+
         IsHost = true;
         IsClient = false;
         IsConnected = false;
@@ -255,7 +274,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     public bool StartClient(
-        ProductUserId hostUserId)
+        ProductUserId hostUserId
+    )
     {
         if (!Initialize())
         {
@@ -300,7 +320,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private bool RequestConnection(
-        ProductUserId remoteUserId)
+        ProductUserId remoteUserId
+    )
     {
         if (!IsInitialized)
         {
@@ -326,10 +347,12 @@ public class EOSOnlineTransport : MonoBehaviour
                 SocketId = socketId,
                 Channel = 0,
                 AllowDelayedDelivery = true,
-                Reliability = PacketReliability.ReliableOrdered,
-                Data = new ArraySegment<byte>(
-                    connectionData
-                )
+                Reliability =
+                    PacketReliability.ReliableOrdered,
+                Data =
+                    new ArraySegment<byte>(
+                        connectionData
+                    )
             };
 
         Result result =
@@ -355,7 +378,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private void OnIncomingConnectionRequest(
-        ref OnIncomingConnectionRequestInfo data)
+        ref OnIncomingConnectionRequestInfo data
+    )
     {
         if (data.RemoteUserId == null ||
             !data.RemoteUserId.IsValid())
@@ -389,7 +413,8 @@ public class EOSOnlineTransport : MonoBehaviour
 
     private void AcceptConnection(
         ProductUserId remoteUserId,
-        SocketId socketId)
+        SocketId socketId
+    )
     {
         AcceptConnectionOptions options =
             new AcceptConnectionOptions
@@ -422,7 +447,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private void OnPeerConnectionEstablished(
-        ref OnPeerConnectionEstablishedInfo data)
+        ref OnPeerConnectionEstablishedInfo data
+    )
     {
         if (data.RemoteUserId == null ||
             !data.RemoteUserId.IsValid())
@@ -456,7 +482,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private void OnPeerConnectionInterrupted(
-        ref OnPeerConnectionInterruptedInfo data)
+        ref OnPeerConnectionInterruptedInfo data
+    )
     {
         if (data.RemoteUserId == null ||
             !data.RemoteUserId.IsValid())
@@ -486,7 +513,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private void OnRemoteConnectionClosed(
-        ref OnRemoteConnectionClosedInfo data)
+        ref OnRemoteConnectionClosedInfo data
+    )
     {
         if (data.RemoteUserId == null ||
             !data.RemoteUserId.IsValid())
@@ -569,11 +597,9 @@ public class EOSOnlineTransport : MonoBehaviour
                     MaxDataSizeBytes = packetSize
                 };
 
-            ProductUserId peerId =
-                null;
+            ProductUserId peerId = null;
 
-            SocketId socketId =
-                default;
+            SocketId socketId = default;
 
             byte channel;
 
@@ -635,7 +661,8 @@ public class EOSOnlineTransport : MonoBehaviour
 
     public void Send(
         ProductUserId remoteUserId,
-        byte[] packet)
+        byte[] packet
+    )
     {
         if (!IsInitialized ||
             p2pInterface == null)
@@ -673,10 +700,12 @@ public class EOSOnlineTransport : MonoBehaviour
                 SocketId = socketId,
                 Channel = 0,
                 AllowDelayedDelivery = true,
-                Reliability = PacketReliability.ReliableOrdered,
-                Data = new ArraySegment<byte>(
-                    packet
-                )
+                Reliability =
+                    PacketReliability.ReliableOrdered,
+                Data =
+                    new ArraySegment<byte>(
+                        packet
+                    )
             };
 
         Result result =
@@ -695,7 +724,8 @@ public class EOSOnlineTransport : MonoBehaviour
 
     public void SendToHost(
         ProductUserId hostUserId,
-        byte[] packet)
+        byte[] packet
+    )
     {
         Send(
             hostUserId,
@@ -704,7 +734,8 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     public void DisconnectFrom(
-        ProductUserId remoteUserId)
+        ProductUserId remoteUserId
+    )
     {
         if (!IsInitialized ||
             p2pInterface == null ||
@@ -745,11 +776,20 @@ public class EOSOnlineTransport : MonoBehaviour
 
     public void Disconnect()
     {
-        if (!IsInitialized ||
-            p2pInterface == null)
+        if (!IsInitialized)
         {
             return;
         }
+
+        /*
+         * IMPORTANTE:
+         *
+         * No eliminamos las notificaciones aquí.
+         * No destruimos p2pInterface aquí.
+         *
+         * Este método solamente cambia el estado lógico
+         * del transporte.
+         */
 
         IsConnected = false;
         IsHost = false;
@@ -760,9 +800,38 @@ public class EOSOnlineTransport : MonoBehaviour
         );
     }
 
+    private void OnApplicationQuit()
+    {
+        /*
+         * Marcamos que la aplicación se está cerrando.
+         *
+         * El orden entre OnApplicationQuit/OnDestroy de distintos
+         * MonoBehaviours no está garantizado por Unity. Si EOSManager
+         * ya liberó la PlatformInterface antes de que este objeto
+         * se destruya, llamar a RemoveNotifyPeerConnection* sobre
+         * una interfaz ya liberada provoca un crash nativo (SIGSEGV).
+         *
+         * Como el proceso está por terminar de todas formas, es
+         * seguro (e inofensivo) saltarnos la limpieza del SDK en
+         * este escenario.
+         */
+        isApplicationQuitting = true;
+    }
+
     private void RemoveNotifications()
     {
+        if (isApplicationQuitting)
+        {
+            return;
+        }
+
         if (p2pInterface == null)
+        {
+            return;
+        }
+
+        if (EOSManager.Instance == null ||
+            EOSManager.Instance.GetEOSPlatformInterface() == null)
         {
             return;
         }
@@ -809,6 +878,15 @@ public class EOSOnlineTransport : MonoBehaviour
         RemoveNotifications();
 
         p2pInterface = null;
+
         IsInitialized = false;
+        IsHost = false;
+        IsClient = false;
+        IsConnected = false;
+
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 }
