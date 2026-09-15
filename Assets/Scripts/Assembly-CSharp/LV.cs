@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using SaveClass;
 using SocketSave;
 using UnityEngine;
@@ -162,6 +163,26 @@ public class LV : MonoBehaviour
 		VaseBreakerVase = lv.VaseBreakerVase;
 	}
 
+	private void GiveTrophy()
+	{
+		BootySprite = BootySprite.Trophy;
+		AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
+		FirstBootyEvent = () =>
+		{
+			PlayerManager.Instance.Money += 1000;
+		};
+	}
+
+	private void GiveMoneyBag(int amount)
+	{
+		BootySprite = BootySprite.MoneyBag;
+		AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
+		FirstBootyEvent = () =>
+		{
+			PlayerManager.Instance.Money += amount;
+		};
+	}
+
 	private void Awake()
 	{
 		Instance = this;
@@ -199,403 +220,33 @@ public class LV : MonoBehaviour
 
 	private void LoadLocalLevel(int LVId)
 	{
-		switch (LVId)
+		// Casos especiales: alternan entre nivel de debug y nivel real
+		if (LVId == 1)
 		{
-		case 1:
 			LVPvP();
-			break;
-		case 10001:
-			if (PlayerManager.Instance.IsDebug)
-			{
-				LVTest();
-			}
-			else
-			{
-				LV10001();
-			}
-			break;
-		case 10002:
-			if (PlayerManager.Instance.IsDebug)
-			{
-				LVTest2();
-			}
-			else
-			{
-				LV10002();
-			}
-			break;
-		case 10003:
-			LV10003();
-			break;
-		case 10004:
-			LV10004();
-			break;
-		case 10005:
-			LV10005();
-			break;
-		case 10006:
-			LV10006();
-			break;
-		case 10007:
-			LV10007();
-			break;
-		case 10008:
-			LV10008();
-			break;
-		case 10009:
-			LV10009();
-			break;
-		case 10010:
-			LV10010();
-			break;
-		case 10011:
-			LV10011();
-			break;
-		case 10012:
-			LV10012();
-			break;
-		case 10013:
-			LV10013();
-			break;
-		case 10014:
-			LV10014();
-			break;
-		case 10015:
-			LV10015();
-			break;
-		case 10016:
-			LV10016();
-			break;
-		case 10017:
-			LV10017();
-			break;
-		case 10018:
-			LV10018();
-			break;
-		case 10019:
-			LV10019();
-			break;
-		case 10020:
-			LV10020();
-			break;
-		case 10021:
-			LV10021();
-			break;
-		case 10022:
-			LV10022();
-			break;
-		case 10023:
-			LV10023();
-			break;
-		case 10024:
-			LV10024();
-			break;
-		case 10025:
-			LV10025();
-			break;
-		case 10026:
-			LV10026();
-			break;
-		case 10027:
-			LV10027();
-			break;
-		case 10028:
-			LV10028();
-			break;
-		case 10029:
-			LV10029();
-			break;
-		case 10030:
-			LV10030();
-			break;
-		case 10031:
-			LV10031();
-			break;
-		case 10032:
-			LV10032();
-			break;
-		case 10033:
-			LV10033();
-			break;
-		case 10034:
-			LV10034();
-			break;
-		case 10035:
-			LV10035();
-			break;
-		case 10036:
-			LV10036();
-			break;
-		case 10037:
-			LV10037();
-			break;
-		case 10038:
-			LV10038();
-			break;
-		case 10039:
-			LV10039();
-			break;
-		case 10040:
-			LV10040();
-			break;
-		case 10041:
-			LV10041();
-			break;
-		case 10042:
-			LV10042();
-			break;
-		case 10043:
-			LV10043();
-			break;
-		case 10044:
-			LV10044();
-			break;
-		case 10045:
-			LV10045();
-			break;
-		case 10046:
-			LV10046();
-			break;
-		case 10047:
-			LV10047();
-			break;
-		case 10048:
-			LV10048();
-			break;
-		case 10049:
-			LV10049();
-			break;
-		case 10050:
-			LV10050();
-			break;
-		case 10051:
-			LV10051();
-			break;
-		case 10052:
-			LV10052();
-			break;
-		case 10053:
-			LV10053();
-			break;
-		case 10054:
-			LV10054();
-			break;
-		case 10055:
-			LV10055();
-			break;
-		case 11001:
-			LV11001();
-			break;
-		case 11002:
-			LV11002();
-			break;
-		case 11003:
-			LV11003();
-			break;
-		case 11004:
-			LV11004();
-			break;
-		case 11005:
-			LV11005();
-			break;
-		case 11006:
-			LV11006();
-			break;
-		case 11007:
-			LV11007();
-			break;
-		case 11008:
-			LV11008();
-			break;
-		case 11009:
-			LV11009();
-			break;
-		case 11010:
-			LV11010();
-			break;
-		case 11011:
-			LV11011();
-			break;
-		case 11012:
-			LV11012();
-			break;
-		case 11013:
-			LV11013();
-			break;
-		case 11014:
-			LV11014();
-			break;
-		case 11015:
-			LV11015();
-			break;
-		case 11016:
-			LV11016();
-			break;
-		case 11017:
-			LV11017();
-			break;
-		case 11018:
-			LV11018();
-			break;
-		case 11019:
-			LV11019();
-			break;
-		case 11020:
-			LV11020();
-			break;
-		case 11021:
-			LV11021();
-			break;
-		case 11022:
-			LV11022();
-			break;
-		case 11023:
-			LV11023();
-			break;
-		case 11024:
-			LV11024();
-			break;
-		case 11025:
-			LV11025();
-			break;
-		case 11026:
-			LV11026();
-			break;
-		case 11027:
-			LV11027();
-			break;
-		case 11028:
-			LV11028();
-			break;
-		case 11029:
-			LV11029();
-			break;
-		case 11030:
-			LV11030();
-			break;
-		case 11031:
-			LV11031();
-			break;
-		case 11032:
-			LV11032();
-			break;
-		case 11033:
-			LV11033();
-			break;
-		case 11034:
-			LV11034();
-			break;
-		case 11035:
-			LV11035();
-			break;
-		case 12001:
-			LV12001();
-			break;
-		case 12002:
-			LV12002();
-			break;
-		case 12003:
-			LV12003();
-			break;
-		case 12004:
-			LV12004();
-			break;
-		case 12005:
-			LV12005();
-			break;
-		case 12006:
-			LV12006();
-			break;
-		case 12007:
-			LV12007();
-			break;
-		case 12008:
-			LV12008();
-			break;
-		case 12009:
-			LV12009();
-			break;
-		case 12010:
-			LV12010();
-			break;
-		case 20001:
-			LV20001();
-			break;
-		case 20002:
-			LV20002();
-			break;
-		case 20003:
-			LV20003();
-			break;
-		case 20004:
-			LV20004();
-			break;
-		case 20005:
-			LV20005();
-			break;
-		case 20006:
-			LV20006();
-			break;
-		case 20007:
-			LV20007();
-			break;
-		case 20008:
-			LV20008();
-			break;
-		case 20009:
-			LV20009();
-			break;
-		case 20010:
-			LV20010();
-			break;
-		case 20011:
-			LV20011();
-			break;
-		case 20012:
-			LV20012();
-			break;
-		case 20013:
-			LV20013();
-			break;
-		case 20014:
-			LV20014();
-			break;
-		case 20015:
-			LV20015();
-			break;
-		case 20016:
-			LV20016();
-			break;
-		case 20017:
-			LV20017();
-			break;
-		case 20018:
-			LV20018();
-			break;
-		case 20019:
-			LV20019();
-			break;
-		case 20020:
-			LV20020();
-			break;
-		case 20021:
-			LV20021();
-			break;
-		case 20022:
-			LV20022();
-			break;
-		case 20023:
-			LV20023();
-			break;
-		case 20024:
-			LV20024();
-			break;
-		case 20025:
-			LV20025();
-			break;
-		default:
-			LV10001();
-			break;
+			return;
+		}
+		if (LVId == 10001)
+		{
+			if (PlayerManager.Instance.IsDebug) { LVTest(); } else { LV10001(); }
+			return;
+		}
+		if (LVId == 10002)
+		{
+			if (PlayerManager.Instance.IsDebug) { LVTest2(); } else { LV10002(); }
+			return;
+		}
+
+		// Resto de los niveles: se despachan por convencion de nombre "LV" + id,
+		// reemplazando el switch de 128 casos que llamaba 1 a 1 al mismo metodo.
+		MethodInfo method = GetType().GetMethod("LV" + LVId, BindingFlags.NonPublic | BindingFlags.Instance);
+		if (method != null)
+		{
+			method.Invoke(this, null);
+		}
+		else
+		{
+			LV10001(); // mismo comportamiento que el "default" del switch original
 		}
 	}
 
@@ -795,12 +446,7 @@ public class LV : MonoBehaviour
 				ZombieType.NormalZombie,
 				ZombieType.NormalZombie
 			};
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			LvNormalSunNum = 50;
 			Weights = new List<List<int>>
 			{
@@ -6924,12 +6570,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 300;
@@ -7013,12 +6654,7 @@ public class LV : MonoBehaviour
 		LvSpStates.Add(LVSpState.NutBowling);
 		dayBgm = BgmType.Loonboon;
 		nightBgm = BgmType.Loonboon;
-		BootySprite = BootySprite.Trophy;
-		AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-		FirstBootyEvent = () =>
-		{
-			PlayerManager.Instance.Money += 1000;
-		};
+		GiveTrophy();
 		NextWaveLossTime = -25;
 		GeneralCardPool = new List<CardType>
 		{
@@ -7122,12 +6758,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(PlantType.Cherry)
@@ -7246,12 +6877,7 @@ public class LV : MonoBehaviour
 		{
 			LvSpStates.Add(LVSpState.SleepDay);
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 300;
@@ -7365,12 +6991,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.RainPlant);
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(PlantType.Cherry)
@@ -7488,12 +7109,7 @@ public class LV : MonoBehaviour
 		}
 		LvSpStates.Add(LVSpState.InvisibleZombie);
 		dayBgm = BgmType.WateryGraves;
-		BootySprite = BootySprite.Trophy;
-		AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-		FirstBootyEvent = () =>
-		{
-			PlayerManager.Instance.Money += 1000;
-		};
+		GiveTrophy();
 		if (IsEasy)
 		{
 			LvNormalSunNum = 350;
@@ -7608,12 +7224,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.SmallZombie);
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 300;
@@ -7703,12 +7314,7 @@ public class LV : MonoBehaviour
 			return;
 		}
 		dayBgm = BgmType.WateryGraves;
-		BootySprite = BootySprite.Trophy;
-		AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-		FirstBootyEvent = () =>
-		{
-			PlayerManager.Instance.Money += 1000;
-		};
+		GiveTrophy();
 		if (IsEasy)
 		{
 			LvNormalSunNum = 150;
@@ -7814,12 +7420,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.PlantLikeColumn);
 			dayBgm = BgmType.UltimateBattle;
 			nightBgm = BgmType.UltimateBattle;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			GeneralCardPool = new List<CardType>
 			{
 				new CardType(PlantType.Melonpult),
@@ -7947,12 +7548,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 300;
@@ -8058,12 +7654,7 @@ public class LV : MonoBehaviour
 		if (!OnlyInfo)
 		{
 			dayBgm = BgmType.WateryGraves;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 750;
@@ -8153,12 +7744,7 @@ public class LV : MonoBehaviour
 		}
 		dayBgm = BgmType.GrazeTheRoof;
 		nightBgm = BgmType.MoonGrains;
-		BootySprite = BootySprite.Trophy;
-		AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-		FirstBootyEvent = () =>
-		{
-			PlayerManager.Instance.Money += 1000;
-		};
+		GiveTrophy();
 		CurrSeedBankType = SeedBankType.MoonBank;
 		WaterZombieNum = 4;
 		WaterZombie = new List<ZombieType>
@@ -8258,12 +7844,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.QuickZombie);
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 200;
@@ -8374,12 +7955,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 300;
@@ -8586,12 +8162,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.PlantReverse);
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 200;
@@ -8692,12 +8263,7 @@ public class LV : MonoBehaviour
 			WeightLimit = false;
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			BigWaveFixedZombie = new List<ZombieType> { ZombieType.FlagZombie };
 			NextWaveLossTime = 15;
 			if (IsEasy)
@@ -8775,12 +8341,7 @@ public class LV : MonoBehaviour
 		{
 			return;
 		}
-		BootySprite = BootySprite.Trophy;
-		AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-		FirstBootyEvent = () =>
-		{
-			PlayerManager.Instance.Money += 1000;
-		};
+		GiveTrophy();
 		dayBgm = BgmType.WateryGraves;
 		nightBgm = BgmType.RigorMormist;
 		if (IsEasy)
@@ -8907,12 +8468,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 250;
@@ -9009,12 +8565,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.FreeDay);
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				BigWaveFixedZombie = new List<ZombieType>
@@ -9128,12 +8679,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrazeTheRoof;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 150;
@@ -9234,12 +8780,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrazeTheRoof;
 			nightBgm = BgmType.MoonGrains;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			CurrSeedBankType = SeedBankType.MoonBank;
 			if (IsEasy)
 			{
@@ -9318,12 +8859,7 @@ public class LV : MonoBehaviour
 			nightBgm = BgmType.RigorMormist;
 			BanMultyCardAdd = true;
 			WeightLimit = false;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(PlantType.SunFlower),
@@ -9437,12 +8973,7 @@ public class LV : MonoBehaviour
 			dayBgm = BgmType.GrazeTheRoof;
 			nightBgm = BgmType.RigorMormist;
 			WeightLimit = false;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 500;
@@ -9558,12 +9089,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.SmallZombie);
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 300;
@@ -9654,12 +9180,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 500;
@@ -9760,12 +9281,7 @@ public class LV : MonoBehaviour
 			LvTemperature = 25;
 			dayBgm = BgmType.GrazeTheRoof;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 500;
@@ -9877,12 +9393,7 @@ public class LV : MonoBehaviour
 		{
 			CurrSeedBankType = SeedBankType.SunAndMoonBank;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 800;
@@ -10014,12 +9525,7 @@ public class LV : MonoBehaviour
 			LvTemperature = -40;
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 700;
@@ -10121,12 +9627,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				LvNormalSunNum = 600;
@@ -10263,12 +9764,7 @@ public class LV : MonoBehaviour
 			LvSpStates.Add(LVSpState.SleepDay);
 			dayBgm = BgmType.WateryGraves;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			if (IsEasy)
 			{
 				BigWaveFixedZombie = new List<ZombieType>
@@ -10384,12 +9880,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.GrazeTheRoof;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			WaterZombieNum = 4;
 			WaterZombie = new List<ZombieType>
 			{
@@ -10700,12 +10191,7 @@ public class LV : MonoBehaviour
 			BanMultyCardAdd = true;
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			EnablePlantGlove = true;
 			FixedCard = new List<CardType>
 			{
@@ -10876,12 +10362,7 @@ public class LV : MonoBehaviour
 			BanMultyCardAdd = true;
 			dayBgm = BgmType.GrassWalk;
 			nightBgm = BgmType.RigorMormist;
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			EnableZombieGlove = true;
 			FixedCard = new List<CardType>
 			{
@@ -10971,12 +10452,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			PlantVaseNum = 2;
 			ZombieVaseNum = 2;
 			VaseBreakerVase = new List<List<List<VaseType>>>
@@ -11034,12 +10510,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(ZombieType.NormalZombie),
@@ -11100,12 +10571,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			PlantVaseNum = 2;
 			ZombieVaseNum = 2;
 			VaseBreakerVase = new List<List<List<VaseType>>>
@@ -11178,12 +10644,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(ZombieType.NormalZombie),
@@ -11250,12 +10711,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			PlantVaseNum = 2;
 			ZombieVaseNum = 2;
 			VaseBreakerVase = new List<List<List<VaseType>>>
@@ -11328,12 +10784,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(ZombieType.NormalZombie),
@@ -11398,12 +10849,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.BackYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			PlantVaseNum = 2;
 			ZombieVaseNum = 2;
 			VaseBreakerVase = new List<List<List<VaseType>>>
@@ -11474,12 +10920,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(ZombieType.NormalZombie),
@@ -11548,12 +10989,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.Roof };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			PlantVaseNum = 2;
 			ZombieVaseNum = 2;
 			VaseBreakerVase = new List<List<List<VaseType>>>
@@ -11616,12 +11052,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.FrontYard };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.Trophy;
-			AwardScence.Instance.LoadText("你获得了一个奖杯!", "奖杯", "继续解锁更多奖杯吧！");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1000;
-			};
+			GiveTrophy();
 			FixedCard = new List<CardType>
 			{
 				new CardType(ZombieType.NormalZombie),
@@ -11703,12 +11134,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				Weights = new List<List<int>>
@@ -11756,12 +11182,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 150;
@@ -11811,12 +11232,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 150;
@@ -11875,12 +11291,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 150;
@@ -11939,12 +11350,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 200;
@@ -12001,12 +11407,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				Weights = new List<List<int>>
@@ -12065,12 +11466,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				Weights = new List<List<int>>
@@ -12136,12 +11532,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 125;
@@ -12368,12 +11759,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 150;
@@ -12448,12 +11834,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 500;
-			};
+			GiveMoneyBag(500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 250;
@@ -12534,12 +11915,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 600;
-			};
+			GiveMoneyBag(600);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 200;
@@ -12622,12 +11998,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 500;
@@ -12702,12 +12073,7 @@ public class LV : MonoBehaviour
 		};
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			WaterZombieNum = 4;
 			WaterZombie = new List<ZombieType>
 			{
@@ -12805,12 +12171,7 @@ public class LV : MonoBehaviour
 		};
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
 			SetupTime = new Vector2(13f, 15f);
@@ -12894,12 +12255,7 @@ public class LV : MonoBehaviour
 		};
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
 			WaterZombieNum = 2;
@@ -12999,12 +12355,7 @@ public class LV : MonoBehaviour
 		LoadMapTypes = new List<MapType> { MapType.BackSwamp };
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
 			WaterZombieNum = 2;
@@ -13092,12 +12443,7 @@ public class LV : MonoBehaviour
 		};
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
 			WaterZombieNum = 2;
@@ -13206,12 +12552,7 @@ public class LV : MonoBehaviour
 		};
 		if (!OnlyInfo)
 		{
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
 			WaterZombieNum = 2;
@@ -13332,12 +12673,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			if (IsEasy)
 			{
 				LvNormalSunNum = 400;
@@ -13404,12 +12740,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			if (IsEasy)
 			{
 				Weights = new List<List<int>>
@@ -13474,12 +12805,7 @@ public class LV : MonoBehaviour
 			};
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			if (IsEasy)
 			{
 				Weights = new List<List<int>>
@@ -13633,12 +12959,7 @@ public class LV : MonoBehaviour
 		{
 			dayBgm = BgmType.SwampDay;
 			nightBgm = BgmType.SwampNight;
-			BootySprite = BootySprite.MoneyBag;
-			AwardScence.Instance.LoadText("你获得了一些钱!", "金币袋", "袋中的钱币已存入你的手中");
-			FirstBootyEvent = () =>
-			{
-				PlayerManager.Instance.Money += 1500;
-			};
+			GiveMoneyBag(1500);
 			WaterZombieNum = 4;
 			WaterZombie = new List<ZombieType>
 			{
