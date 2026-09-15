@@ -1,0 +1,30 @@
+allprojects {
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+
+        dependencies {
+            classpath 'com.android.tools.build:gradle:7.4.2'
+            classpath "com.android.tools:r8:8.1.56"
+        }
+    }
+
+    repositories {
+        google()
+        mavenCentral()
+
+        maven {
+            url = uri("https://storage.googleapis.com/r8-releases/raw")
+        }
+
+        flatDir {
+            dirs "${project(':unityLibrary').projectDir}/libs"
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
