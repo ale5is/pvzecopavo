@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using UnityEngine;
 using Epic.OnlineServices;
 
@@ -10,20 +11,17 @@ public class EOSOnlineClient : MonoBehaviour
 
     public bool IsConnected { get; private set; }
 
-    public ProductUserId HostUserId =>
-        hostUserId;
+    public ProductUserId HostUserId => hostUserId;
 
     private void Awake()
     {
-        if (Instance != null &&
-            Instance != this)
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
 
         Instance = this;
-
         DontDestroyOnLoad(gameObject);
     }
 
@@ -40,91 +38,52 @@ public class EOSOnlineClient : MonoBehaviour
     private void SubscribeTransport()
     {
         if (EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
 
-        EOSOnlineTransport.Instance.OnPeerConnected -=
-            OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerConnected -= OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerDisconnected -= OnPeerDisconnected;
+        EOSOnlineTransport.Instance.OnPacketReceived -= OnPacketReceived;
 
-        EOSOnlineTransport.Instance.OnPeerDisconnected -=
-            OnPeerDisconnected;
-
-        EOSOnlineTransport.Instance.OnPacketReceived -=
-            OnPacketReceived;
-
-        EOSOnlineTransport.Instance.OnPeerConnected +=
-            OnPeerConnected;
-
-        EOSOnlineTransport.Instance.OnPeerDisconnected +=
-            OnPeerDisconnected;
-
-        EOSOnlineTransport.Instance.OnPacketReceived +=
-            OnPacketReceived;
+        EOSOnlineTransport.Instance.OnPeerConnected += OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerDisconnected += OnPeerDisconnected;
+        EOSOnlineTransport.Instance.OnPacketReceived += OnPacketReceived;
     }
 
     private void UnsubscribeTransport()
     {
         if (EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
 
-        EOSOnlineTransport.Instance.OnPeerConnected -=
-            OnPeerConnected;
-
-        EOSOnlineTransport.Instance.OnPeerDisconnected -=
-            OnPeerDisconnected;
-
-        EOSOnlineTransport.Instance.OnPacketReceived -=
-            OnPacketReceived;
+        EOSOnlineTransport.Instance.OnPeerConnected -= OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerDisconnected -= OnPeerDisconnected;
+        EOSOnlineTransport.Instance.OnPacketReceived -= OnPacketReceived;
     }
 
-    public bool ConnectToHost(
-        ProductUserId productUserId)
+    public bool ConnectToHost(ProductUserId productUserId)
     {
-        if (productUserId == null ||
-            !productUserId.IsValid())
+        if (productUserId == null || !productUserId.IsValid())
         {
-            Debug.LogError(
-                "[EOS CLIENT] ProductUserId del host inválido."
-            );
-
+            Debug.LogError("[EOS CLIENT] ProductUserId del host inválido.");
             return false;
         }
 
         if (EOSOnlineTransport.Instance == null)
         {
-            Debug.LogError(
-                "[EOS CLIENT] EOSOnlineTransport no existe."
-            );
-
+            Debug.LogError("[EOS CLIENT] EOSOnlineTransport no existe.");
             return false;
         }
 
         if (IsConnected)
-        {
-            Debug.LogWarning(
-                "[EOS CLIENT] Ya está conectado al host."
-            );
-
             return true;
-        }
 
-        hostUserId =
-            productUserId;
+        hostUserId = productUserId;
 
         Debug.Log(
             "[EOS CLIENT] Conectando al host: " +
             hostUserId
         );
 
-        bool result =
-            EOSOnlineTransport.Instance.StartClient(
-                hostUserId
-            );
-
-        if (!result)
+        if (!EOSOnlineTransport.Instance.StartClient(hostUserId))
         {
             hostUserId = null;
             IsConnected = false;
@@ -139,43 +98,25 @@ public class EOSOnlineClient : MonoBehaviour
         return true;
     }
 
-    private void OnPeerConnected(
-        ProductUserId playerId)
+    private void OnPeerConnected(ProductUserId playerId)
     {
-        if (hostUserId == null)
-        {
+        if (hostUserId == null ||
+            playerId != hostUserId)
             return;
-        }
-
-        if (playerId != hostUserId)
-        {
-            return;
-        }
 
         IsConnected = true;
 
         Debug.Log(
-            "[EOS CLIENT] CONECTADO AL SERVIDOR."
-        );
-
-        Debug.Log(
-            "[EOS CLIENT] Host: " +
+            "[EOS CLIENT] CONECTADO AL SERVIDOR: " +
             hostUserId
         );
     }
 
-    private void OnPeerDisconnected(
-        ProductUserId playerId)
+    private void OnPeerDisconnected(ProductUserId playerId)
     {
-        if (hostUserId == null)
-        {
+        if (hostUserId == null ||
+            playerId != hostUserId)
             return;
-        }
-
-        if (playerId != hostUserId)
-        {
-            return;
-        }
 
         IsConnected = false;
 
@@ -190,28 +131,20 @@ public class EOSOnlineClient : MonoBehaviour
     {
         if (sender == null ||
             packet == null ||
-            packet.Length == 0)
-        {
+            packet.Length == 0 ||
+            (hostUserId != null && sender != hostUserId))
             return;
-        }
 
-        if (hostUserId != null &&
-            sender != hostUserId)
-        {
-            return;
-        }
-
-        string text = null;
+        string text;
 
         try
         {
-            text =
-                System.Text.Encoding.UTF8.GetString(
-                    packet
-                );
+            text = Encoding.UTF8.GetString(packet);
         }
         catch
         {
+            OnGamePacket(packet);
+            return;
         }
 
         if (text == "EOS_WELCOME")
@@ -223,10 +156,9 @@ public class EOSOnlineClient : MonoBehaviour
             return;
         }
 
-        if (text != null &&
-            text.StartsWith(
-                "EOS_PLAYERS|",
-                StringComparison.Ordinal))
+        if (text.StartsWith(
+            "EOS_PLAYERS|",
+            StringComparison.Ordinal))
         {
             Debug.Log(
                 "[EOS CLIENT] Lista de jugadores: " +
@@ -236,24 +168,15 @@ public class EOSOnlineClient : MonoBehaviour
             return;
         }
 
-        OnGamePacket(
-            packet
-        );
+        OnGamePacket(packet);
     }
 
-    private void OnGamePacket(
-        byte[] packet)
+    private void OnGamePacket(byte[] packet)
     {
-        /*
-         * Este es el punto donde conectaremos
-         * el protocolo actual de SocketClient.
-         *
-         * No modificamos todavía SocketClient.cs.
-         */
+        // Aquí se conectará posteriormente SocketClient.
     }
 
-    public void Send(
-        byte[] packet)
+    public void Send(byte[] packet)
     {
         if (!IsConnected)
         {
@@ -265,15 +188,9 @@ public class EOSOnlineClient : MonoBehaviour
         }
 
         if (hostUserId == null ||
-            !hostUserId.IsValid())
-        {
+            !hostUserId.IsValid() ||
+            EOSOnlineTransport.Instance == null)
             return;
-        }
-
-        if (EOSOnlineTransport.Instance == null)
-        {
-            return;
-        }
 
         EOSOnlineTransport.Instance.SendToHost(
             hostUserId,
@@ -281,34 +198,14 @@ public class EOSOnlineClient : MonoBehaviour
         );
     }
 
-    public void SendText(
-        string text)
+    public void SendText(string text)
     {
-        if (string.IsNullOrEmpty(text))
-        {
-            return;
-        }
-
-        Send(
-            System.Text.Encoding.UTF8.GetBytes(
-                text
-            )
-        );
+        if (!string.IsNullOrEmpty(text))
+            Send(Encoding.UTF8.GetBytes(text));
     }
 
     public void Disconnect()
     {
-        /*
-         * El transporte es el único responsable
-         * del estado P2P.
-         *
-         * EOSOnlineSession se encarga del orden:
-         * Server -> Client -> Transport -> Session.
-         *
-         * Por eso NO llamamos Transport.Disconnect()
-         * aquí.
-         */
-
         IsConnected = false;
         hostUserId = null;
 
@@ -319,12 +216,6 @@ public class EOSOnlineClient : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        /*
-         * No tocamos el transporte aquí.
-         *
-         * EOSOnlineTransport es el único encargado
-         * del ciclo de vida P2P al cerrar Unity.
-         */
         IsConnected = false;
         hostUserId = null;
     }
@@ -337,8 +228,6 @@ public class EOSOnlineClient : MonoBehaviour
         hostUserId = null;
 
         if (Instance == this)
-        {
             Instance = null;
-        }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using Epic.OnlineServices;
 
@@ -6,32 +7,19 @@ public class EOSOnlineServer : MonoBehaviour
 {
     public static EOSOnlineServer Instance;
 
-    [Header("Servidor EOS")]
     [SerializeField] private int maxPlayers = 4;
 
-    private readonly List<ProductUserId> players =
-        new List<ProductUserId>();
+    private readonly List<ProductUserId> players = new List<ProductUserId>();
 
     public bool IsRunning { get; private set; }
 
-    public ProductUserId LocalHostId
-    {
-        get
-        {
-            if (EOSOnlineTransport.Instance == null)
-            {
-                return null;
-            }
+    public ProductUserId LocalHostId =>
+        EOSOnlineTransport.Instance != null
+            ? EOSOnlineTransport.Instance.LocalUserId
+            : null;
 
-            return EOSOnlineTransport.Instance.LocalUserId;
-        }
-    }
-
-    public IReadOnlyList<ProductUserId> Players =>
-        players;
-
-    public int MaxPlayers =>
-        maxPlayers;
+    public IReadOnlyList<ProductUserId> Players => players;
+    public int MaxPlayers => maxPlayers;
 
     private bool applicationQuitting;
 
@@ -44,7 +32,6 @@ public class EOSOnlineServer : MonoBehaviour
         }
 
         Instance = this;
-
         DontDestroyOnLoad(gameObject);
     }
 
@@ -61,137 +48,74 @@ public class EOSOnlineServer : MonoBehaviour
     private void SubscribeTransport()
     {
         if (EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
 
-        EOSOnlineTransport.Instance.OnPeerConnected -=
-            OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerConnected -= OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerDisconnected -= OnPeerDisconnected;
+        EOSOnlineTransport.Instance.OnPacketReceived -= OnPacketReceived;
 
-        EOSOnlineTransport.Instance.OnPeerDisconnected -=
-            OnPeerDisconnected;
-
-        EOSOnlineTransport.Instance.OnPacketReceived -=
-            OnPacketReceived;
-
-        EOSOnlineTransport.Instance.OnPeerConnected +=
-            OnPeerConnected;
-
-        EOSOnlineTransport.Instance.OnPeerDisconnected +=
-            OnPeerDisconnected;
-
-        EOSOnlineTransport.Instance.OnPacketReceived +=
-            OnPacketReceived;
+        EOSOnlineTransport.Instance.OnPeerConnected += OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerDisconnected += OnPeerDisconnected;
+        EOSOnlineTransport.Instance.OnPacketReceived += OnPacketReceived;
     }
 
     private void UnsubscribeTransport()
     {
         if (EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
 
-        EOSOnlineTransport.Instance.OnPeerConnected -=
-            OnPeerConnected;
-
-        EOSOnlineTransport.Instance.OnPeerDisconnected -=
-            OnPeerDisconnected;
-
-        EOSOnlineTransport.Instance.OnPacketReceived -=
-            OnPacketReceived;
+        EOSOnlineTransport.Instance.OnPeerConnected -= OnPeerConnected;
+        EOSOnlineTransport.Instance.OnPeerDisconnected -= OnPeerDisconnected;
+        EOSOnlineTransport.Instance.OnPacketReceived -= OnPacketReceived;
     }
 
     public bool StartServer()
     {
         if (IsRunning)
-        {
-            Debug.Log(
-                "[EOS SERVER] El servidor ya está iniciado."
-            );
-
             return true;
-        }
 
         if (EOSOnlineTransport.Instance == null)
         {
-            Debug.LogError(
-                "[EOS SERVER] EOSOnlineTransport no existe."
-            );
-
+            Debug.LogError("[EOS SERVER] EOSOnlineTransport no existe.");
             return false;
         }
-
-        /*
-         * IMPORTANTE:
-         *
-         * StartHost() YA se ejecuta antes desde EOSOnlineSession.
-         * No volver a llamarlo aquí.
-         */
 
         ProductUserId localId =
             EOSOnlineTransport.Instance.LocalUserId;
 
-        if (localId == null ||
-            !localId.IsValid())
+        if (localId == null || !localId.IsValid())
         {
-            Debug.LogError(
-                "[EOS SERVER] ProductUserId local inválido."
-            );
-
+            Debug.LogError("[EOS SERVER] ProductUserId local inválido.");
             return false;
         }
 
         players.Clear();
-
         players.Add(localId);
-
         IsRunning = true;
 
         SubscribeTransport();
 
         Debug.Log(
-            "[EOS SERVER] SERVIDOR ONLINE INICIADO."
-        );
-
-        Debug.Log(
-            "[EOS SERVER] Host ProductUserId: " +
-            localId
-        );
-
-        Debug.Log(
-            "[EOS SERVER] Capacidad: " +
+            "[EOS SERVER] ONLINE | Host: " +
+            localId +
+            " | Jugadores: 1/" +
             maxPlayers
         );
 
         return true;
     }
 
-    private void OnPeerConnected(
-        ProductUserId playerId
-    )
+    private void OnPeerConnected(ProductUserId playerId)
     {
-        if (!IsRunning)
-        {
+        if (!IsRunning ||
+            playerId == null ||
+            !playerId.IsValid() ||
+            players.Contains(playerId))
             return;
-        }
-
-        if (playerId == null ||
-            !playerId.IsValid())
-        {
-            return;
-        }
-
-        if (players.Contains(playerId))
-        {
-            return;
-        }
 
         if (players.Count >= maxPlayers)
         {
-            Debug.LogWarning(
-                "[EOS SERVER] Servidor lleno."
-            );
-
+            Debug.LogWarning("[EOS SERVER] Servidor lleno.");
             return;
         }
 
@@ -199,29 +123,21 @@ public class EOSOnlineServer : MonoBehaviour
 
         Debug.Log(
             "[EOS SERVER] Jugador conectado: " +
-            playerId
-        );
-
-        Debug.Log(
-            "[EOS SERVER] Jugadores: " +
+            playerId +
+            " | " +
             players.Count +
             "/" +
             maxPlayers
         );
 
         SendWelcome(playerId);
-
         SendPlayerList();
     }
 
-    private void OnPeerDisconnected(
-        ProductUserId playerId
-    )
+    private void OnPeerDisconnected(ProductUserId playerId)
     {
         if (playerId == null)
-        {
             return;
-        }
 
         players.Remove(playerId);
 
@@ -231,69 +147,33 @@ public class EOSOnlineServer : MonoBehaviour
         );
 
         if (IsRunning)
-        {
             SendPlayerList();
-        }
     }
 
     private void OnPacketReceived(
         ProductUserId sender,
-        byte[] packet
-    )
+        byte[] packet)
     {
-        if (!IsRunning)
-        {
-            return;
-        }
-
-        if (sender == null ||
+        if (!IsRunning ||
+            sender == null ||
             packet == null ||
-            packet.Length == 0)
-        {
+            packet.Length == 0 ||
+            !players.Contains(sender))
             return;
-        }
 
-        if (!players.Contains(sender))
-        {
-            return;
-        }
-
-        Debug.Log(
-            "[EOS SERVER] Paquete recibido de " +
-            sender +
-            " | Bytes: " +
-            packet.Length
-        );
-
-        BroadcastExcept(
-            sender,
-            packet
-        );
-
-        OnGamePacket(
-            sender,
-            packet
-        );
+        BroadcastExcept(sender, packet);
+        OnGamePacket(sender, packet);
     }
 
-    private void SendWelcome(
-        ProductUserId playerId
-    )
+    private void SendWelcome(ProductUserId playerId)
     {
         if (!IsRunning ||
             EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
-
-        byte[] packet =
-            System.Text.Encoding.UTF8.GetBytes(
-                "EOS_WELCOME"
-            );
 
         EOSOnlineTransport.Instance.Send(
             playerId,
-            packet
+            Encoding.UTF8.GetBytes("EOS_WELCOME")
         );
     }
 
@@ -301,159 +181,83 @@ public class EOSOnlineServer : MonoBehaviour
     {
         if (!IsRunning ||
             EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
 
-        string data =
+        byte[] packet = Encoding.UTF8.GetBytes(
             "EOS_PLAYERS|" +
-            string.Join(
-                ",",
-                players
-            );
-
-        byte[] packet =
-            System.Text.Encoding.UTF8.GetBytes(
-                data
-            );
+            string.Join(",", players)
+        );
 
         foreach (ProductUserId player in players)
         {
-            if (player == null ||
-                !player.IsValid())
-            {
-                continue;
-            }
-
-            EOSOnlineTransport.Instance.Send(
-                player,
-                packet
-            );
+            if (IsValidPlayer(player))
+                EOSOnlineTransport.Instance.Send(player, packet);
         }
     }
 
     private void BroadcastExcept(
         ProductUserId excludedPlayer,
-        byte[] packet
-    )
+        byte[] packet)
     {
         if (!IsRunning ||
             EOSOnlineTransport.Instance == null)
-        {
             return;
-        }
 
         foreach (ProductUserId player in players)
         {
-            if (player == null ||
-                !player.IsValid())
-            {
+            if (!IsValidPlayer(player) ||
+                player == excludedPlayer)
                 continue;
-            }
 
-            if (player == excludedPlayer)
-            {
-                continue;
-            }
-
-            EOSOnlineTransport.Instance.Send(
-                player,
-                packet
-            );
+            EOSOnlineTransport.Instance.Send(player, packet);
         }
+    }
+
+    private bool IsValidPlayer(ProductUserId player)
+    {
+        return player != null && player.IsValid();
     }
 
     private void OnGamePacket(
         ProductUserId sender,
-        byte[] packet
-    )
+        byte[] packet)
     {
-        /*
-         * Aquí conectaremos posteriormente
-         * el protocolo actual de SocketServer.
-         *
-         * SocketServer.cs no se modifica.
-         */
+        // Aquí se conectará posteriormente el protocolo de SocketServer.
     }
 
     public void SendToPlayer(
         ProductUserId playerId,
-        byte[] packet
-    )
+        byte[] packet)
     {
-        if (!IsRunning)
-        {
+        if (!IsRunning ||
+            !IsValidPlayer(playerId) ||
+            !players.Contains(playerId) ||
+            EOSOnlineTransport.Instance == null)
             return;
-        }
 
-        if (playerId == null ||
-            !playerId.IsValid())
-        {
-            return;
-        }
-
-        if (!players.Contains(playerId))
-        {
-            return;
-        }
-
-        if (EOSOnlineTransport.Instance == null)
-        {
-            return;
-        }
-
-        EOSOnlineTransport.Instance.Send(
-            playerId,
-            packet
-        );
+        EOSOnlineTransport.Instance.Send(playerId, packet);
     }
 
-    public void Broadcast(
-        byte[] packet
-    )
+    public void Broadcast(byte[] packet)
     {
-        if (!IsRunning)
-        {
+        if (!IsRunning ||
+            EOSOnlineTransport.Instance == null)
             return;
-        }
-
-        if (EOSOnlineTransport.Instance == null)
-        {
-            return;
-        }
 
         foreach (ProductUserId player in players)
         {
-            if (player == null ||
-                !player.IsValid())
-            {
+            if (!IsValidPlayer(player) ||
+                player == LocalHostId)
                 continue;
-            }
 
-            if (player == LocalHostId)
-            {
-                continue;
-            }
-
-            EOSOnlineTransport.Instance.Send(
-                player,
-                packet
-            );
+            EOSOnlineTransport.Instance.Send(player, packet);
         }
     }
 
-    public bool HasPlayer(
-        ProductUserId playerId
-    )
+    public bool HasPlayer(ProductUserId playerId)
     {
-        if (playerId == null)
-        {
-            return false;
-        }
-
-        return players.Contains(
-            playerId
-        );
+        return IsValidPlayer(playerId) &&
+               players.Contains(playerId);
     }
 
     public void StopServer()
@@ -464,28 +268,18 @@ public class EOSOnlineServer : MonoBehaviour
             return;
         }
 
-        Debug.Log(
-            "[EOS SERVER] Cerrando servidor..."
-        );
-
         IsRunning = false;
-
         players.Clear();
 
-        Debug.Log(
-            "[EOS SERVER] SERVIDOR ONLINE CERRADO."
-        );
+        Debug.Log("[EOS SERVER] SERVIDOR CERRADO.");
     }
 
     private void OnApplicationQuit()
     {
         if (applicationQuitting)
-        {
             return;
-        }
 
         applicationQuitting = true;
-
         StopServer();
     }
 
@@ -494,8 +288,6 @@ public class EOSOnlineServer : MonoBehaviour
         UnsubscribeTransport();
 
         if (Instance == this)
-        {
             Instance = null;
-        }
     }
 }

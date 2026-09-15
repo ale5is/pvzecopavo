@@ -10,27 +10,22 @@ public class EOSOnlineUI : MonoBehaviour
 
     [Header("Panel")]
     [SerializeField] private GameObject onlineRoomsPanel;
-
     [SerializeField] private TMP_Text roomsStatusText;
 
     [Header("Textos de las salas")]
     [SerializeField] private TMP_Text[] roomNameTexts;
-
     [SerializeField] private TMP_Text[] roomPlayersTexts;
-
     [SerializeField] private TMP_Text[] roomHostTexts;
 
     private bool operationInProgress;
-
+    private bool statusLocked;
     private int selectedRoomIndex = -1;
 
-    private readonly List<EOSOnlineRoom> displayedRooms =
-        new List<EOSOnlineRoom>();
+    private readonly List<EOSOnlineRoom> displayedRooms = new();
 
     private void Awake()
     {
-        if (Instance != null &&
-            Instance != this)
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
@@ -42,95 +37,60 @@ public class EOSOnlineUI : MonoBehaviour
     private void Start()
     {
         ConfigureRoomClickTargets();
-
         HideRoomTexts();
 
         if (onlineRoomsPanel != null)
-        {
             onlineRoomsPanel.SetActive(false);
-        }
     }
 
     private void Update()
     {
-        if (EOSOnlineSession.Instance == null)
-        {
+        if (EOSOnlineSession.Instance == null ||
+            EOSOnlineSession.Instance.IsSearching)
             return;
-        }
-
-        if (EOSOnlineSession.Instance.IsSearching)
-        {
-            return;
-        }
 
         RefreshRooms();
     }
 
     private bool IsBusy()
     {
-        if (operationInProgress)
-        {
-            return true;
-        }
-
-        if (EOSOnlineSession.Instance != null &&
-            EOSOnlineSession.Instance.IsOperationInProgress)
-        {
-            return true;
-        }
-
-        if (EOSAutoLogin.Instance != null &&
-            EOSAutoLogin.Instance.IsLoginInProgress)
-        {
-            return true;
-        }
-
-        return false;
+        return operationInProgress ||
+               (EOSOnlineSession.Instance != null &&
+                EOSOnlineSession.Instance.IsOperationInProgress) ||
+               (EOSAutoLogin.Instance != null &&
+                EOSAutoLogin.Instance.IsLoginInProgress);
     }
 
     public void CreateOnlineGame()
     {
         if (IsBusy())
-        {
             return;
-        }
 
         if (EOSAutoLogin.Instance == null)
         {
-            Debug.LogError(
-                "[EOS UI] EOSAutoLogin no existe."
-            );
-
+            SetSessionStatus("EOSAutoLogin no existe.");
             return;
         }
 
         operationInProgress = true;
+        SetSessionStatus("Creando partida...");
 
-        EOSAutoLogin.Instance.Login(
-            OnCreateLoginFinished
-        );
+        EOSAutoLogin.Instance.Login(OnCreateLoginFinished);
     }
 
-    private void OnCreateLoginFinished(
-        bool success)
+    private void OnCreateLoginFinished(bool success)
     {
         operationInProgress = false;
 
         if (!success)
         {
-            Debug.LogError(
-                "[EOS UI] No se pudo iniciar sesión."
-            );
-
+            SetSessionStatus("No se pudo iniciar sesión.");
             return;
         }
 
         if (EOSOnlineSession.Instance == null)
         {
-            Debug.LogError(
-                "[EOS UI] EOSOnlineSession no existe."
-            );
-
+            SetSessionStatus("EOSOnlineSession no existe.");
             return;
         }
 
@@ -140,58 +100,38 @@ public class EOSOnlineUI : MonoBehaviour
     public void SearchOnlineGames()
     {
         if (IsBusy())
-        {
             return;
-        }
 
         if (EOSAutoLogin.Instance == null)
         {
-            Debug.LogError(
-                "[EOS UI] EOSAutoLogin no existe."
-            );
-
+            SetStatus("EOSAutoLogin no existe.");
             return;
         }
 
         operationInProgress = true;
-
         selectedRoomIndex = -1;
-
         displayedRooms.Clear();
 
         ShowOnlineRooms();
-
         ClearRoomTexts();
+        SetStatus("Buscando partidas...");
 
-        SetStatus(
-            "Buscando partidas..."
-        );
-
-        EOSAutoLogin.Instance.Login(
-            OnSearchLoginFinished
-        );
+        EOSAutoLogin.Instance.Login(OnSearchLoginFinished);
     }
 
-    private void OnSearchLoginFinished(
-        bool success)
+    private void OnSearchLoginFinished(bool success)
     {
         operationInProgress = false;
 
         if (!success)
         {
-            SetStatus(
-                "No se pudo iniciar sesión."
-            );
-
+            SetStatus("No se pudo iniciar sesión.");
             return;
         }
 
         if (EOSOnlineSession.Instance == null)
         {
-            SetStatus(
-                "EOSOnlineSession no existe."
-            );
-
+            SetStatus("EOSOnlineSession no existe.");
             return;
         }
 
@@ -201,94 +141,61 @@ public class EOSOnlineUI : MonoBehaviour
     public void JoinOnlineGame()
     {
         if (IsBusy())
-        {
             return;
-        }
 
         if (selectedRoomIndex < 0)
         {
-            SetStatus(
-                "Seleccioná una partida primero."
-            );
-
-            Debug.LogWarning(
-                "[EOS UI] No hay ninguna sala seleccionada."
-            );
-
+            SetStatus("Seleccioná una partida primero.");
             return;
         }
 
         if (selectedRoomIndex >= displayedRooms.Count)
         {
-            SetStatus(
-                "La partida seleccionada ya no está disponible."
-            );
-
+            SetStatus("La partida seleccionada ya no está disponible.");
             selectedRoomIndex = -1;
-
             return;
         }
 
         if (EOSAutoLogin.Instance == null)
         {
-            Debug.LogError(
-                "[EOS UI] EOSAutoLogin no existe."
-            );
-
+            SetStatus("EOSAutoLogin no existe.");
             return;
         }
 
         operationInProgress = true;
+        SetSessionStatus("Uniéndose a la partida...");
 
-        EOSAutoLogin.Instance.Login(
-            OnJoinLoginFinished
-        );
+        EOSAutoLogin.Instance.Login(OnJoinLoginFinished);
     }
 
-    private void OnJoinLoginFinished(
-        bool success)
+    private void OnJoinLoginFinished(bool success)
     {
         operationInProgress = false;
 
         if (!success)
         {
-            SetStatus(
-                "No se pudo iniciar sesión."
-            );
-
+            SetSessionStatus("No se pudo iniciar sesión.");
             return;
         }
 
         if (EOSOnlineSession.Instance == null)
         {
-            SetStatus(
-                "EOSOnlineSession no existe."
-            );
-
+            SetSessionStatus("EOSOnlineSession no existe.");
             return;
         }
 
-        EOSOnlineRoom selectedRoom =
-            GetSelectedRoom();
+        EOSOnlineRoom room = GetSelectedRoom();
 
-        if (selectedRoom == null)
+        if (room == null)
         {
-            SetStatus(
-                "La partida seleccionada ya no está disponible."
-            );
-
+            SetSessionStatus("La partida seleccionada ya no está disponible.");
             selectedRoomIndex = -1;
-
             return;
         }
 
-        if (!EOSOnlineSession.Instance.SelectRoom(
-                selectedRoom))
+        if (!EOSOnlineSession.Instance.SelectRoom(room))
         {
-            SetStatus(
-                "No se pudo seleccionar la partida."
-            );
-
+            SetSessionStatus("No se pudo seleccionar la partida.");
             return;
         }
 
@@ -297,138 +204,86 @@ public class EOSOnlineUI : MonoBehaviour
 
     public void LeaveOnlineGame()
     {
-        if (EOSOnlineSession.Instance == null)
-        {
-            return;
-        }
-
         operationInProgress = false;
-
         selectedRoomIndex = -1;
-
         displayedRooms.Clear();
 
-        EOSOnlineSession.Instance.LeaveOnlineGame();
+        if (EOSOnlineSession.Instance != null)
+            EOSOnlineSession.Instance.LeaveOnlineGame();
 
         ClearRoomTexts();
-
         HideOnlineRooms();
     }
 
     public void ShowOnlineRooms()
     {
         if (onlineRoomsPanel != null)
-        {
             onlineRoomsPanel.SetActive(true);
-        }
     }
 
     public void HideOnlineRooms()
     {
         if (onlineRoomsPanel != null)
-        {
             onlineRoomsPanel.SetActive(false);
-        }
+    }
+
+    public void SetSessionStatus(string message)
+    {
+        statusLocked = true;
+        SetStatus(message);
     }
 
     private void RefreshRooms()
     {
-        if (EOSOnlineSession.Instance == null)
-        {
-            return;
-        }
-
         IReadOnlyList<EOSOnlineRoom> rooms =
             EOSOnlineSession.Instance.AvailableRooms;
 
         if (rooms == null)
-        {
             return;
-        }
 
-        int textCount =
-            GetTextCount();
-
-        int roomCount =
-            Mathf.Min(
-                rooms.Count,
-                textCount
-            );
+        int textCount = GetTextCount();
+        int roomCount = Mathf.Min(rooms.Count, textCount);
 
         displayedRooms.Clear();
 
-        for (int i = 0;
-             i < roomCount;
-             i++)
+        for (int i = 0; i < roomCount; i++)
         {
             if (rooms[i] != null)
-            {
-                displayedRooms.Add(
-                    rooms[i]
-                );
-            }
+                displayedRooms.Add(rooms[i]);
         }
 
         if (selectedRoomIndex >= displayedRooms.Count)
-        {
             selectedRoomIndex = -1;
-        }
 
-        for (int i = 0;
-             i < textCount;
-             i++)
+        for (int i = 0; i < textCount; i++)
         {
-            if (i < displayedRooms.Count &&
-                displayedRooms[i] != null)
-            {
-                ShowRoom(
-                    i,
-                    displayedRooms[i]
-                );
-            }
+            if (i < displayedRooms.Count)
+                ShowRoom(i, displayedRooms[i]);
             else
-            {
-                HideRoom(
-                    i
-                );
-            }
+                HideRoom(i);
         }
 
-        if (displayedRooms.Count == 0)
+        if (!statusLocked)
         {
-            SetStatus(
-                "No hay partidas disponibles."
-            );
-        }
-        else if (selectedRoomIndex >= 0)
-        {
-            SetStatus(
-                "Partida seleccionada. Presioná Unirse."
-            );
-        }
-        else
-        {
-            SetStatus(
-                displayedRooms.Count +
-                " partida(s) disponible(s)."
-            );
+            if (displayedRooms.Count == 0)
+                SetStatus("No hay partidas disponibles.");
+            else if (selectedRoomIndex >= 0)
+                SetStatus("Partida seleccionada. Presioná Unirse.");
+            else
+                SetStatus(displayedRooms.Count + " partida(s) disponible(s).");
         }
 
         if (rooms.Count > textCount)
         {
             Debug.LogWarning(
-                "[EOS UI] Hay " +
-                rooms.Count +
-                " partidas, pero solo hay " +
-                textCount +
+                "[EOS UI] Hay " + rooms.Count +
+                " partidas, pero solo hay " + textCount +
                 " grupos de textos configurados."
             );
         }
     }
 
-    private void ShowRoom(
-        int index,
-        EOSOnlineRoom room)
+    private void ShowRoom(int index, EOSOnlineRoom room)
     {
         if (room == null)
         {
@@ -436,264 +291,145 @@ public class EOSOnlineUI : MonoBehaviour
             return;
         }
 
-        bool selected =
-            index == selectedRoomIndex;
+        bool selected = index == selectedRoomIndex;
 
-        if (roomNameTexts != null &&
-            index < roomNameTexts.Length &&
-            roomNameTexts[index] != null)
-        {
-            if (selected)
-            {
-                roomNameTexts[index].text =
-                    "▶ " +
-                    room.RoomName +
-                    "  [SELECCIONADA]";
-            }
-            else
-            {
-                roomNameTexts[index].text =
-                    room.RoomName;
-            }
-        }
-
-        if (roomPlayersTexts != null &&
-            index < roomPlayersTexts.Length &&
-            roomPlayersTexts[index] != null)
-        {
-            roomPlayersTexts[index].text =
-                room.CurrentPlayers +
-                " / " +
-                room.MaxPlayers +
-                " jugadores";
-        }
-
-        if (roomHostTexts != null &&
-            index < roomHostTexts.Length &&
-            roomHostTexts[index] != null)
-        {
-            roomHostTexts[index].text =
-                "Host: " +
-                ShortId(
-                    room.HostUserId
-                );
-        }
-
-        SetRoomTextsActive(
-            index,
-            true
-        );
-    }
-
-    private void HideRoom(
-        int index)
-    {
-        if (roomNameTexts != null &&
-            index < roomNameTexts.Length &&
-            roomNameTexts[index] != null)
-        {
+        if (HasText(roomNameTexts, index))
             roomNameTexts[index].text =
-                "";
-        }
+                selected
+                    ? "▶ " + room.RoomName + "  [SELECCIONADA]"
+                    : room.RoomName;
 
-        if (roomPlayersTexts != null &&
-            index < roomPlayersTexts.Length &&
-            roomPlayersTexts[index] != null)
-        {
+        if (HasText(roomPlayersTexts, index))
             roomPlayersTexts[index].text =
-                "";
-        }
+                room.CurrentPlayers + " / " +
+                room.MaxPlayers + " jugadores";
 
-        if (roomHostTexts != null &&
-            index < roomHostTexts.Length &&
-            roomHostTexts[index] != null)
-        {
+        if (HasText(roomHostTexts, index))
             roomHostTexts[index].text =
-                "";
-        }
+                "Host: " + ShortId(room.HostUserId);
 
-        SetRoomTextsActive(
-            index,
-            false
-        );
+        SetRoomTextsActive(index, true);
     }
 
-    private void SetRoomTextsActive(
-        int index,
-        bool active)
+    private void HideRoom(int index)
     {
-        if (roomNameTexts != null &&
-            index < roomNameTexts.Length &&
-            roomNameTexts[index] != null)
-        {
-            roomNameTexts[index].gameObject.SetActive(
-                active
-            );
-        }
+        if (HasText(roomNameTexts, index))
+            roomNameTexts[index].text = "";
 
-        if (roomPlayersTexts != null &&
-            index < roomPlayersTexts.Length &&
-            roomPlayersTexts[index] != null)
-        {
-            roomPlayersTexts[index].gameObject.SetActive(
-                active
-            );
-        }
+        if (HasText(roomPlayersTexts, index))
+            roomPlayersTexts[index].text = "";
 
-        if (roomHostTexts != null &&
-            index < roomHostTexts.Length &&
-            roomHostTexts[index] != null)
-        {
-            roomHostTexts[index].gameObject.SetActive(
-                active
-            );
-        }
+        if (HasText(roomHostTexts, index))
+            roomHostTexts[index].text = "";
+
+        SetRoomTextsActive(index, false);
+    }
+
+    private void SetRoomTextsActive(int index, bool active)
+    {
+        if (HasText(roomNameTexts, index))
+            roomNameTexts[index].gameObject.SetActive(active);
+
+        if (HasText(roomPlayersTexts, index))
+            roomPlayersTexts[index].gameObject.SetActive(active);
+
+        if (HasText(roomHostTexts, index))
+            roomHostTexts[index].gameObject.SetActive(active);
+    }
+
+    private bool HasText(TMP_Text[] texts, int index)
+    {
+        return texts != null &&
+               index >= 0 &&
+               index < texts.Length &&
+               texts[index] != null;
     }
 
     private void ConfigureRoomClickTargets()
     {
         if (roomNameTexts == null)
-        {
             return;
-        }
 
-        for (int i = 0;
-             i < roomNameTexts.Length;
-             i++)
+        for (int i = 0; i < roomNameTexts.Length; i++)
         {
             if (roomNameTexts[i] == null)
-            {
                 continue;
-            }
 
-            GameObject roomObject =
+            GameObject target =
                 roomNameTexts[i].transform.parent != null
                     ? roomNameTexts[i].transform.parent.gameObject
                     : roomNameTexts[i].gameObject;
 
             EventTrigger trigger =
-                roomObject.GetComponent<EventTrigger>();
-
-            if (trigger == null)
-            {
-                trigger =
-                    roomObject.AddComponent<EventTrigger>();
-            }
+                target.GetComponent<EventTrigger>() ??
+                target.AddComponent<EventTrigger>();
 
             trigger.triggers.Clear();
 
-            int roomIndex = i;
-
-            EventTrigger.Entry entry =
-                new EventTrigger.Entry();
-
-            entry.eventID =
-                EventTriggerType.PointerClick;
+            int index = i;
+            EventTrigger.Entry entry = new()
+            {
+                eventID = EventTriggerType.PointerClick
+            };
 
             entry.callback.AddListener(
-                data =>
-                {
-                    SelectRoomByIndex(
-                        roomIndex
-                    );
-                }
+                _ => SelectRoomByIndex(index)
             );
 
-            trigger.triggers.Add(
-                entry
-            );
+            trigger.triggers.Add(entry);
         }
     }
 
-    private void SelectRoomByIndex(
-        int index)
+    private void SelectRoomByIndex(int index)
     {
-        if (index < 0 ||
-            index >= displayedRooms.Count)
+        if (index < 0 || index >= displayedRooms.Count)
+            return;
+
+        EOSOnlineRoom room = displayedRooms[index];
+
+        if (room == null ||
+            EOSOnlineSession.Instance == null)
+            return;
+
+        if (!EOSOnlineSession.Instance.SelectRoom(room))
         {
+            SetStatus("No se pudo seleccionar la partida.");
             return;
         }
 
-        EOSOnlineRoom room =
-            displayedRooms[index];
-
-        if (room == null)
-        {
-            return;
-        }
-
-        if (EOSOnlineSession.Instance == null)
-        {
-            return;
-        }
-
-        if (!EOSOnlineSession.Instance.SelectRoom(
-                room))
-        {
-            SetStatus(
-                "No se pudo seleccionar la partida."
-            );
-
-            return;
-        }
-
-        selectedRoomIndex =
-            index;
+        statusLocked = false;
+        selectedRoomIndex = index;
 
         RefreshRooms();
 
-        SetStatus(
-            "Partida seleccionada. Presioná Unirse."
-        );
+        SetStatus("Partida seleccionada. Presioná Unirse.");
 
-        Debug.Log(
-            "[EOS UI] Sala seleccionada: " +
-            room.RoomName
-        );
+        Debug.Log("[EOS UI] Sala seleccionada: " + room.RoomName);
     }
 
     private EOSOnlineRoom GetSelectedRoom()
     {
         if (selectedRoomIndex < 0 ||
             selectedRoomIndex >= displayedRooms.Count)
-        {
             return null;
-        }
 
-        return displayedRooms[
-            selectedRoomIndex
-        ];
+        return displayedRooms[selectedRoomIndex];
     }
 
     private void HideRoomTexts()
     {
-        int count =
-            GetTextCount();
-
-        for (int i = 0;
-             i < count;
-             i++)
-        {
+        for (int i = 0; i < GetTextCount(); i++)
             HideRoom(i);
-        }
     }
 
     private void ClearRoomTexts()
     {
-        int count =
-            GetTextCount();
-
-        for (int i = 0;
-             i < count;
-             i++)
-        {
+        for (int i = 0; i < GetTextCount(); i++)
             HideRoom(i);
-        }
 
         selectedRoomIndex = -1;
-
         displayedRooms.Clear();
-
+        statusLocked = false;
         SetStatus("");
     }
 
@@ -702,72 +438,38 @@ public class EOSOnlineUI : MonoBehaviour
         int count = 0;
 
         if (roomNameTexts != null)
-        {
-            count =
-                Mathf.Max(
-                    count,
-                    roomNameTexts.Length
-                );
-        }
+            count = Mathf.Max(count, roomNameTexts.Length);
 
         if (roomPlayersTexts != null)
-        {
-            count =
-                Mathf.Max(
-                    count,
-                    roomPlayersTexts.Length
-                );
-        }
+            count = Mathf.Max(count, roomPlayersTexts.Length);
 
         if (roomHostTexts != null)
-        {
-            count =
-                Mathf.Max(
-                    count,
-                    roomHostTexts.Length
-                );
-        }
+            count = Mathf.Max(count, roomHostTexts.Length);
 
         return count;
     }
 
-    private void SetStatus(
-        string message)
+    private void SetStatus(string message)
     {
         if (roomsStatusText != null)
-        {
-            roomsStatusText.text =
-                message;
-        }
+            roomsStatusText.text = message;
     }
 
-    private string ShortId(
-        ProductUserId userId)
+    private string ShortId(ProductUserId userId)
     {
         if (userId == null)
-        {
             return "Desconocido";
-        }
 
-        string id =
-            userId.ToString();
+        string id = userId.ToString();
 
-        if (id.Length <= 12)
-        {
-            return id;
-        }
-
-        return id.Substring(
-            0,
-            12
-        ) + "...";
+        return id.Length <= 12
+            ? id
+            : id.Substring(0, 12) + "...";
     }
 
     private void OnDestroy()
     {
         if (Instance == this)
-        {
             Instance = null;
-        }
     }
 }

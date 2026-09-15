@@ -9,16 +9,10 @@ public class EOSAutoLogin : MonoBehaviour
     public static EOSAutoLogin Instance;
 
     public ProductUserId LocalProductUserId { get; private set; }
-
     public bool IsLoggedIn { get; private set; }
 
-    public bool IsLoginInProgress
-    {
-        get
-        {
-            return loginInProgress || creatingUser;
-        }
-    }
+    public bool IsLoginInProgress =>
+        loginInProgress || creatingUser;
 
     private bool loginInProgress;
     private bool creatingUser;
@@ -34,7 +28,6 @@ public class EOSAutoLogin : MonoBehaviour
         }
 
         Instance = this;
-
         DontDestroyOnLoad(gameObject);
     }
 
@@ -47,51 +40,38 @@ public class EOSAutoLogin : MonoBehaviour
         }
 
         if (callback != null)
-        {
             loginCallback += callback;
-        }
 
-        if (loginInProgress || creatingUser)
-        {
+        if (IsLoginInProgress)
             return;
-        }
 
         if (EOSManager.Instance == null)
         {
-            Debug.LogError(
-                "[EOS] EOSManager no existe."
-            );
-
+            Debug.LogError("[EOS] EOSManager no existe.");
             CompleteLogin(false);
             return;
         }
 
-        ConnectInterface connectInterface =
-            EOSManager.Instance.GetEOSConnectInterface();
-
-        if (connectInterface == null)
+        if (EOSManager.Instance.GetEOSConnectInterface() == null)
         {
-            Debug.LogError(
-                "[EOS] ConnectInterface no está disponible."
-            );
-
+            Debug.LogError("[EOS] ConnectInterface no disponible.");
             CompleteLogin(false);
             return;
         }
 
         loginInProgress = true;
 
-        string displayName =
-            System.Environment.UserName;
+        Debug.Log("[EOS] Iniciando login de Device ID...");
+
+        StartDeviceLogin();
+    }
+
+    private void StartDeviceLogin()
+    {
+        string displayName = Environment.UserName;
 
         if (string.IsNullOrWhiteSpace(displayName))
-        {
             displayName = "Jugador";
-        }
-
-        Debug.Log(
-            "[EOS] Iniciando login de Device ID..."
-        );
 
         EOSManager.Instance.StartConnectLoginWithOptions(
             ExternalCredentialType.DeviceidAccessToken,
@@ -101,19 +81,13 @@ public class EOSAutoLogin : MonoBehaviour
         );
     }
 
-    private void OnConnectLogin(
-        LoginCallbackInfo data)
+    private void OnConnectLogin(LoginCallbackInfo data)
     {
-        Debug.Log(
-            "[EOS] Connect Login: " +
-            data.ResultCode
-        );
+        Debug.Log("[EOS] Connect Login: " + data.ResultCode);
 
         if (data.ResultCode == Result.Success)
         {
-            LocalProductUserId =
-                data.LocalUserId;
-
+            LocalProductUserId = data.LocalUserId;
             IsLoggedIn =
                 LocalProductUserId != null &&
                 LocalProductUserId.IsValid();
@@ -123,7 +97,7 @@ public class EOSAutoLogin : MonoBehaviour
             if (!IsLoggedIn)
             {
                 Debug.LogError(
-                    "[EOS] Login correcto pero ProductUserId inválido."
+                    "[EOS] ProductUserId inválido."
                 );
 
                 CompleteLogin(false);
@@ -131,16 +105,11 @@ public class EOSAutoLogin : MonoBehaviour
             }
 
             Debug.Log(
-                "[EOS] LOGIN CORRECTO"
-            );
-
-            Debug.Log(
-                "[EOS] ProductUserId: " +
+                "[EOS] LOGIN CORRECTO | ProductUserId: " +
                 LocalProductUserId
             );
 
             CompleteLogin(true);
-
             return;
         }
 
@@ -151,22 +120,14 @@ public class EOSAutoLogin : MonoBehaviour
                 loginInProgress = false;
 
                 Debug.LogError(
-                    "[EOS] InvalidUser pero ContinuanceToken es null."
+                    "[EOS] ContinuanceToken inválido."
                 );
 
                 CompleteLogin(false);
                 return;
             }
 
-            Debug.Log(
-                "[EOS] Device ID sin Product User. " +
-                "Creando usuario..."
-            );
-
-            CreateProductUser(
-                data.ContinuanceToken
-            );
-
+            CreateProductUser(data.ContinuanceToken);
             return;
         }
 
@@ -184,27 +145,18 @@ public class EOSAutoLogin : MonoBehaviour
         ContinuanceToken continuanceToken)
     {
         if (creatingUser)
-        {
             return;
-        }
 
         if (EOSManager.Instance == null)
         {
             loginInProgress = false;
-
-            Debug.LogError(
-                "[EOS] EOSManager no existe."
-            );
-
             CompleteLogin(false);
             return;
         }
 
         creatingUser = true;
 
-        Debug.Log(
-            "[EOS] Creando Product User..."
-        );
+        Debug.Log("[EOS] Creando Product User...");
 
         EOSManager.Instance.CreateConnectUserWithContinuanceToken(
             continuanceToken,
@@ -232,54 +184,17 @@ public class EOSAutoLogin : MonoBehaviour
             );
 
             CompleteLogin(false);
-
             return;
         }
 
-        Debug.Log(
-            "[EOS] Product User creado correctamente."
-        );
+        Debug.Log("[EOS] Product User creado.");
 
-        LoginWithDeviceId();
+        StartDeviceLogin();
     }
 
-    private void LoginWithDeviceId()
+    private void CompleteLogin(bool success)
     {
-        if (EOSManager.Instance == null)
-        {
-            loginInProgress = false;
-
-            Debug.LogError(
-                "[EOS] EOSManager no existe."
-            );
-
-            CompleteLogin(false);
-
-            return;
-        }
-
-        string displayName =
-            System.Environment.UserName;
-
-        if (string.IsNullOrWhiteSpace(displayName))
-        {
-            displayName = "Jugador";
-        }
-
-        EOSManager.Instance.StartConnectLoginWithOptions(
-            ExternalCredentialType.DeviceidAccessToken,
-            null,
-            displayName,
-            OnConnectLogin
-        );
-    }
-
-    private void CompleteLogin(
-        bool success)
-    {
-        Action<bool> callback =
-            loginCallback;
-
+        Action<bool> callback = loginCallback;
         loginCallback = null;
 
         callback?.Invoke(success);

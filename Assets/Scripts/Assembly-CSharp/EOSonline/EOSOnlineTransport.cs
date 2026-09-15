@@ -8,8 +8,7 @@ public class EOSOnlineTransport : MonoBehaviour
 {
     public static EOSOnlineTransport Instance;
 
-    [SerializeField]
-    private string socketName = "PvZEcoPavo";
+    [SerializeField] private string socketName = "PvZEcoPavo";
 
     private P2PInterface p2pInterface;
 
@@ -25,96 +24,61 @@ public class EOSOnlineTransport : MonoBehaviour
     public bool IsClient { get; private set; }
     public bool IsConnected { get; private set; }
 
-    public ProductUserId LocalUserId
-    {
-        get
-        {
-            if (EOSAutoLogin.Instance == null)
-            {
-                return null;
-            }
+    public ProductUserId LocalUserId =>
+        EOSAutoLogin.Instance != null
+            ? EOSAutoLogin.Instance.LocalProductUserId
+            : null;
 
-            return EOSAutoLogin.Instance.LocalProductUserId;
-        }
-    }
+    public string SocketName => socketName;
 
-    public string SocketName =>
-        socketName;
-
-    public event Action<ProductUserId>
-        OnPeerConnected;
-
-    public event Action<ProductUserId>
-        OnPeerDisconnected;
-
-    public event Action<ProductUserId, byte[]>
-        OnPacketReceived;
+    public event Action<ProductUserId> OnPeerConnected;
+    public event Action<ProductUserId> OnPeerDisconnected;
+    public event Action<ProductUserId, byte[]> OnPacketReceived;
 
     private void Awake()
     {
-        if (Instance != null &&
-            Instance != this)
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
 
         Instance = this;
-
         DontDestroyOnLoad(gameObject);
     }
 
     private void Update()
     {
-        if (!IsInitialized)
-        {
-            return;
-        }
-
-        ReceivePackets();
+        if (IsInitialized)
+            ReceivePackets();
     }
 
     public bool Initialize()
     {
         if (IsInitialized)
-        {
             return true;
-        }
 
         if (EOSManager.Instance == null)
         {
-            Debug.LogError(
-                "[EOS P2P] EOSManager no existe."
-            );
-
+            Debug.LogError("[EOS P2P] EOSManager no existe.");
             return false;
         }
 
         if (EOSAutoLogin.Instance == null ||
             !EOSAutoLogin.Instance.IsLoggedIn)
+            return false;
+
+        if (LocalUserId == null || !LocalUserId.IsValid())
         {
+            Debug.LogError("[EOS P2P] ProductUserId local inválido.");
             return false;
         }
 
-        if (LocalUserId == null ||
-            !LocalUserId.IsValid())
-        {
-            Debug.LogError(
-                "[EOS P2P] ProductUserId local inválido."
-            );
-
-            return false;
-        }
-
-        p2pInterface =
-            EOSManager.Instance.GetEOSP2PInterface();
+        p2pInterface = EOSManager.Instance.GetEOSP2PInterface();
 
         if (p2pInterface == null)
         {
-            Debug.LogError(
-                "[EOS P2P] P2PInterface no disponible."
-            );
-
+            Debug.LogError("[EOS P2P] P2PInterface no disponible.");
             return false;
         }
 
@@ -122,17 +86,14 @@ public class EOSOnlineTransport : MonoBehaviour
 
         IsInitialized = true;
 
-        Debug.Log(
-            "[EOS P2P] Transporte inicializado."
-        );
-
-        Debug.Log(
-            "[EOS P2P] ProductUserId local: " +
-            LocalUserId
-        );
+        Debug.Log("[EOS P2P] Transporte inicializado.");
+        Debug.Log("[EOS P2P] ProductUserId local: " + LocalUserId);
 
         return true;
     }
+
+    private SocketId GetSocketId() =>
+        new SocketId { SocketName = socketName };
 
     private void RegisterNotifications()
     {
@@ -145,18 +106,13 @@ public class EOSOnlineTransport : MonoBehaviour
     private void RegisterConnectionRequest()
     {
         if (connectionRequestNotificationId != 0)
-        {
             return;
-        }
 
         AddNotifyPeerConnectionRequestOptions options =
             new AddNotifyPeerConnectionRequestOptions
             {
                 LocalUserId = LocalUserId,
-                SocketId = new SocketId
-                {
-                    SocketName = socketName
-                }
+                SocketId = GetSocketId()
             };
 
         connectionRequestNotificationId =
@@ -170,18 +126,13 @@ public class EOSOnlineTransport : MonoBehaviour
     private void RegisterConnectionEstablished()
     {
         if (connectionEstablishedNotificationId != 0)
-        {
             return;
-        }
 
         AddNotifyPeerConnectionEstablishedOptions options =
             new AddNotifyPeerConnectionEstablishedOptions
             {
                 LocalUserId = LocalUserId,
-                SocketId = new SocketId
-                {
-                    SocketName = socketName
-                }
+                SocketId = GetSocketId()
             };
 
         connectionEstablishedNotificationId =
@@ -195,18 +146,13 @@ public class EOSOnlineTransport : MonoBehaviour
     private void RegisterConnectionInterrupted()
     {
         if (connectionInterruptedNotificationId != 0)
-        {
             return;
-        }
 
         AddNotifyPeerConnectionInterruptedOptions options =
             new AddNotifyPeerConnectionInterruptedOptions
             {
                 LocalUserId = LocalUserId,
-                SocketId = new SocketId
-                {
-                    SocketName = socketName
-                }
+                SocketId = GetSocketId()
             };
 
         connectionInterruptedNotificationId =
@@ -220,18 +166,13 @@ public class EOSOnlineTransport : MonoBehaviour
     private void RegisterConnectionClosed()
     {
         if (connectionClosedNotificationId != 0)
-        {
             return;
-        }
 
         AddNotifyPeerConnectionClosedOptions options =
             new AddNotifyPeerConnectionClosedOptions
             {
                 LocalUserId = LocalUserId,
-                SocketId = new SocketId
-                {
-                    SocketName = socketName
-                }
+                SocketId = GetSocketId()
             };
 
         connectionClosedNotificationId =
@@ -245,59 +186,35 @@ public class EOSOnlineTransport : MonoBehaviour
     public bool StartHost()
     {
         if (!Initialize())
-        {
             return false;
-        }
 
         if (IsHost)
-        {
-            Debug.Log(
-                "[EOS P2P] El host ya está iniciado."
-            );
-
             return true;
-        }
 
         IsHost = true;
         IsClient = false;
         IsConnected = false;
 
-        Debug.Log(
-            "[EOS P2P] HOST ONLINE."
-        );
-
-        Debug.Log(
-            "[EOS P2P] Esperando conexiones..."
-        );
+        Debug.Log("[EOS P2P] HOST ONLINE.");
+        Debug.Log("[EOS P2P] Esperando conexiones.");
 
         return true;
     }
 
-    public bool StartClient(
-        ProductUserId hostUserId
-    )
+    public bool StartClient(ProductUserId hostUserId)
     {
         if (!Initialize())
-        {
             return false;
-        }
 
-        if (hostUserId == null ||
-            !hostUserId.IsValid())
+        if (hostUserId == null || !hostUserId.IsValid())
         {
-            Debug.LogError(
-                "[EOS P2P] ProductUserId del host inválido."
-            );
-
+            Debug.LogError("[EOS P2P] ProductUserId del host inválido.");
             return false;
         }
 
         if (hostUserId == LocalUserId)
         {
-            Debug.LogError(
-                "[EOS P2P] El host y el cliente son el mismo usuario."
-            );
-
+            Debug.LogError("[EOS P2P] El host y el cliente son el mismo usuario.");
             return false;
         }
 
@@ -305,100 +222,57 @@ public class EOSOnlineTransport : MonoBehaviour
         IsClient = true;
         IsConnected = false;
 
-        Debug.Log(
-            "[EOS P2P] CLIENTE ONLINE."
-        );
+        Debug.Log("[EOS P2P] CLIENTE ONLINE.");
+        Debug.Log("[EOS P2P] Conectando con host: " + hostUserId);
 
-        Debug.Log(
-            "[EOS P2P] Conectando con host: " +
-            hostUserId
-        );
-
-        return RequestConnection(
-            hostUserId
-        );
+        return RequestConnection(hostUserId);
     }
 
-    private bool RequestConnection(
-        ProductUserId remoteUserId
-    )
+    private bool RequestConnection(ProductUserId remoteUserId)
     {
         if (!IsInitialized)
-        {
             return false;
-        }
 
-        SocketId socketId =
-            new SocketId
-            {
-                SocketName = socketName
-            };
-
-        byte[] connectionData =
-            System.Text.Encoding.ASCII.GetBytes(
-                "EOS_CONNECT"
-            );
+        byte[] data =
+            System.Text.Encoding.ASCII.GetBytes("EOS_CONNECT");
 
         SendPacketOptions options =
             new SendPacketOptions
             {
                 LocalUserId = LocalUserId,
                 RemoteUserId = remoteUserId,
-                SocketId = socketId,
+                SocketId = GetSocketId(),
                 Channel = 0,
                 AllowDelayedDelivery = true,
-                Reliability =
-                    PacketReliability.ReliableOrdered,
-                Data =
-                    new ArraySegment<byte>(
-                        connectionData
-                    )
+                Reliability = PacketReliability.ReliableOrdered,
+                Data = new ArraySegment<byte>(data)
             };
 
-        Result result =
-            p2pInterface.SendPacket(
-                ref options
-            );
+        Result result = p2pInterface.SendPacket(ref options);
 
         if (result != Result.Success)
         {
-            Debug.LogError(
-                "[EOS P2P] SendPacket conexión: " +
-                result
-            );
-
+            Debug.LogError("[EOS P2P] SendPacket conexión: " + result);
             return false;
         }
 
-        Debug.Log(
-            "[EOS P2P] Solicitud de conexión enviada."
-        );
+        Debug.Log("[EOS P2P] Solicitud de conexión enviada.");
 
         return true;
     }
 
     private void OnIncomingConnectionRequest(
-        ref OnIncomingConnectionRequestInfo data
-    )
+        ref OnIncomingConnectionRequestInfo data)
     {
         if (data.RemoteUserId == null ||
-            !data.RemoteUserId.IsValid())
-        {
+            !data.RemoteUserId.IsValid() ||
+            !data.SocketId.HasValue)
             return;
-        }
 
-        if (!data.SocketId.HasValue)
-        {
+        SocketId socket = data.SocketId.Value;
+
+        if (socket.SocketName != socketName)
             return;
-        }
-
-        SocketId socketId =
-            data.SocketId.Value;
-
-        if (socketId.SocketName != socketName)
-        {
-            return;
-        }
 
         Debug.Log(
             "[EOS P2P] Solicitud de conexión recibida de: " +
@@ -407,14 +281,13 @@ public class EOSOnlineTransport : MonoBehaviour
 
         AcceptConnection(
             data.RemoteUserId,
-            socketId
+            socket
         );
     }
 
     private void AcceptConnection(
         ProductUserId remoteUserId,
-        SocketId socketId
-    )
+        SocketId socketId)
     {
         AcceptConnectionOptions options =
             new AcceptConnectionOptions
@@ -425,9 +298,7 @@ public class EOSOnlineTransport : MonoBehaviour
             };
 
         Result result =
-            p2pInterface.AcceptConnection(
-                ref options
-            );
+            p2pInterface.AcceptConnection(ref options);
 
         if (result != Result.Success &&
             result != Result.AlreadyConfigured)
@@ -447,27 +318,15 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private void OnPeerConnectionEstablished(
-        ref OnPeerConnectionEstablishedInfo data
-    )
+        ref OnPeerConnectionEstablishedInfo data)
     {
         if (data.RemoteUserId == null ||
-            !data.RemoteUserId.IsValid())
-        {
+            !data.RemoteUserId.IsValid() ||
+            !data.SocketId.HasValue)
             return;
-        }
 
-        if (!data.SocketId.HasValue)
-        {
+        if (data.SocketId.Value.SocketName != socketName)
             return;
-        }
-
-        SocketId socketId =
-            data.SocketId.Value;
-
-        if (socketId.SocketName != socketName)
-        {
-            return;
-        }
 
         IsConnected = true;
 
@@ -476,33 +335,19 @@ public class EOSOnlineTransport : MonoBehaviour
             data.RemoteUserId
         );
 
-        OnPeerConnected?.Invoke(
-            data.RemoteUserId
-        );
+        OnPeerConnected?.Invoke(data.RemoteUserId);
     }
 
     private void OnPeerConnectionInterrupted(
-        ref OnPeerConnectionInterruptedInfo data
-    )
+        ref OnPeerConnectionInterruptedInfo data)
     {
         if (data.RemoteUserId == null ||
-            !data.RemoteUserId.IsValid())
-        {
+            !data.RemoteUserId.IsValid() ||
+            !data.SocketId.HasValue)
             return;
-        }
 
-        if (!data.SocketId.HasValue)
-        {
+        if (data.SocketId.Value.SocketName != socketName)
             return;
-        }
-
-        SocketId socketId =
-            data.SocketId.Value;
-
-        if (socketId.SocketName != socketName)
-        {
-            return;
-        }
 
         IsConnected = false;
 
@@ -513,27 +358,15 @@ public class EOSOnlineTransport : MonoBehaviour
     }
 
     private void OnRemoteConnectionClosed(
-        ref OnRemoteConnectionClosedInfo data
-    )
+        ref OnRemoteConnectionClosedInfo data)
     {
         if (data.RemoteUserId == null ||
-            !data.RemoteUserId.IsValid())
-        {
+            !data.RemoteUserId.IsValid() ||
+            !data.SocketId.HasValue)
             return;
-        }
 
-        if (!data.SocketId.HasValue)
-        {
+        if (data.SocketId.Value.SocketName != socketName)
             return;
-        }
-
-        SocketId socketId =
-            data.SocketId.Value;
-
-        if (socketId.SocketName != socketName)
-        {
-            return;
-        }
 
         IsConnected = false;
 
@@ -542,9 +375,7 @@ public class EOSOnlineTransport : MonoBehaviour
             data.RemoteUserId
         );
 
-        OnPeerDisconnected?.Invoke(
-            data.RemoteUserId
-        );
+        OnPeerDisconnected?.Invoke(data.RemoteUserId);
     }
 
     private void ReceivePackets()
@@ -552,9 +383,7 @@ public class EOSOnlineTransport : MonoBehaviour
         if (p2pInterface == null ||
             LocalUserId == null ||
             !LocalUserId.IsValid())
-        {
             return;
-        }
 
         while (true)
         {
@@ -566,29 +395,16 @@ public class EOSOnlineTransport : MonoBehaviour
 
             uint packetSize;
 
-            Result sizeResult =
+            Result result =
                 p2pInterface.GetNextReceivedPacketSize(
                     ref sizeOptions,
                     out packetSize
                 );
 
-            if (sizeResult != Result.Success)
-            {
+            if (result != Result.Success || packetSize == 0)
                 break;
-            }
 
-            if (packetSize == 0)
-            {
-                break;
-            }
-
-            byte[] data =
-                new byte[packetSize];
-
-            ArraySegment<byte> dataSegment =
-                new ArraySegment<byte>(
-                    data
-                );
+            byte[] data = new byte[packetSize];
 
             ReceivePacketOptions receiveOptions =
                 new ReceivePacketOptions
@@ -598,14 +414,14 @@ public class EOSOnlineTransport : MonoBehaviour
                 };
 
             ProductUserId peerId = null;
-
             SocketId socketId = default;
-
             byte channel;
-
             uint bytesWritten;
 
-            Result receiveResult =
+            ArraySegment<byte> dataSegment =
+                new ArraySegment<byte>(data);
+
+            result =
                 p2pInterface.ReceivePacket(
                     ref receiveOptions,
                     ref peerId,
@@ -615,31 +431,21 @@ public class EOSOnlineTransport : MonoBehaviour
                     out bytesWritten
                 );
 
-            if (receiveResult != Result.Success)
+            if (result != Result.Success)
             {
                 Debug.LogError(
                     "[EOS P2P] ReceivePacket: " +
-                    receiveResult
+                    result
                 );
 
                 break;
             }
 
             if (peerId == null ||
-                !peerId.IsValid())
-            {
+                !peerId.IsValid() ||
+                socketId.SocketName != socketName ||
+                bytesWritten == 0)
                 continue;
-            }
-
-            if (socketId.SocketName != socketName)
-            {
-                continue;
-            }
-
-            if (bytesWritten == 0)
-            {
-                continue;
-            }
 
             byte[] finalData =
                 new byte[bytesWritten];
@@ -661,108 +467,61 @@ public class EOSOnlineTransport : MonoBehaviour
 
     public void Send(
         ProductUserId remoteUserId,
-        byte[] packet
-    )
+        byte[] packet)
     {
         if (!IsInitialized ||
-            p2pInterface == null)
-        {
-            return;
-        }
-
-        if (remoteUserId == null ||
-            !remoteUserId.IsValid())
-        {
-            Debug.LogError(
-                "[EOS P2P] Usuario remoto inválido."
-            );
-
-            return;
-        }
-
-        if (packet == null ||
+            p2pInterface == null ||
+            remoteUserId == null ||
+            !remoteUserId.IsValid() ||
+            packet == null ||
             packet.Length == 0)
-        {
             return;
-        }
-
-        SocketId socketId =
-            new SocketId
-            {
-                SocketName = socketName
-            };
 
         SendPacketOptions options =
             new SendPacketOptions
             {
                 LocalUserId = LocalUserId,
                 RemoteUserId = remoteUserId,
-                SocketId = socketId,
+                SocketId = GetSocketId(),
                 Channel = 0,
                 AllowDelayedDelivery = true,
-                Reliability =
-                    PacketReliability.ReliableOrdered,
-                Data =
-                    new ArraySegment<byte>(
-                        packet
-                    )
+                Reliability = PacketReliability.ReliableOrdered,
+                Data = new ArraySegment<byte>(packet)
             };
 
         Result result =
-            p2pInterface.SendPacket(
-                ref options
-            );
+            p2pInterface.SendPacket(ref options);
 
         if (result != Result.Success)
-        {
-            Debug.LogError(
-                "[EOS P2P] SendPacket: " +
-                result
-            );
-        }
+            Debug.LogError("[EOS P2P] SendPacket: " + result);
     }
 
     public void SendToHost(
         ProductUserId hostUserId,
-        byte[] packet
-    )
+        byte[] packet)
     {
-        Send(
-            hostUserId,
-            packet
-        );
+        Send(hostUserId, packet);
     }
 
     public void DisconnectFrom(
-        ProductUserId remoteUserId
-    )
+        ProductUserId remoteUserId)
     {
         if (!IsInitialized ||
             p2pInterface == null ||
             remoteUserId == null ||
             !remoteUserId.IsValid())
-        {
             return;
-        }
-
-        SocketId socketId =
-            new SocketId
-            {
-                SocketName = socketName
-            };
 
         CloseConnectionOptions options =
             new CloseConnectionOptions
             {
                 LocalUserId = LocalUserId,
                 RemoteUserId = remoteUserId,
-                SocketId = socketId
+                SocketId = GetSocketId()
             };
 
         Result result =
-            p2pInterface.CloseConnection(
-                ref options
-            );
+            p2pInterface.CloseConnection(ref options);
 
         if (result != Result.Success &&
             result != Result.NotFound)
@@ -777,64 +536,27 @@ public class EOSOnlineTransport : MonoBehaviour
     public void Disconnect()
     {
         if (!IsInitialized)
-        {
             return;
-        }
-
-        /*
-         * IMPORTANTE:
-         *
-         * No eliminamos las notificaciones aquí.
-         * No destruimos p2pInterface aquí.
-         *
-         * Este método solamente cambia el estado lógico
-         * del transporte.
-         */
 
         IsConnected = false;
         IsHost = false;
         IsClient = false;
 
-        Debug.Log(
-            "[EOS P2P] Transporte desconectado."
-        );
+        Debug.Log("[EOS P2P] Transporte desconectado.");
     }
 
     private void OnApplicationQuit()
     {
-        /*
-         * Marcamos que la aplicación se está cerrando.
-         *
-         * El orden entre OnApplicationQuit/OnDestroy de distintos
-         * MonoBehaviours no está garantizado por Unity. Si EOSManager
-         * ya liberó la PlatformInterface antes de que este objeto
-         * se destruya, llamar a RemoveNotifyPeerConnection* sobre
-         * una interfaz ya liberada provoca un crash nativo (SIGSEGV).
-         *
-         * Como el proceso está por terminar de todas formas, es
-         * seguro (e inofensivo) saltarnos la limpieza del SDK en
-         * este escenario.
-         */
         isApplicationQuitting = true;
     }
 
     private void RemoveNotifications()
     {
-        if (isApplicationQuitting)
-        {
-            return;
-        }
-
-        if (p2pInterface == null)
-        {
-            return;
-        }
-
-        if (EOSManager.Instance == null ||
+        if (isApplicationQuitting ||
+            p2pInterface == null ||
+            EOSManager.Instance == null ||
             EOSManager.Instance.GetEOSPlatformInterface() == null)
-        {
             return;
-        }
 
         if (connectionRequestNotificationId != 0)
         {
@@ -885,8 +607,6 @@ public class EOSOnlineTransport : MonoBehaviour
         IsConnected = false;
 
         if (Instance == this)
-        {
             Instance = null;
-        }
     }
 }
