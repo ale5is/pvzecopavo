@@ -16,6 +16,8 @@ public class EOSOnlineSession : MonoBehaviour
     private SessionSearch sessionSearch;
     private SessionDetails foundSession;
 
+    private ProductUserId foundHostUserId;
+
     private string localSessionName;
 
     private bool sessionsInitialized;
@@ -25,7 +27,10 @@ public class EOSOnlineSession : MonoBehaviour
     public bool IsSearching { get; private set; }
 
     public string LocalSessionName => localSessionName;
+
     public bool IsInitialized => sessionsInitialized;
+
+    public ProductUserId HostUserId => foundHostUserId;
 
     private void Awake()
     {
@@ -108,7 +113,8 @@ public class EOSOnlineSession : MonoBehaviour
         ProductUserId localUserId =
             EOSManager.Instance.GetProductUserId();
 
-        if (localUserId == null)
+        if (localUserId == null ||
+            !localUserId.IsValid())
         {
             Debug.LogError(
                 "[EOS SESSION] ProductUserId no disponible."
@@ -340,6 +346,9 @@ public class EOSOnlineSession : MonoBehaviour
         IsHosting = true;
         IsJoined = true;
 
+        foundHostUserId =
+            EOSAutoLogin.Instance.LocalProductUserId;
+
         Debug.Log(
             "[EOS SESSION] PARTIDA ONLINE CREADA."
         );
@@ -347,6 +356,47 @@ public class EOSOnlineSession : MonoBehaviour
         Debug.Log(
             "[EOS SESSION] SessionName: " +
             localSessionName
+        );
+
+        Debug.Log(
+            "[EOS SESSION] Host ProductUserId: " +
+            foundHostUserId
+        );
+
+        StartOnlineServer();
+    }
+
+    private void StartOnlineServer()
+    {
+        if (EOSOnlineServer.Instance == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] EOSOnlineServer no existe en la escena."
+            );
+
+            return;
+        }
+
+        if (!EOSOnlineTransport.Instance.StartHost())
+        {
+            Debug.LogError(
+                "[EOS SESSION] No se pudo iniciar EOS P2P como host."
+            );
+
+            return;
+        }
+
+        if (!EOSOnlineServer.Instance.StartServer())
+        {
+            Debug.LogError(
+                "[EOS SESSION] No se pudo iniciar EOSOnlineServer."
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            "[EOS SESSION] SERVIDOR ONLINE INICIADO."
         );
     }
 
@@ -366,7 +416,10 @@ public class EOSOnlineSession : MonoBehaviour
             return;
         }
 
+        ReleaseFoundSession();
         ReleaseSearch();
+
+        foundHostUserId = null;
 
         CreateSessionSearchOptions searchOptions =
             new CreateSessionSearchOptions
@@ -429,7 +482,8 @@ public class EOSOnlineSession : MonoBehaviour
         ProductUserId localUserId =
             EOSManager.Instance.GetProductUserId();
 
-        if (localUserId == null)
+        if (localUserId == null ||
+            !localUserId.IsValid())
         {
             Debug.LogError(
                 "[EOS SESSION] ProductUserId no disponible."
@@ -493,11 +547,7 @@ public class EOSOnlineSession : MonoBehaviour
             count
         );
 
-        if (foundSession != null)
-        {
-            foundSession.Release();
-            foundSession = null;
-        }
+        ReleaseFoundSession();
 
         for (uint i = 0; i < count; i++)
         {
@@ -560,10 +610,27 @@ public class EOSOnlineSession : MonoBehaviour
                 maxConnections
             );
 
+            Debug.Log(
+                "[EOS SESSION] Host ProductUserId: " +
+                info.Value.OwnerUserId
+            );
+
             if (foundSession == null &&
-                openConnections > 0)
+                openConnections > 0 &&
+                info.Value.OwnerUserId != null &&
+                info.Value.OwnerUserId.IsValid())
             {
                 foundSession = details;
+                foundHostUserId = info.Value.OwnerUserId;
+
+                Debug.Log(
+                    "[EOS SESSION] Partida seleccionada."
+                );
+
+                Debug.Log(
+                    "[EOS SESSION] Host: " +
+                    foundHostUserId
+                );
             }
             else
             {
@@ -601,13 +668,33 @@ public class EOSOnlineSession : MonoBehaviour
             return;
         }
 
+        if (foundHostUserId == null ||
+            !foundHostUserId.IsValid())
+        {
+            Debug.LogError(
+                "[EOS SESSION] ProductUserId del host no disponible."
+            );
+
+            return;
+        }
+
         ProductUserId localUserId =
             EOSManager.Instance.GetProductUserId();
 
-        if (localUserId == null)
+        if (localUserId == null ||
+            !localUserId.IsValid())
         {
             Debug.LogError(
-                "[EOS SESSION] ProductUserId no disponible."
+                "[EOS SESSION] ProductUserId local no disponible."
+            );
+
+            return;
+        }
+
+        if (foundHostUserId == localUserId)
+        {
+            Debug.LogError(
+                "[EOS SESSION] La partida encontrada pertenece al usuario local."
             );
 
             return;
@@ -617,7 +704,8 @@ public class EOSOnlineSession : MonoBehaviour
             "PvZEcoPavo_Client_" +
             localUserId.ToString();
 
-        localSessionName = joinedSessionName;
+        localSessionName =
+            joinedSessionName;
 
         JoinSessionOptions joinOptions =
             new JoinSessionOptions
@@ -630,6 +718,11 @@ public class EOSOnlineSession : MonoBehaviour
 
         Debug.Log(
             "[EOS SESSION] Uniéndose a partida..."
+        );
+
+        Debug.Log(
+            "[EOS SESSION] Host ProductUserId: " +
+            foundHostUserId
         );
 
         sessionsInterface.JoinSession(
@@ -651,7 +744,6 @@ public class EOSOnlineSession : MonoBehaviour
         {
             IsJoined = false;
             IsHosting = false;
-            localSessionName = null;
 
             Debug.LogError(
                 "[EOS SESSION] No se pudo unir."
@@ -671,6 +763,58 @@ public class EOSOnlineSession : MonoBehaviour
             "[EOS SESSION] SessionName local: " +
             localSessionName
         );
+
+        if (foundHostUserId == null ||
+            !foundHostUserId.IsValid())
+        {
+            Debug.LogError(
+                "[EOS SESSION] El host no tiene un ProductUserId válido."
+            );
+
+            return;
+        }
+
+        StartOnlineClient();
+    }
+
+    private void StartOnlineClient()
+    {
+        if (EOSOnlineClient.Instance == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] EOSOnlineClient no existe en la escena."
+            );
+
+            return;
+        }
+
+        if (EOSOnlineTransport.Instance == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] EOSOnlineTransport no existe en la escena."
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            "[EOS SESSION] Conectando P2P con host: " +
+            foundHostUserId
+        );
+
+        if (!EOSOnlineClient.Instance.ConnectToHost(
+                foundHostUserId))
+        {
+            Debug.LogError(
+                "[EOS SESSION] No se pudo iniciar el cliente P2P."
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            "[EOS SESSION] CLIENTE ONLINE INICIADO."
+        );
     }
 
     public void LeaveOnlineGame()
@@ -683,6 +827,22 @@ public class EOSOnlineSession : MonoBehaviour
         if (string.IsNullOrEmpty(localSessionName))
         {
             return;
+        }
+
+        if (EOSOnlineClient.Instance != null)
+        {
+            EOSOnlineClient.Instance.Disconnect();
+        }
+
+        if (EOSOnlineServer.Instance != null &&
+            IsHosting)
+        {
+            EOSOnlineServer.Instance.StopServer();
+        }
+
+        if (EOSOnlineTransport.Instance != null)
+        {
+            EOSOnlineTransport.Instance.Disconnect();
         }
 
         DestroySessionOptions destroyOptions =
@@ -712,15 +872,12 @@ public class EOSOnlineSession : MonoBehaviour
 
         IsHosting = false;
         IsJoined = false;
+        IsSearching = false;
 
-        if (foundSession != null)
-        {
-            foundSession.Release();
-            foundSession = null;
-        }
-
+        ReleaseFoundSession();
         ReleaseSearch();
 
+        foundHostUserId = null;
         localSessionName = null;
     }
 
@@ -761,17 +918,9 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (sessionsInterface == null)
         {
-            sessionsInterface =
-                EOSManager.Instance.GetEOSSessionsInterface();
-        }
-
-        if (sessionsInterface == null)
-        {
             Debug.LogError(
                 "[EOS SESSION] SessionsInterface no disponible."
             );
-
-            sessionsInitialized = false;
 
             return false;
         }
@@ -788,6 +937,17 @@ public class EOSOnlineSession : MonoBehaviour
         }
     }
 
+    private void ReleaseFoundSession()
+    {
+        if (foundSession != null)
+        {
+            foundSession.Release();
+            foundSession = null;
+        }
+
+        foundHostUserId = null;
+    }
+
     private void ReleaseSearch()
     {
         if (sessionSearch != null)
@@ -799,35 +959,17 @@ public class EOSOnlineSession : MonoBehaviour
         IsSearching = false;
     }
 
-    private void OnApplicationQuit()
+    private void OnDestroy()
     {
-        if (sessionsInterface == null)
-        {
-            return;
-        }
-
-        if (!string.IsNullOrEmpty(localSessionName))
-        {
-            DestroySessionOptions destroyOptions =
-                new DestroySessionOptions
-                {
-                    SessionName = localSessionName
-                };
-
-            sessionsInterface.DestroySession(
-                ref destroyOptions,
-                null,
-                null
-            );
-        }
-
         ReleaseSessionModification();
+        ReleaseFoundSession();
         ReleaseSearch();
 
-        if (foundSession != null)
+        sessionsInterface = null;
+
+        if (Instance == this)
         {
-            foundSession.Release();
-            foundSession = null;
+            Instance = null;
         }
     }
 }
