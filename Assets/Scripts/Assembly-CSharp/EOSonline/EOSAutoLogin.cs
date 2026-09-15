@@ -36,7 +36,8 @@ public class EOSAutoLogin : MonoBehaviour
             return;
         }
 
-        ConnectInterface connectInterface = EOSManager.Instance.GetEOSConnectInterface();
+        ConnectInterface connectInterface =
+            EOSManager.Instance.GetEOSConnectInterface();
 
         if (connectInterface == null)
         {
@@ -58,23 +59,25 @@ public class EOSAutoLogin : MonoBehaviour
         );
     }
 
-    private void OnCreateDeviceId(ref CreateDeviceIdCallbackInfo data)
+    private void OnCreateDeviceId(
+        ref CreateDeviceIdCallbackInfo data)
     {
-        Debug.Log("[EOS] CreateDeviceId: " + data.ResultCode);
-
-        ConnectInterface connectInterface = EOSManager.Instance.GetEOSConnectInterface();
-
-        if (connectInterface == null)
-        {
-            Debug.LogError("[EOS] ConnectInterface no disponible después de CreateDeviceId.");
-            return;
-        }
+        Debug.Log(
+            "[EOS] CreateDeviceId: " +
+            data.ResultCode
+        );
 
         LoginWithDeviceId();
     }
 
     private void LoginWithDeviceId()
     {
+        if (EOSManager.Instance == null)
+        {
+            Debug.LogError("[EOS] EOSManager no existe.");
+            return;
+        }
+
         string displayName = System.Environment.UserName;
 
         if (string.IsNullOrWhiteSpace(displayName))
@@ -82,7 +85,9 @@ public class EOSAutoLogin : MonoBehaviour
             displayName = "Jugador";
         }
 
-        Debug.Log("[EOS] Iniciando Connect Login con Device ID...");
+        Debug.Log(
+            "[EOS] Iniciando Connect Login con Device ID..."
+        );
 
         EOSManager.Instance.StartConnectLoginWithOptions(
             ExternalCredentialType.DeviceidAccessToken,
@@ -94,7 +99,10 @@ public class EOSAutoLogin : MonoBehaviour
 
     private void OnConnectLogin(LoginCallbackInfo data)
     {
-        Debug.Log("[EOS] Connect Login: " + data.ResultCode);
+        Debug.Log(
+            "[EOS] Connect Login: " +
+            data.ResultCode
+        );
 
         if (data.ResultCode == Result.Success)
         {
@@ -102,21 +110,30 @@ public class EOSAutoLogin : MonoBehaviour
             IsLoggedIn = true;
 
             Debug.Log("[EOS] LOGIN CORRECTO");
-            Debug.Log("[EOS] ProductUserId: " + LocalProductUserId);
+
+            Debug.Log(
+                "[EOS] ProductUserId: " +
+                LocalProductUserId
+            );
+
             return;
         }
 
         if (data.ResultCode == Result.InvalidUser)
         {
-            Debug.LogError(
-                "[EOS] El Device ID todavía no tiene un Product User asociado."
-            );
-
             if (data.ContinuanceToken == null)
             {
-                Debug.LogError("[EOS] ContinuanceToken es null.");
+                Debug.LogError(
+                    "[EOS] InvalidUser pero " +
+                    "ContinuanceToken es null."
+                );
+
                 return;
             }
+
+            Debug.Log(
+                "[EOS] Product User no existe. Creándolo..."
+            );
 
             EOSManager.Instance.CreateConnectUserWithContinuanceToken(
                 data.ContinuanceToken,
@@ -127,13 +144,18 @@ public class EOSAutoLogin : MonoBehaviour
         }
 
         Debug.LogError(
-            "[EOS] Connect Login falló: " + data.ResultCode
+            "[EOS] Connect Login falló: " +
+            data.ResultCode
         );
     }
 
-    private void OnCreateConnectUser(CreateUserCallbackInfo data)
+    private void OnCreateConnectUser(
+        CreateUserCallbackInfo data)
     {
-        Debug.Log("[EOS] Create Connect User: " + data.ResultCode);
+        Debug.Log(
+            "[EOS] Create Connect User: " +
+            data.ResultCode
+        );
 
         if (data.ResultCode != Result.Success)
         {
@@ -145,7 +167,10 @@ public class EOSAutoLogin : MonoBehaviour
             return;
         }
 
-        Debug.Log("[EOS] Product User creado. Reintentando Connect Login...");
+        Debug.Log(
+            "[EOS] Product User creado. " +
+            "Reintentando Connect Login..."
+        );
 
         LoginWithDeviceId();
     }
