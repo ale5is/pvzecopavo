@@ -263,7 +263,7 @@ public class LV : MonoBehaviour
 			SkyManager.Instance.PlayWeather(LoadWeathers[0]);
 			MyTool.MoveFirstToLast(LoadWeathers);
 		}
-		Timetable.Instance.UpdateWeatherReport();
+		SkyManager.Instance.timetable.UpdateWeatherReport(); 
 		if (MapOverAction != null)
 		{
 			MapOverAction();
