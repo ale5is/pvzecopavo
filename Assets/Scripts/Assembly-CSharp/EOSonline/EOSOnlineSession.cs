@@ -1,7 +1,21 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Epic.OnlineServices;
 using Epic.OnlineServices.Sessions;
 using PlayEveryWare.EpicOnlineServices;
+
+public class EOSOnlineRoom
+{
+    public string RoomName;
+    public string SessionId;
+    public ProductUserId HostUserId;
+    public uint CurrentPlayers;
+    public uint MaxPlayers;
+    public SessionDetails Details;
+
+    public bool HasOpenSlots =>
+        CurrentPlayers < MaxPlayers;
+}
 
 public class EOSOnlineSession : MonoBehaviour
 {
@@ -10,6 +24,7 @@ public class EOSOnlineSession : MonoBehaviour
     [Header("Configuración")]
     [SerializeField] private string bucketId = "PvZEcoPavo";
     [SerializeField] private uint maxPlayers = 4;
+    [SerializeField] private string defaultRoomName = "Sala de PvZ Eco Pavo";
 
     private SessionsInterface sessionsInterface;
     private SessionModification sessionModification;
@@ -19,8 +34,12 @@ public class EOSOnlineSession : MonoBehaviour
     private ProductUserId foundHostUserId;
 
     private string localSessionName;
+    private string localRoomName;
 
     private bool sessionsInitialized;
+
+    private readonly List<EOSOnlineRoom> availableRooms =
+        new List<EOSOnlineRoom>();
 
     public bool IsHosting { get; private set; }
     public bool IsJoined { get; private set; }
@@ -28,9 +47,17 @@ public class EOSOnlineSession : MonoBehaviour
 
     public string LocalSessionName => localSessionName;
 
+    public string LocalRoomName => localRoomName;
+
     public bool IsInitialized => sessionsInitialized;
 
     public ProductUserId HostUserId => foundHostUserId;
+
+    public IReadOnlyList<EOSOnlineRoom> AvailableRooms =>
+        availableRooms;
+
+    public int AvailableRoomCount =>
+        availableRooms.Count;
 
     private void Awake()
     {
@@ -94,7 +121,29 @@ public class EOSOnlineSession : MonoBehaviour
         );
     }
 
+    public void SetRoomName(string roomName)
+    {
+        if (string.IsNullOrWhiteSpace(roomName))
+        {
+            localRoomName = defaultRoomName;
+        }
+        else
+        {
+            localRoomName = roomName.Trim();
+        }
+
+        Debug.Log(
+            "[EOS SESSION] Nombre de sala: " +
+            localRoomName
+        );
+    }
+
     public void CreateOnlineGame()
+    {
+        CreateOnlineGame(defaultRoomName);
+    }
+
+    public void CreateOnlineGame(string roomName)
     {
         if (!CanUseSessions())
         {
@@ -109,6 +158,8 @@ public class EOSOnlineSession : MonoBehaviour
 
             return;
         }
+
+        SetRoomName(roomName);
 
         ProductUserId localUserId =
             EOSManager.Instance.GetProductUserId();
@@ -140,6 +191,11 @@ public class EOSOnlineSession : MonoBehaviour
         Debug.Log(
             "[EOS SESSION] Creando sesión: " +
             localSessionName
+        );
+
+        Debug.Log(
+            "[EOS SESSION] Sala: " +
+            localRoomName
         );
 
         Result result =
@@ -234,72 +290,20 @@ public class EOSOnlineSession : MonoBehaviour
             return;
         }
 
-        AttributeData gameAttribute =
-            new AttributeData
-            {
-                Key = "Game",
-                Value = new AttributeDataValue
-                {
-                    AsUtf8 = "PvZEcoPavo"
-                }
-            };
+        AddSessionAttribute(
+            "Game",
+            "PvZEcoPavo"
+        );
 
-        SessionModificationAddAttributeOptions attributeOptions =
-            new SessionModificationAddAttributeOptions
-            {
-                SessionAttribute = gameAttribute,
-                AdvertisementType =
-                    SessionAttributeAdvertisementType.Advertise
-            };
+        AddSessionAttribute(
+            "GameVersion",
+            "0.7"
+        );
 
-        result =
-            sessionModification.AddAttribute(
-                ref attributeOptions
-            );
-
-        if (result != Result.Success)
-        {
-            Debug.LogError(
-                "[EOS SESSION] AddAttribute Game: " +
-                result
-            );
-
-            ReleaseSessionModification();
-            localSessionName = null;
-
-            return;
-        }
-
-        AttributeData versionAttribute =
-            new AttributeData
-            {
-                Key = "GameVersion",
-                Value = new AttributeDataValue
-                {
-                    AsUtf8 = "0.7"
-                }
-            };
-
-        attributeOptions.SessionAttribute =
-            versionAttribute;
-
-        result =
-            sessionModification.AddAttribute(
-                ref attributeOptions
-            );
-
-        if (result != Result.Success)
-        {
-            Debug.LogError(
-                "[EOS SESSION] AddAttribute GameVersion: " +
-                result
-            );
-
-            ReleaseSessionModification();
-            localSessionName = null;
-
-            return;
-        }
+        AddSessionAttribute(
+            "RoomName",
+            localRoomName
+        );
 
         UpdateSessionOptions updateOptions =
             new UpdateSessionOptions
@@ -319,8 +323,55 @@ public class EOSOnlineSession : MonoBehaviour
         );
     }
 
+    private bool AddSessionAttribute(
+        string key,
+        string value
+    )
+    {
+        AttributeData attribute =
+            new AttributeData
+            {
+                Key = key,
+                Value = new AttributeDataValue
+                {
+                    AsUtf8 = value
+                }
+            };
+
+        SessionModificationAddAttributeOptions attributeOptions =
+            new SessionModificationAddAttributeOptions
+            {
+                SessionAttribute = attribute,
+                AdvertisementType =
+                    SessionAttributeAdvertisementType.Advertise
+            };
+
+        Result result =
+            sessionModification.AddAttribute(
+                ref attributeOptions
+            );
+
+        if (result != Result.Success)
+        {
+            Debug.LogError(
+                "[EOS SESSION] AddAttribute " +
+                key +
+                ": " +
+                result
+            );
+
+            ReleaseSessionModification();
+            localSessionName = null;
+
+            return false;
+        }
+
+        return true;
+    }
+
     private void OnSessionCreated(
-        ref UpdateSessionCallbackInfo data)
+        ref UpdateSessionCallbackInfo data
+    )
     {
         Debug.Log(
             "[EOS SESSION] Create/Update: " +
@@ -359,6 +410,11 @@ public class EOSOnlineSession : MonoBehaviour
         );
 
         Debug.Log(
+            "[EOS SESSION] Sala: " +
+            localRoomName
+        );
+
+        Debug.Log(
             "[EOS SESSION] Host ProductUserId: " +
             foundHostUserId
         );
@@ -372,6 +428,15 @@ public class EOSOnlineSession : MonoBehaviour
         {
             Debug.LogError(
                 "[EOS SESSION] EOSOnlineServer no existe en la escena."
+            );
+
+            return;
+        }
+
+        if (EOSOnlineTransport.Instance == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] EOSOnlineTransport no existe en la escena."
             );
 
             return;
@@ -418,6 +483,7 @@ public class EOSOnlineSession : MonoBehaviour
 
         ReleaseFoundSession();
         ReleaseSearch();
+        ClearAvailableRooms();
 
         foundHostUserId = null;
 
@@ -514,7 +580,8 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     private void OnSearchFinished(
-        ref SessionSearchFindCallbackInfo data)
+        ref SessionSearchFindCallbackInfo data
+    )
     {
         IsSearching = false;
 
@@ -548,6 +615,7 @@ public class EOSOnlineSession : MonoBehaviour
         );
 
         ReleaseFoundSession();
+        ClearAvailableRooms();
 
         for (uint i = 0; i < count; i++)
         {
@@ -601,42 +669,67 @@ public class EOSOnlineSession : MonoBehaviour
                     ? maxConnections - openConnections
                     : 0;
 
-            Debug.Log(
-                "[EOS SESSION] Encontrada: " +
-                info.Value.SessionId +
-                " | Jugadores: " +
-                players +
-                "/" +
-                maxConnections
-            );
+            string roomName =
+                GetSessionAttributeString(
+                    details,
+                    "RoomName"
+                );
 
-            Debug.Log(
-                "[EOS SESSION] Host ProductUserId: " +
-                info.Value.OwnerUserId
-            );
-
-            if (foundSession == null &&
-                openConnections > 0 &&
-                info.Value.OwnerUserId != null &&
-                info.Value.OwnerUserId.IsValid())
+            if (string.IsNullOrWhiteSpace(roomName))
             {
-                foundSession = details;
-                foundHostUserId = info.Value.OwnerUserId;
+                roomName =
+                    info.Value.SessionId;
+            }
+
+            EOSOnlineRoom room =
+                new EOSOnlineRoom
+                {
+                    RoomName = roomName,
+                    SessionId = info.Value.SessionId,
+                    HostUserId = info.Value.OwnerUserId,
+                    CurrentPlayers = players,
+                    MaxPlayers = maxConnections,
+                    Details = details
+                };
+
+            if (room.HostUserId != null &&
+                room.HostUserId.IsValid() &&
+                room.HasOpenSlots)
+            {
+                availableRooms.Add(room);
 
                 Debug.Log(
-                    "[EOS SESSION] Partida seleccionada."
+                    "[EOS SESSION] Sala encontrada: " +
+                    room.RoomName +
+                    " | Jugadores: " +
+                    room.CurrentPlayers +
+                    "/" +
+                    room.MaxPlayers +
+                    " | Host: " +
+                    room.HostUserId
                 );
 
-                Debug.Log(
-                    "[EOS SESSION] Host: " +
-                    foundHostUserId
-                );
+                if (foundSession == null)
+                {
+                    foundSession = details;
+                    foundHostUserId = room.HostUserId;
+
+                    Debug.Log(
+                        "[EOS SESSION] Primera sala seleccionada: " +
+                        room.RoomName
+                    );
+                }
             }
             else
             {
                 details.Release();
             }
         }
+
+        Debug.Log(
+            "[EOS SESSION] Salas disponibles: " +
+            availableRooms.Count
+        );
 
         if (foundSession != null)
         {
@@ -652,7 +745,149 @@ public class EOSOnlineSession : MonoBehaviour
         }
     }
 
+    private string GetSessionAttributeString(
+        SessionDetails details,
+        string key
+    )
+    {
+        for (uint i = 0; i < 64; i++)
+        {
+            SessionDetailsCopySessionAttributeByIndexOptions indexOptions =
+                new SessionDetailsCopySessionAttributeByIndexOptions
+                {
+                    AttrIndex = i
+                };
+
+            SessionDetailsAttribute? attribute;
+
+            Result result =
+                details.CopySessionAttributeByIndex(
+                    ref indexOptions,
+                    out attribute
+                );
+
+            if (result != Result.Success)
+            {
+                break;
+            }
+
+            if (!attribute.HasValue)
+            {
+                continue;
+            }
+
+            AttributeData? data =
+                attribute.Value.Data;
+
+            if (!data.HasValue)
+            {
+                continue;
+            }
+
+            if (data.Value.Key != key)
+            {
+                continue;
+            }
+
+            AttributeDataValue value =
+                data.Value.Value;
+
+            return value.AsUtf8;
+        }
+
+        return null;
+    }
+
+    public EOSOnlineRoom GetAvailableRoom(int index)
+    {
+        if (index < 0 ||
+            index >= availableRooms.Count)
+        {
+            return null;
+        }
+
+        return availableRooms[index];
+    }
+
+    public EOSOnlineRoom GetFirstAvailableRoom()
+    {
+        if (availableRooms.Count == 0)
+        {
+            return null;
+        }
+
+        return availableRooms[0];
+    }
+
+    public bool SelectRoom(int index)
+    {
+        EOSOnlineRoom room =
+            GetAvailableRoom(index);
+
+        if (room == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] Índice de sala inválido: " +
+                index
+            );
+
+            return false;
+        }
+
+        return SelectRoom(room);
+    }
+
+    public bool SelectRoom(EOSOnlineRoom room)
+    {
+        if (room == null)
+        {
+            return false;
+        }
+
+        if (room.Details == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] La sala seleccionada no tiene SessionDetails."
+            );
+
+            return false;
+        }
+
+        if (room.HostUserId == null ||
+            !room.HostUserId.IsValid())
+        {
+            Debug.LogError(
+                "[EOS SESSION] La sala no tiene un HostUserId válido."
+            );
+
+            return false;
+        }
+
+        foundSession = room.Details;
+        foundHostUserId = room.HostUserId;
+
+        Debug.Log(
+            "[EOS SESSION] Sala seleccionada: " +
+            room.RoomName
+        );
+
+        return true;
+    }
+
     public void JoinFirstOnlineGame()
+    {
+        EOSOnlineRoom room =
+            GetFirstAvailableRoom();
+
+        if (room != null)
+        {
+            SelectRoom(room);
+        }
+
+        JoinSelectedOnlineGame();
+    }
+
+    public void JoinSelectedOnlineGame()
     {
         if (!CanUseSessions())
         {
@@ -662,7 +897,7 @@ public class EOSOnlineSession : MonoBehaviour
         if (foundSession == null)
         {
             Debug.LogError(
-                "[EOS SESSION] Primero ejecutá SearchOnlineGames()."
+                "[EOS SESSION] No hay ninguna sala seleccionada."
             );
 
             return;
@@ -733,7 +968,8 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     private void OnJoinFinished(
-        ref JoinSessionCallbackInfo data)
+        ref JoinSessionCallbackInfo data
+    )
     {
         Debug.Log(
             "[EOS SESSION] JoinSession: " +
@@ -863,7 +1099,8 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     private void OnSessionDestroyed(
-        ref DestroySessionCallbackInfo data)
+        ref DestroySessionCallbackInfo data
+    )
     {
         Debug.Log(
             "[EOS SESSION] DestroySession: " +
@@ -877,8 +1114,11 @@ public class EOSOnlineSession : MonoBehaviour
         ReleaseFoundSession();
         ReleaseSearch();
 
+        ClearAvailableRooms();
+
         foundHostUserId = null;
         localSessionName = null;
+        localRoomName = null;
     }
 
     private bool CanUseSessions()
@@ -928,6 +1168,30 @@ public class EOSOnlineSession : MonoBehaviour
         return true;
     }
 
+    private void ClearAvailableRooms()
+    {
+        for (int i = 0; i < availableRooms.Count; i++)
+        {
+            EOSOnlineRoom room =
+                availableRooms[i];
+
+            if (room == null ||
+                room.Details == null)
+            {
+                continue;
+            }
+
+            if (room.Details == foundSession)
+            {
+                continue;
+            }
+
+            room.Details.Release();
+        }
+
+        availableRooms.Clear();
+    }
+
     private void ReleaseSessionModification()
     {
         if (sessionModification != null)
@@ -941,7 +1205,26 @@ public class EOSOnlineSession : MonoBehaviour
     {
         if (foundSession != null)
         {
-            foundSession.Release();
+            bool belongsToRoom = false;
+
+            for (int i = 0; i < availableRooms.Count; i++)
+            {
+                EOSOnlineRoom room =
+                    availableRooms[i];
+
+                if (room != null &&
+                    room.Details == foundSession)
+                {
+                    belongsToRoom = true;
+                    break;
+                }
+            }
+
+            if (!belongsToRoom)
+            {
+                foundSession.Release();
+            }
+
             foundSession = null;
         }
 
@@ -963,6 +1246,7 @@ public class EOSOnlineSession : MonoBehaviour
     {
         ReleaseSessionModification();
         ReleaseFoundSession();
+        ClearAvailableRooms();
         ReleaseSearch();
 
         sessionsInterface = null;
