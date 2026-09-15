@@ -3,22 +3,51 @@ using UnityEngine.UI;
 
 public class ChatText : MonoBehaviour
 {
-	public RectTransform rectTransform;
+    public RectTransform rectTransform;
+    public Text text;
 
-	public Text text;
+    public void GetContent(string content)
+    {
+        if (text == null || rectTransform == null)
+            return;
 
-	public void GetContent(string Content)
-	{
-		text.text = Content;
-		rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, 50f + 50f * (text.preferredHeight - 44f) / 46f);
-		base.transform.localScale = new Vector3(1f, 1f, 1f);
-	}
+        text.text = content;
 
-	public void GetContent(string Content, Color32 color)
-	{
-		text.text = Content;
-		text.color = color;
-		rectTransform.sizeDelta = new Vector2(rectTransform.sizeDelta.x, 50f + 50f * (text.preferredHeight - 44f) / 46f);
-		base.transform.localScale = new Vector3(1f, 1f, 1f);
-	}
+        Canvas.ForceUpdateCanvases();
+
+        float height = Mathf.Max(
+            50f,
+            text.preferredHeight + 6f
+        );
+
+        rectTransform.SetSizeWithCurrentAnchors(
+            RectTransform.Axis.Vertical,
+            height
+        );
+
+        gameObject.SetActive(true);
+    }
+
+    public void GetContent(string content, Color32 color)
+    {
+        if (text == null || rectTransform == null)
+            return;
+
+        text.text = content;
+        text.color = color;
+
+        Canvas.ForceUpdateCanvases();
+
+        float height = Mathf.Max(
+            50f,
+            text.preferredHeight + 6f
+        );
+
+        rectTransform.SetSizeWithCurrentAnchors(
+            RectTransform.Axis.Vertical,
+            height
+        );
+
+        gameObject.SetActive(true);
+    }
 }

@@ -12,20 +12,28 @@ public class UIManager : MonoBehaviour
     public LogPanel LogPanel;
     public ConfirmPanel ConfirmPanel;
     public Transform BattleUI;
+
     private LVStartEF LVStartEF;
+
     public SetPanel SetPanel;
     public OverPanel OverPanel;
     public Transform LastStandBtn;
+
     public Transform HostGame;
     public InputField IpInput;
     public InputField PortInput;
+
     public Transform HostPassword;
     public InputField HostPasswordInput;
+
     public Transform JoinGame;
     public InputField JoinIpInput;
     public InputField JoinPasswordInput;
+
     private bool isChatBoxOpen;
+
     public ChatInput chatInput;
+
     public Transform ChatBox;
     public Transform OutChatBox;
     public Transform OpenChatButton;
@@ -33,21 +41,39 @@ public class UIManager : MonoBehaviour
 
     public bool IsChatBoxOpen
     {
-        get => isChatBoxOpen;
+        get
+        {
+            return isChatBoxOpen;
+        }
         set
         {
             isChatBoxOpen = value;
+
             if (value)
             {
-                chatInput.InputField.ActivateInputField();
-                ChatBox.localScale = Vector3.one;
-                OutChatBox.localScale = Vector3.zero;
+                if (ChatBox != null)
+                    ChatBox.gameObject.SetActive(true);
+
+                if (OutChatBox != null)
+                    OutChatBox.gameObject.SetActive(false);
+
+                if (chatInput != null && chatInput.InputField != null)
+                {
+                    chatInput.InputField.gameObject.SetActive(true);
+                    chatInput.InputField.ActivateInputField();
+                    chatInput.InputField.MoveTextEnd(false);
+                }
             }
             else
             {
-                chatInput.ClearInput();
-                ChatBox.localScale = Vector3.zero;
-                OutChatBox.localScale = Vector3.one;
+                if (chatInput != null)
+                    chatInput.ClearInput();
+
+                if (ChatBox != null)
+                    ChatBox.gameObject.SetActive(false);
+
+                if (OutChatBox != null)
+                    OutChatBox.gameObject.SetActive(true);
             }
         }
     }
@@ -55,46 +81,93 @@ public class UIManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        LVStartEF = BattleUI.Find("LVEF").GetComponent<LVStartEF>();
-        OverPanel = BattleUI.Find("OverPanel").GetComponent<OverPanel>();
-        SetPanel = transform.Find("SetPanel").GetComponent<SetPanel>();
+
+        if (BattleUI != null)
+        {
+            Transform lvEffect = BattleUI.Find("LVEF");
+
+            if (lvEffect != null)
+                LVStartEF = lvEffect.GetComponent<LVStartEF>();
+
+            Transform overPanel = BattleUI.Find("OverPanel");
+
+            if (overPanel != null)
+                OverPanel = overPanel.GetComponent<OverPanel>();
+        }
+
+        Transform setPanel = transform.Find("SetPanel");
+
+        if (setPanel != null)
+            SetPanel = setPanel.GetComponent<SetPanel>();
     }
 
     private void Start()
     {
-        OpenChatButton.gameObject.SetActive(GameManager.Instance.isAndroid);
-        LastStandBtn.gameObject.SetActive(false);
+        if (OpenChatButton != null)
+        {
+            OpenChatButton.gameObject.SetActive(
+                GameManager.Instance != null &&
+                GameManager.Instance.isAndroid
+            );
+        }
+
+        if (LastStandBtn != null)
+            LastStandBtn.gameObject.SetActive(false);
+
+        if (ChatBox != null)
+            ChatBox.gameObject.SetActive(false);
+
+        if (OutChatBox != null)
+            OutChatBox.gameObject.SetActive(true);
+
         SetHostAddress();
     }
 
     private void Update()
     {
-        if (SetPanel.isOpen || isChatBoxOpen)
+        if (SetPanel != null &&
+            (SetPanel.isOpen || isChatBoxOpen))
         {
             if (Input.GetKeyDown(KeyCode.Escape))
             {
-                if (SetPanel.isOpen) SetPanel.CloseSetPanel();
-                else IsChatBoxOpen = false;
+                if (SetPanel.isOpen)
+                {
+                    SetPanel.CloseSetPanel();
+                }
+                else
+                {
+                    IsChatBoxOpen = false;
+                }
             }
+
             return;
         }
 
-        if (Input.GetKeyDown(KeyCode.Escape) && LVManager.Instance.InGame)
+        if (Input.GetKeyDown(KeyCode.Escape) &&
+            LVManager.Instance != null &&
+            LVManager.Instance.InGame)
+        {
             ShowBattleSetPanel();
+        }
 
         if (Input.GetKeyDown(KeyCode.T))
+        {
             IsChatBoxOpen = true;
+        }
 
         if (Input.GetKeyDown(KeyCode.Slash))
         {
             IsChatBoxOpen = true;
-            chatInput.SlashOpen();
+
+            if (chatInput != null)
+                chatInput.SlashOpen();
         }
     }
 
     private string GetLocalIPAddress()
     {
-        NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
+        NetworkInterface[] interfaces =
+            NetworkInterface.GetAllNetworkInterfaces();
 
         for (int i = 0; i < interfaces.Length; i++)
         {
@@ -102,18 +175,24 @@ public class UIManager : MonoBehaviour
 
             if (network.OperationalStatus != OperationalStatus.Up ||
                 network.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+            {
                 continue;
+            }
 
-            IPInterfaceProperties properties = network.GetIPProperties();
+            IPInterfaceProperties properties =
+                network.GetIPProperties();
 
             for (int j = 0; j < properties.UnicastAddresses.Count; j++)
             {
-                IPAddress address = properties.UnicastAddresses[j].Address;
+                IPAddress address =
+                    properties.UnicastAddresses[j].Address;
 
                 if (address.AddressFamily == AddressFamily.InterNetwork &&
                     !IPAddress.IsLoopback(address) &&
                     !address.ToString().StartsWith("169.254."))
+                {
                     return address.ToString();
+                }
             }
         }
 
@@ -122,8 +201,11 @@ public class UIManager : MonoBehaviour
 
     private void SetHostAddress()
     {
-        IpInput.text = GetLocalIPAddress();
-        PortInput.text = "45678";
+        if (IpInput != null)
+            IpInput.text = GetLocalIPAddress();
+
+        if (PortInput != null)
+            PortInput.text = "45678";
     }
 
     public void SetChooserType(SeedBankType type)
@@ -138,7 +220,7 @@ public class UIManager : MonoBehaviour
         {
             SeedChooser.Instance.transform.localScale = Vector3.zero;
             ZombieChooser.Instance.transform.localScale = Vector3.one;
-            ZombieChooser.Instance.ChangeChooserBtn.localScale = Vector3.zero;
+            SeedChooser.Instance.ChangeChooserBtn.localScale = Vector3.zero;
         }
         else if (type == SeedBankType.SunAndMoonBank)
         {
@@ -151,34 +233,103 @@ public class UIManager : MonoBehaviour
 
     public void ChangeChooser()
     {
-        bool seed = SeedChooser.Instance.transform.localScale.x == 0f;
-        SeedChooser.Instance.transform.localScale = seed ? Vector3.one : Vector3.zero;
-        ZombieChooser.Instance.transform.localScale = seed ? Vector3.zero : Vector3.one;
+        bool seed =
+            SeedChooser.Instance.transform.localScale.x == 0f;
+
+        SeedChooser.Instance.transform.localScale =
+            seed ? Vector3.one : Vector3.zero;
+
+        ZombieChooser.Instance.transform.localScale =
+            seed ? Vector3.zero : Vector3.one;
     }
 
     public void OpenChatBtn()
     {
-        if (IsChatBoxOpen) chatInput.SendContent();
-        else IsChatBoxOpen = true;
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        if (IsChatBoxOpen)
+        {
+            if (chatInput != null)
+                chatInput.SendContent();
+        }
+        else
+        {
+            IsChatBoxOpen = true;
+        }
+
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
     }
 
-    public void ShowLVStartEF() => LVStartEF.Show();
-    public void StopLVStartEF() => LVStartEF.StopAll();
-    public void ShowBigWaveEF() => LVStartEF.ShowBigWave();
-    public void ShowFinalWaveEF() => LVStartEF.ShowFinalWave();
-    public void ShowSetPanel() => SetPanel.ShowPanel(true, false);
-    public void ShowBattleSetPanel() => SetPanel.ShowPanel(true, true);
+    public void ShowLVStartEF()
+    {
+        if (LVStartEF != null)
+            LVStartEF.Show();
+    }
+
+    public void StopLVStartEF()
+    {
+        if (LVStartEF != null)
+            LVStartEF.StopAll();
+    }
+
+    public void ShowBigWaveEF()
+    {
+        if (LVStartEF != null)
+            LVStartEF.ShowBigWave();
+    }
+
+    public void ShowFinalWaveEF()
+    {
+        if (LVStartEF != null)
+            LVStartEF.ShowFinalWave();
+    }
+
+    public void ShowSetPanel()
+    {
+        if (SetPanel != null)
+            SetPanel.ShowPanel(true, false);
+    }
+
+    public void ShowBattleSetPanel()
+    {
+        if (SetPanel != null)
+            SetPanel.ShowPanel(true, true);
+    }
 
     public void ConfirmOpenServer()
     {
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
-
-        if (!IPAddress.TryParse(IpInput.text, out IPAddress address) ||
-            !int.TryParse(PortInput.text, out int port) ||
-            port < 1025 || port > 65535)
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
         {
-            LogPanel.DisplayLog("Ingrese una dirección IP y un puerto válidos", () => HostGame.gameObject.SetActive(true));
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
+
+        if (!IPAddress.TryParse(
+                IpInput.text,
+                out IPAddress address) ||
+            !int.TryParse(
+                PortInput.text,
+                out int port) ||
+            port < 1025 ||
+            port > 65535)
+        {
+            LogPanel.DisplayLog(
+                "Ingrese una dirección IP y un puerto válidos",
+                () => HostGame.gameObject.SetActive(true)
+            );
+
             return;
         }
 
@@ -188,61 +339,104 @@ public class UIManager : MonoBehaviour
 
     public void ConfirmJoinGame()
     {
-        if (GameManager.Instance.isOnline) return;
+        if (GameManager.Instance.isOnline)
+            return;
 
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
 
-        string[] address = JoinIpInput.text.Split(':');
+        string[] address =
+            JoinIpInput.text.Split(':');
 
         if (address.Length < 2 ||
             !int.TryParse(address[1], out int port) ||
             port < 1025 ||
             port > 65535)
         {
-            LogPanel.DisplayLog("Ingrese una dirección válida", () => JoinGame.gameObject.SetActive(true));
+            LogPanel.DisplayLog(
+                "Ingrese una dirección válida",
+                () => JoinGame.gameObject.SetActive(true)
+            );
+
             return;
         }
 
         try
         {
-            IPAddress[] addresses = Dns.GetHostAddresses(address[0]);
+            IPAddress[] addresses =
+                Dns.GetHostAddresses(address[0]);
 
             if (addresses.Length == 0)
             {
-                LogPanel.DisplayLog("No se pudo encontrar la dirección", () => JoinGame.gameObject.SetActive(true));
+                LogPanel.DisplayLog(
+                    "No se pudo encontrar la dirección",
+                    () => JoinGame.gameObject.SetActive(true)
+                );
+
                 return;
             }
 
-            LogPanel.DisplayLog("Conectando...", () => JoinGame.gameObject.SetActive(true));
+            LogPanel.DisplayLog(
+                "Conectando...",
+                () => JoinGame.gameObject.SetActive(true)
+            );
+
             LogPanel.ButtonText.text = "Cancelar";
             LogPanel.CancelConfirm();
-            SocketClient.Instance.JoinGame(addresses[0], port, JoinPasswordInput.text);
+
+            SocketClient.Instance.JoinGame(
+                addresses[0],
+                port,
+                JoinPasswordInput.text
+            );
         }
         catch
         {
-            LogPanel.DisplayLog("No se pudo encontrar la dirección", () => JoinGame.gameObject.SetActive(true));
+            LogPanel.DisplayLog(
+                "No se pudo encontrar la dirección",
+                () => JoinGame.gameObject.SetActive(true)
+            );
         }
     }
 
     public void ReJoinGame()
     {
-        if (GameManager.Instance.isOnline) return;
-
-        string[] address = JoinIpInput.text.Split(':');
-
-        if (address.Length < 2 || !int.TryParse(address[1], out int port))
+        if (GameManager.Instance.isOnline)
             return;
+
+        string[] address =
+            JoinIpInput.text.Split(':');
+
+        if (address.Length < 2 ||
+            !int.TryParse(address[1], out int port))
+        {
+            return;
+        }
 
         try
         {
-            IPAddress[] addresses = Dns.GetHostAddresses(address[0]);
+            IPAddress[] addresses =
+                Dns.GetHostAddresses(address[0]);
 
             if (addresses.Length == 0)
                 return;
 
             LogPanel.DisplayLog("Conectando...", null);
             LogPanel.CancelConfirm();
-            SocketClient.Instance.JoinGame(addresses[0], port, JoinPasswordInput.text);
+
+            SocketClient.Instance.JoinGame(
+                addresses[0],
+                port,
+                JoinPasswordInput.text
+            );
         }
         catch
         {
@@ -257,26 +451,63 @@ public class UIManager : MonoBehaviour
 
     public void CloseHostGame()
     {
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
+
         SetHostAddress();
         HostGame.gameObject.SetActive(false);
     }
 
     public void CloseJoinGame()
     {
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
+
         JoinGame.gameObject.SetActive(false);
     }
 
     public void ConfirmPassword()
     {
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
+
         HostPassword.gameObject.SetActive(false);
     }
 
     public void OpenAndFocusUI(bool isBlack = true)
     {
-        UIBackground.GetComponent<Image>().color = new Color(0f, 0f, 0f, isBlack ? 0.4f : 0f);
+        UIBackground.GetComponent<Image>().color =
+            new Color(
+                0f,
+                0f,
+                0f,
+                isBlack ? 0.4f : 0f
+            );
+
         UIBackground.gameObject.SetActive(true);
     }
 
@@ -291,13 +522,27 @@ public class UIManager : MonoBehaviour
         Shovel.Instance.LvStart();
         Glove.Instance.LvStart();
         CreatePanel.Instance.BattleUIOpen();
-        QuickChatGroup.gameObject.SetActive(SetPanel.OpenQuickChat);
-        BattleUI.localScale = Vector3.one;
+
+        QuickChatGroup.gameObject.SetActive(
+            SetPanel.OpenQuickChat
+        );
+
+        BattleUI.gameObject.SetActive(true);
     }
 
     public void StartLastStand()
     {
         LVManager.Instance.StartLastStand();
-        AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.GraveButton, transform.position, isAll: true);
+
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.GraveButton,
+                transform.position,
+                isAll: true
+            );
+        }
     }
 }
