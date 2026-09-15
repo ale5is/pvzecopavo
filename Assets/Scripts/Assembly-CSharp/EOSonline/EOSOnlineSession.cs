@@ -18,11 +18,14 @@ public class EOSOnlineSession : MonoBehaviour
 
     private string localSessionName;
 
+    private bool sessionsInitialized;
+
     public bool IsHosting { get; private set; }
     public bool IsJoined { get; private set; }
     public bool IsSearching { get; private set; }
 
     public string LocalSessionName => localSessionName;
+    public bool IsInitialized => sessionsInitialized;
 
     private void Awake()
     {
@@ -38,24 +41,36 @@ public class EOSOnlineSession : MonoBehaviour
 
     private void Start()
     {
-        Invoke(nameof(Initialize), 1f);
+        TryInitialize();
     }
 
-    private void Initialize()
+    private void Update()
     {
-        if (EOSManager.Instance == null)
+        if (!sessionsInitialized)
         {
-            Debug.LogError("[EOS SESSION] EOSManager no existe.");
+            TryInitialize();
+        }
+    }
+
+    private void TryInitialize()
+    {
+        if (sessionsInitialized)
+        {
             return;
         }
 
-        if (EOSAutoLogin.Instance == null ||
-            !EOSAutoLogin.Instance.IsLoggedIn)
+        if (EOSManager.Instance == null)
         {
-            Debug.LogError(
-                "[EOS SESSION] EOS todavía no inició sesión."
-            );
+            return;
+        }
 
+        if (EOSAutoLogin.Instance == null)
+        {
+            return;
+        }
+
+        if (!EOSAutoLogin.Instance.IsLoggedIn)
+        {
             return;
         }
 
@@ -64,15 +79,13 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (sessionsInterface == null)
         {
-            Debug.LogError(
-                "[EOS SESSION] SessionsInterface no disponible."
-            );
-
             return;
         }
 
+        sessionsInitialized = true;
+
         Debug.Log(
-            "[EOS SESSION] SessionsInterface listo."
+            "[EOS SESSION] Sesiones inicializadas correctamente."
         );
     }
 
@@ -137,6 +150,8 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             sessionModification = null;
+            localSessionName = null;
+
             return;
         }
 
@@ -160,6 +175,8 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSessionModification();
+            localSessionName = null;
+
             return;
         }
 
@@ -182,6 +199,8 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSessionModification();
+            localSessionName = null;
+
             return;
         }
 
@@ -204,6 +223,8 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSessionModification();
+            localSessionName = null;
+
             return;
         }
 
@@ -238,6 +259,8 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSessionModification();
+            localSessionName = null;
+
             return;
         }
 
@@ -267,6 +290,8 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSessionModification();
+            localSessionName = null;
+
             return;
         }
 
@@ -306,6 +331,8 @@ public class EOSOnlineSession : MonoBehaviour
             Debug.LogError(
                 "[EOS SESSION] No se pudo crear la sesión."
             );
+
+            localSessionName = null;
 
             return;
         }
@@ -361,6 +388,7 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             sessionSearch = null;
+
             return;
         }
 
@@ -394,14 +422,28 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSearch();
+
+            return;
+        }
+
+        ProductUserId localUserId =
+            EOSManager.Instance.GetProductUserId();
+
+        if (localUserId == null)
+        {
+            Debug.LogError(
+                "[EOS SESSION] ProductUserId no disponible."
+            );
+
+            ReleaseSearch();
+
             return;
         }
 
         SessionSearchFindOptions findOptions =
             new SessionSearchFindOptions
             {
-                LocalUserId =
-                    EOSManager.Instance.GetProductUserId()
+                LocalUserId = localUserId
             };
 
         IsSearching = true;
@@ -434,6 +476,7 @@ public class EOSOnlineSession : MonoBehaviour
             );
 
             ReleaseSearch();
+
             return;
         }
 
@@ -450,7 +493,11 @@ public class EOSOnlineSession : MonoBehaviour
             count
         );
 
-        foundSession = null;
+        if (foundSession != null)
+        {
+            foundSession.Release();
+            foundSession = null;
+        }
 
         for (uint i = 0; i < count; i++)
         {
@@ -489,6 +536,7 @@ public class EOSOnlineSession : MonoBehaviour
             }
 
             uint maxConnections = 0;
+
             uint openConnections =
                 info.Value.NumOpenPublicConnections;
 
@@ -498,11 +546,16 @@ public class EOSOnlineSession : MonoBehaviour
                     info.Value.Settings.Value.NumPublicConnections;
             }
 
+            uint players =
+                maxConnections >= openConnections
+                    ? maxConnections - openConnections
+                    : 0;
+
             Debug.Log(
                 "[EOS SESSION] Encontrada: " +
                 info.Value.SessionId +
                 " | Jugadores: " +
-                (maxConnections - openConnections) +
+                players +
                 "/" +
                 maxConnections
             );
@@ -564,6 +617,8 @@ public class EOSOnlineSession : MonoBehaviour
             "PvZEcoPavo_Client_" +
             localUserId.ToString();
 
+        localSessionName = joinedSessionName;
+
         JoinSessionOptions joinOptions =
             new JoinSessionOptions
             {
@@ -595,6 +650,8 @@ public class EOSOnlineSession : MonoBehaviour
         if (data.ResultCode != Result.Success)
         {
             IsJoined = false;
+            IsHosting = false;
+            localSessionName = null;
 
             Debug.LogError(
                 "[EOS SESSION] No se pudo unir."
@@ -608,6 +665,11 @@ public class EOSOnlineSession : MonoBehaviour
 
         Debug.Log(
             "[EOS SESSION] PARTIDA ONLINE UNIDA."
+        );
+
+        Debug.Log(
+            "[EOS SESSION] SessionName local: " +
+            localSessionName
         );
     }
 
@@ -664,6 +726,20 @@ public class EOSOnlineSession : MonoBehaviour
 
     private bool CanUseSessions()
     {
+        if (!sessionsInitialized)
+        {
+            TryInitialize();
+        }
+
+        if (!sessionsInitialized)
+        {
+            Debug.LogError(
+                "[EOS SESSION] EOS todavía no está listo."
+            );
+
+            return false;
+        }
+
         if (EOSManager.Instance == null)
         {
             Debug.LogError(
@@ -694,6 +770,8 @@ public class EOSOnlineSession : MonoBehaviour
             Debug.LogError(
                 "[EOS SESSION] SessionsInterface no disponible."
             );
+
+            sessionsInitialized = false;
 
             return false;
         }
