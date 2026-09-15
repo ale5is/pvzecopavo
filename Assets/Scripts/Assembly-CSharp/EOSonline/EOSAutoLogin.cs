@@ -11,6 +11,9 @@ public class EOSAutoLogin : MonoBehaviour
 
     public bool IsLoggedIn { get; private set; }
 
+    private bool loginInProgress;
+    private bool creatingUser;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -30,9 +33,17 @@ public class EOSAutoLogin : MonoBehaviour
 
     private void StartDeviceLogin()
     {
+        if (loginInProgress || IsLoggedIn)
+        {
+            return;
+        }
+
         if (EOSManager.Instance == null)
         {
-            Debug.LogError("[EOS] EOSManager no existe.");
+            Debug.LogError(
+                "[EOS] EOSManager no existe."
+            );
+
             return;
         }
 
@@ -41,44 +52,17 @@ public class EOSAutoLogin : MonoBehaviour
 
         if (connectInterface == null)
         {
-            Debug.LogError("[EOS] ConnectInterface no está disponible.");
+            Debug.LogError(
+                "[EOS] ConnectInterface no está disponible."
+            );
+
             return;
         }
 
-        CreateDeviceIdOptions options = new CreateDeviceIdOptions
-        {
-            DeviceModel = SystemInfo.deviceModel
-        };
+        loginInProgress = true;
 
-        Debug.Log("[EOS] Creando/registrando Device ID...");
-
-        connectInterface.CreateDeviceId(
-            ref options,
-            null,
-            OnCreateDeviceId
-        );
-    }
-
-    private void OnCreateDeviceId(
-        ref CreateDeviceIdCallbackInfo data)
-    {
-        Debug.Log(
-            "[EOS] CreateDeviceId: " +
-            data.ResultCode
-        );
-
-        LoginWithDeviceId();
-    }
-
-    private void LoginWithDeviceId()
-    {
-        if (EOSManager.Instance == null)
-        {
-            Debug.LogError("[EOS] EOSManager no existe.");
-            return;
-        }
-
-        string displayName = System.Environment.UserName;
+        string displayName =
+            System.Environment.UserName;
 
         if (string.IsNullOrWhiteSpace(displayName))
         {
@@ -86,7 +70,7 @@ public class EOSAutoLogin : MonoBehaviour
         }
 
         Debug.Log(
-            "[EOS] Iniciando Connect Login con Device ID..."
+            "[EOS] Buscando Device ID existente e iniciando login..."
         );
 
         EOSManager.Instance.StartConnectLoginWithOptions(
@@ -97,7 +81,8 @@ public class EOSAutoLogin : MonoBehaviour
         );
     }
 
-    private void OnConnectLogin(LoginCallbackInfo data)
+    private void OnConnectLogin(
+        LoginCallbackInfo data)
     {
         Debug.Log(
             "[EOS] Connect Login: " +
@@ -106,10 +91,15 @@ public class EOSAutoLogin : MonoBehaviour
 
         if (data.ResultCode == Result.Success)
         {
-            LocalProductUserId = data.LocalUserId;
-            IsLoggedIn = true;
+            LocalProductUserId =
+                data.LocalUserId;
 
-            Debug.Log("[EOS] LOGIN CORRECTO");
+            IsLoggedIn = true;
+            loginInProgress = false;
+
+            Debug.Log(
+                "[EOS] LOGIN CORRECTO"
+            );
 
             Debug.Log(
                 "[EOS] ProductUserId: " +
@@ -123,6 +113,8 @@ public class EOSAutoLogin : MonoBehaviour
         {
             if (data.ContinuanceToken == null)
             {
+                loginInProgress = false;
+
                 Debug.LogError(
                     "[EOS] InvalidUser pero " +
                     "ContinuanceToken es null."
@@ -132,16 +124,18 @@ public class EOSAutoLogin : MonoBehaviour
             }
 
             Debug.Log(
-                "[EOS] Product User no existe. Creándolo..."
+                "[EOS] Device ID encontrado, " +
+                "pero todavía no tiene Product User asociado."
             );
 
-            EOSManager.Instance.CreateConnectUserWithContinuanceToken(
-                data.ContinuanceToken,
-                OnCreateConnectUser
+            CreateProductUser(
+                data.ContinuanceToken
             );
 
             return;
         }
+
+        loginInProgress = false;
 
         Debug.LogError(
             "[EOS] Connect Login falló: " +
@@ -149,9 +143,44 @@ public class EOSAutoLogin : MonoBehaviour
         );
     }
 
-    private void OnCreateConnectUser(
-        CreateUserCallbackInfo data)
+    private void CreateProductUser(
+        ContinuanceToken continuanceToken
+    )
     {
+        if (creatingUser)
+        {
+            return;
+        }
+
+        if (EOSManager.Instance == null)
+        {
+            loginInProgress = false;
+
+            Debug.LogError(
+                "[EOS] EOSManager no existe."
+            );
+
+            return;
+        }
+
+        creatingUser = true;
+
+        Debug.Log(
+            "[EOS] Creando Product User..."
+        );
+
+        EOSManager.Instance.CreateConnectUserWithContinuanceToken(
+            continuanceToken,
+            OnCreateConnectUser
+        );
+    }
+
+    private void OnCreateConnectUser(
+        CreateUserCallbackInfo data
+    )
+    {
+        creatingUser = false;
+
         Debug.Log(
             "[EOS] Create Connect User: " +
             data.ResultCode
@@ -159,6 +188,8 @@ public class EOSAutoLogin : MonoBehaviour
 
         if (data.ResultCode != Result.Success)
         {
+            loginInProgress = false;
+
             Debug.LogError(
                 "[EOS] No se pudo crear el Product User: " +
                 data.ResultCode
@@ -168,10 +199,42 @@ public class EOSAutoLogin : MonoBehaviour
         }
 
         Debug.Log(
-            "[EOS] Product User creado. " +
-            "Reintentando Connect Login..."
+            "[EOS] Product User creado correctamente."
+        );
+
+        Debug.Log(
+            "[EOS] Reintentando login..."
         );
 
         LoginWithDeviceId();
+    }
+
+    private void LoginWithDeviceId()
+    {
+        if (EOSManager.Instance == null)
+        {
+            loginInProgress = false;
+
+            Debug.LogError(
+                "[EOS] EOSManager no existe."
+            );
+
+            return;
+        }
+
+        string displayName =
+            System.Environment.UserName;
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = "Jugador";
+        }
+
+        EOSManager.Instance.StartConnectLoginWithOptions(
+            ExternalCredentialType.DeviceidAccessToken,
+            null,
+            displayName,
+            OnConnectLogin
+        );
     }
 }
