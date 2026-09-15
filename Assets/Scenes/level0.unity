@@ -128125,7 +128125,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.000137021}
+  m_AnchoredPosition: {x: 0, y: 0.00013952494}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!1 &313557439
@@ -128611,7 +128611,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.00015004403}
+  m_AnchoredPosition: {x: 0, y: 0.00013952494}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &336738396
@@ -130620,7 +130620,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.000137021}
+  m_AnchoredPosition: {x: 0, y: 0.00013952494}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &423918493
@@ -133743,7 +133743,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -235}
+  m_AnchoredPosition: {x: 193, y: -180}
   m_SizeDelta: {x: 260, y: 99.02}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &563968905
@@ -133790,7 +133790,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112851}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: EOSOnlineUI, Assembly-CSharp
         m_MethodName: LeaveOnlineGame
         m_Mode: 1
@@ -139269,8 +139269,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -157, y: 49}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -9.2052, y: 94}
+  m_SizeDelta: {x: 598.1, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &827050801
 MonoBehaviour:
@@ -139319,8 +139319,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 30
+  m_fontSizeBase: 30
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -139355,7 +139355,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0, y: 0, z: -1.5531006, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -141460,8 +141460,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -157, y: 108}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -9.2064, y: 156}
+  m_SizeDelta: {x: 598.1003, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &916323719
 MonoBehaviour:
@@ -141510,8 +141510,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 30
+  m_fontSizeBase: 30
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -141594,8 +141594,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -159, y: -7}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -9.2046, y: 35}
+  m_SizeDelta: {x: 598.1, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &919555072
 MonoBehaviour:
@@ -141644,8 +141644,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 30
+  m_fontSizeBase: 30
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -141914,7 +141914,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -208, y: -195}
+  m_AnchoredPosition: {x: -211.99, y: -147}
   m_SizeDelta: {x: 260, y: 99.02}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &937235170
@@ -141961,7 +141961,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112851}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: EOSOnlineUI, Assembly-CSharp
         m_MethodName: CreateOnlineGame
         m_Mode: 1
@@ -145273,7 +145273,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -147}
+  m_AnchoredPosition: {x: -18, y: -221.51}
   m_SizeDelta: {x: 260, y: 99.02}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1094062422
@@ -145320,7 +145320,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112851}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: EOSOnlineUI, Assembly-CSharp
         m_MethodName: SearchOnlineGames
         m_Mode: 1
@@ -146712,8 +146712,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 115.980835}
-  m_SizeDelta: {x: 700, y: 700}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 800, y: 800}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1183836029
 MonoBehaviour:
@@ -147282,7 +147282,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112847}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: EOSOnlineSession, Assembly-CSharp
         m_MethodName: CreateOnlineGame
         m_Mode: 1
@@ -152547,8 +152547,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 20
+  m_fontSizeBase: 20
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -152613,8 +152613,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 72}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -9.3599, y: -43.73497}
+  m_SizeDelta: {x: 603.2802, y: 107.51}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1445062488
 MonoBehaviour:
@@ -152686,7 +152686,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 205, y: -195}
+  m_AnchoredPosition: {x: -211.98999, y: -221.51001}
   m_SizeDelta: {x: 260, y: 99.02}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1445274211
@@ -152733,7 +152733,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112851}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: EOSOnlineUI, Assembly-CSharp
         m_MethodName: JoinOnlineGame
         m_Mode: 1
@@ -158593,7 +158593,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 157}
+  m_AnchoredPosition: {x: 0, y: 216}
   m_SizeDelta: {x: 163.9859, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1710554691
@@ -165987,13 +165987,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2117112845}
-  - component: {fileID: 2117112844}
-  - component: {fileID: 2117112846}
-  - component: {fileID: 2117112847}
-  - component: {fileID: 2117112850}
-  - component: {fileID: 2117112849}
-  - component: {fileID: 2117112848}
-  - component: {fileID: 2117112851}
   m_Layer: 0
   m_Name: ServerOnlineManager
   m_TagString: Untagged
@@ -166001,19 +165994,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2117112844
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 55c06b9b50cdcdf45839b7da18fa5e5b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  ShouldShutdownOnApplicationQuit: 1
 --- !u!4 &2117112845
 Transform:
   m_ObjectHideFlags: 0
@@ -166029,91 +166009,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2117112846
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8927775ee159e0744b3614bf65d45c20, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &2117112847
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f92d49405a0904445a03776a762d4ca3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  bucketId: PvZEcoPavo
-  maxPlayers: 4
-  defaultRoomName: Sala de PvZ Eco Pavo
---- !u!114 &2117112848
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e66768126cdb51c438904b603d42a6fa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  socketName: PvZEcoPavo
---- !u!114 &2117112849
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c11938f8a92fb2f43b8862eec769860d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxPlayers: 4
---- !u!114 &2117112850
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6b555e8f456e1184fa659032e4a8f1c7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &2117112851
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0d12491c2c270da46bd20a26c66d0526, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  onlineRoomsPanel: {fileID: 1145575878}
-  roomsStatusText: {fileID: 1439396935}
-  roomNameTexts:
-  - {fileID: 916323719}
-  roomPlayersTexts:
-  - {fileID: 827050801}
-  roomHostTexts:
-  - {fileID: 919555072}
 --- !u!1 &2118072417
 GameObject:
   m_ObjectHideFlags: 0
