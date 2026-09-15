@@ -21,9 +21,20 @@ public class EOSOnlineSession : MonoBehaviour
 {
     public static EOSOnlineSession Instance;
 
+    private enum SessionOperation
+    {
+        None,
+        Creating,
+        Searching,
+        Joining,
+        Leaving
+    }
+
     [Header("Configuración")]
     [SerializeField] private string bucketId = "PvZEcoPavo";
+
     [SerializeField] private uint maxPlayers = 4;
+
     [SerializeField]
     private string defaultRoomName =
         "Sala de PvZ Eco Pavo";
@@ -48,6 +59,9 @@ public class EOSOnlineSession : MonoBehaviour
 
     private bool destroyingSession;
 
+    private SessionOperation currentOperation =
+        SessionOperation.None;
+
     private readonly List<EOSOnlineRoom> availableRooms =
         new List<EOSOnlineRoom>();
 
@@ -56,6 +70,11 @@ public class EOSOnlineSession : MonoBehaviour
     public bool IsJoined { get; private set; }
 
     public bool IsSearching { get; private set; }
+
+    public bool IsOperationInProgress =>
+        currentOperation != SessionOperation.None ||
+        leavingOnlineGame ||
+        destroyingSession;
 
     public string LocalSessionName =>
         localSessionName;
@@ -140,8 +159,7 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     public void SetRoomName(
-        string roomName
-    )
+        string roomName)
     {
         if (string.IsNullOrWhiteSpace(roomName))
         {
@@ -168,17 +186,24 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     public void CreateOnlineGame(
-        string roomName
-    )
+        string roomName)
     {
         if (!CanUseSessions())
         {
             return;
         }
 
+        if (IsOperationInProgress)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] Ya hay una operación EOS en proceso."
+            );
+
+            return;
+        }
+
         if (IsHosting ||
-            IsJoined ||
-            destroyingSession)
+            IsJoined)
         {
             Debug.LogWarning(
                 "[EOS SESSION] Ya estás dentro de una sesión."
@@ -188,6 +213,9 @@ public class EOSOnlineSession : MonoBehaviour
         }
 
         leavingOnlineGame = false;
+
+        currentOperation =
+            SessionOperation.Creating;
 
         SetRoomName(
             roomName
@@ -199,6 +227,9 @@ public class EOSOnlineSession : MonoBehaviour
         if (localUserId == null ||
             !localUserId.IsValid())
         {
+            currentOperation =
+                SessionOperation.None;
+
             Debug.LogError(
                 "[EOS SESSION] ProductUserId no disponible."
             );
@@ -238,6 +269,9 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (result != Result.Success)
         {
+            currentOperation =
+                SessionOperation.None;
+
             Debug.LogError(
                 "[EOS SESSION] CreateSessionModification: " +
                 result
@@ -263,14 +297,10 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (result != Result.Success)
         {
-            Debug.LogError(
-                "[EOS SESSION] SetPermissionLevel: " +
+            FailCurrentOperation(
+                "SetPermissionLevel",
                 result
             );
-
-            ReleaseSessionModification();
-
-            localSessionName = null;
 
             return;
         }
@@ -288,14 +318,10 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (result != Result.Success)
         {
-            Debug.LogError(
-                "[EOS SESSION] SetJoinInProgressAllowed: " +
+            FailCurrentOperation(
+                "SetJoinInProgressAllowed",
                 result
             );
-
-            ReleaseSessionModification();
-
-            localSessionName = null;
 
             return;
         }
@@ -313,14 +339,10 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (result != Result.Success)
         {
-            Debug.LogError(
-                "[EOS SESSION] SetInvitesAllowed: " +
+            FailCurrentOperation(
+                "SetInvitesAllowed",
                 result
             );
-
-            ReleaseSessionModification();
-
-            localSessionName = null;
 
             return;
         }
@@ -329,6 +351,9 @@ public class EOSOnlineSession : MonoBehaviour
                 "Game",
                 "PvZEcoPavo"))
         {
+            currentOperation =
+                SessionOperation.None;
+
             return;
         }
 
@@ -336,6 +361,9 @@ public class EOSOnlineSession : MonoBehaviour
                 "GameVersion",
                 "0.7"))
         {
+            currentOperation =
+                SessionOperation.None;
+
             return;
         }
 
@@ -343,6 +371,9 @@ public class EOSOnlineSession : MonoBehaviour
                 "RoomName",
                 localRoomName))
         {
+            currentOperation =
+                SessionOperation.None;
+
             return;
         }
 
@@ -364,10 +395,28 @@ public class EOSOnlineSession : MonoBehaviour
         );
     }
 
+    private void FailCurrentOperation(
+        string operation,
+        Result result)
+    {
+        Debug.LogError(
+            "[EOS SESSION] " +
+            operation +
+            ": " +
+            result
+        );
+
+        ReleaseSessionModification();
+
+        localSessionName = null;
+
+        currentOperation =
+            SessionOperation.None;
+    }
+
     private bool AddSessionAttribute(
         string key,
-        string value
-    )
+        string value)
     {
         if (sessionModification == null)
         {
@@ -418,8 +467,7 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     private void OnSessionCreated(
-        ref UpdateSessionCallbackInfo data
-    )
+        ref UpdateSessionCallbackInfo data)
     {
         Debug.Log(
             "[EOS SESSION] Create/Update: " +
@@ -427,6 +475,34 @@ public class EOSOnlineSession : MonoBehaviour
         );
 
         ReleaseSessionModification();
+
+        /*
+         * Si el usuario pulsó Salir mientras EOS todavía
+         * estaba creando la sesión, NO iniciamos P2P.
+         */
+        if (leavingOnlineGame ||
+            currentOperation != SessionOperation.Creating)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] Callback de creación recibido durante el cierre."
+            );
+
+            currentOperation =
+                SessionOperation.None;
+
+            if (data.ResultCode == Result.Success &&
+                !destroyingSession &&
+                sessionsInterface != null &&
+                !string.IsNullOrEmpty(localSessionName))
+            {
+                DestroyLocalSession();
+            }
+
+            return;
+        }
+
+        currentOperation =
+            SessionOperation.None;
 
         if (data.ResultCode != Result.Success)
         {
@@ -472,6 +548,19 @@ public class EOSOnlineSession : MonoBehaviour
 
     private void StartOnlineServer()
     {
+        /*
+         * Nunca iniciar el servidor si ya empezó
+         * el proceso de salida.
+         */
+        if (leavingOnlineGame)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] No se inicia el servidor porque se está saliendo."
+            );
+
+            return;
+        }
+
         if (EOSOnlineTransport.Instance == null)
         {
             Debug.LogError(
@@ -489,13 +578,6 @@ public class EOSOnlineSession : MonoBehaviour
 
             return;
         }
-
-        /*
-         * StartHost() SOLO se ejecuta aquí.
-         *
-         * EOSOnlineServer.StartServer()
-         * ya NO vuelve a llamar StartHost().
-         */
 
         if (!EOSOnlineTransport.Instance.StartHost())
         {
@@ -529,6 +611,15 @@ public class EOSOnlineSession : MonoBehaviour
             return;
         }
 
+        if (IsOperationInProgress)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] Ya hay una operación EOS en proceso."
+            );
+
+            return;
+        }
+
         if (IsHosting ||
             IsJoined)
         {
@@ -547,6 +638,9 @@ public class EOSOnlineSession : MonoBehaviour
 
         foundHostUserId = null;
 
+        currentOperation =
+            SessionOperation.Searching;
+
         CreateSessionSearchOptions searchOptions =
             new CreateSessionSearchOptions
             {
@@ -561,6 +655,9 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (result != Result.Success)
         {
+            currentOperation =
+                SessionOperation.None;
+
             Debug.LogError(
                 "[EOS SESSION] CreateSessionSearch: " +
                 result
@@ -598,6 +695,9 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (result != Result.Success)
         {
+            currentOperation =
+                SessionOperation.None;
+
             Debug.LogError(
                 "[EOS SESSION] SetParameter: " +
                 result
@@ -614,6 +714,9 @@ public class EOSOnlineSession : MonoBehaviour
         if (localUserId == null ||
             !localUserId.IsValid())
         {
+            currentOperation =
+                SessionOperation.None;
+
             Debug.LogError(
                 "[EOS SESSION] ProductUserId no disponible."
             );
@@ -644,8 +747,7 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     private void OnSearchFinished(
-        ref SessionSearchFindCallbackInfo data
-    )
+        ref SessionSearchFindCallbackInfo data)
     {
         IsSearching = false;
 
@@ -653,6 +755,13 @@ public class EOSOnlineSession : MonoBehaviour
             "[EOS SESSION] Search: " +
             data.ResultCode
         );
+
+        if (currentOperation ==
+            SessionOperation.Searching)
+        {
+            currentOperation =
+                SessionOperation.None;
+        }
 
         if (data.ResultCode != Result.Success)
         {
@@ -662,6 +771,12 @@ public class EOSOnlineSession : MonoBehaviour
 
             ReleaseSearch();
 
+            return;
+        }
+
+        if (leavingOnlineGame)
+        {
+            ReleaseSearch();
             return;
         }
 
@@ -818,8 +933,7 @@ public class EOSOnlineSession : MonoBehaviour
 
     private string GetSessionAttributeString(
         SessionDetails details,
-        string key
-    )
+        string key)
     {
         if (details == null)
         {
@@ -875,8 +989,7 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     public EOSOnlineRoom GetAvailableRoom(
-        int index
-    )
+        int index)
     {
         if (index < 0 ||
             index >= availableRooms.Count)
@@ -898,8 +1011,7 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     public bool SelectRoom(
-        int index
-    )
+        int index)
     {
         EOSOnlineRoom room =
             GetAvailableRoom(index);
@@ -918,8 +1030,7 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     public bool SelectRoom(
-        EOSOnlineRoom room
-    )
+        EOSOnlineRoom room)
     {
         if (room == null)
         {
@@ -979,6 +1090,15 @@ public class EOSOnlineSession : MonoBehaviour
             return;
         }
 
+        if (IsOperationInProgress)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] Ya hay una operación EOS en proceso."
+            );
+
+            return;
+        }
+
         if (foundSession == null)
         {
             Debug.LogError(
@@ -1027,6 +1147,9 @@ public class EOSOnlineSession : MonoBehaviour
         localSessionName =
             joinedSessionName;
 
+        currentOperation =
+            SessionOperation.Joining;
+
         JoinSessionOptions joinOptions =
             new JoinSessionOptions
             {
@@ -1056,13 +1179,40 @@ public class EOSOnlineSession : MonoBehaviour
     }
 
     private void OnJoinFinished(
-        ref JoinSessionCallbackInfo data
-    )
+        ref JoinSessionCallbackInfo data)
     {
         Debug.Log(
             "[EOS SESSION] JoinSession: " +
             data.ResultCode
         );
+
+        if (currentOperation ==
+            SessionOperation.Joining)
+        {
+            currentOperation =
+                SessionOperation.None;
+        }
+
+        /*
+         * Si Salir fue pulsado mientras JoinSession
+         * todavía estaba pendiente, no iniciamos P2P.
+         */
+        if (leavingOnlineGame)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] JoinSession terminó durante el cierre."
+            );
+
+            if (data.ResultCode == Result.Success &&
+                !destroyingSession &&
+                sessionsInterface != null &&
+                !string.IsNullOrEmpty(localSessionName))
+            {
+                DestroyLocalSession();
+            }
+
+            return;
+        }
 
         if (data.ResultCode != Result.Success)
         {
@@ -1072,6 +1222,8 @@ public class EOSOnlineSession : MonoBehaviour
             Debug.LogError(
                 "[EOS SESSION] No se pudo unir."
             );
+
+            localSessionName = null;
 
             return;
         }
@@ -1103,6 +1255,15 @@ public class EOSOnlineSession : MonoBehaviour
 
     private void StartOnlineClient()
     {
+        if (leavingOnlineGame)
+        {
+            Debug.LogWarning(
+                "[EOS SESSION] No se inicia el cliente porque se está saliendo."
+            );
+
+            return;
+        }
+
         if (EOSOnlineClient.Instance == null)
         {
             Debug.LogError(
@@ -1154,12 +1315,23 @@ public class EOSOnlineSession : MonoBehaviour
 
         if (!IsHosting &&
             !IsJoined &&
-            string.IsNullOrEmpty(localSessionName))
+            string.IsNullOrEmpty(localSessionName) &&
+            currentOperation == SessionOperation.None)
         {
             return;
         }
 
+        /*
+         * IMPORTANTE:
+         *
+         * Marcamos la salida ANTES de tocar ningún objeto.
+         * De esta manera cualquier callback EOS que llegue
+         * después sabe que no debe volver a iniciar P2P.
+         */
         leavingOnlineGame = true;
+
+        currentOperation =
+            SessionOperation.Leaving;
 
         Debug.Log(
             "[EOS SESSION] Saliendo de sesión..."
@@ -1176,7 +1348,9 @@ public class EOSOnlineSession : MonoBehaviour
         }
 
         /*
-         * 2. Detener lógica del cliente.
+         * 2. Limpiar estado lógico del cliente.
+         *
+         * EOSOnlineClient ya NO desconecta el transporte.
          */
         if (EOSOnlineClient.Instance != null)
         {
@@ -1184,7 +1358,7 @@ public class EOSOnlineSession : MonoBehaviour
         }
 
         /*
-         * 3. Cerrar P2P UNA SOLA VEZ.
+         * 3. Desconectar P2P una sola vez.
          */
         if (EOSOnlineTransport.Instance != null)
         {
@@ -1192,8 +1366,7 @@ public class EOSOnlineSession : MonoBehaviour
         }
 
         /*
-         * 4. Si no existe sesión EOS para destruir,
-         * limpiar directamente.
+         * 4. Destruir la sesión EOS.
          */
         if (sessionsInterface == null ||
             string.IsNullOrEmpty(localSessionName))
@@ -1203,8 +1376,20 @@ public class EOSOnlineSession : MonoBehaviour
             return;
         }
 
+        DestroyLocalSession();
+    }
+
+    private void DestroyLocalSession()
+    {
         if (destroyingSession)
         {
+            return;
+        }
+
+        if (sessionsInterface == null ||
+            string.IsNullOrEmpty(localSessionName))
+        {
+            FinishLeaveCleanup();
             return;
         }
 
@@ -1217,16 +1402,19 @@ public class EOSOnlineSession : MonoBehaviour
                     localSessionName
             };
 
+        Debug.Log(
+            "[EOS SESSION] Destruyendo sesión: " +
+            localSessionName
+        );
+
         sessionsInterface.DestroySession(
             ref destroyOptions,
             null,
             OnSessionDestroyed
         );
     }
-
     private void OnSessionDestroyed(
-        ref DestroySessionCallbackInfo data
-    )
+        ref DestroySessionCallbackInfo data)
     {
         Debug.Log(
             "[EOS SESSION] DestroySession: " +
@@ -1243,6 +1431,11 @@ public class EOSOnlineSession : MonoBehaviour
         IsSearching = false;
 
         destroyingSession = false;
+
+        currentOperation =
+            SessionOperation.None;
+
+        ReleaseSessionModification();
 
         ReleaseFoundSession();
 
@@ -1388,6 +1581,13 @@ public class EOSOnlineSession : MonoBehaviour
         }
 
         IsSearching = false;
+
+        if (currentOperation ==
+            SessionOperation.Searching)
+        {
+            currentOperation =
+                SessionOperation.None;
+        }
     }
 
     private void OnApplicationQuit()
@@ -1399,6 +1599,9 @@ public class EOSOnlineSession : MonoBehaviour
          * se encargan de su propio ciclo de destrucción.
          */
         leavingOnlineGame = true;
+
+        currentOperation =
+            SessionOperation.Leaving;
     }
 
     private void OnDestroy()

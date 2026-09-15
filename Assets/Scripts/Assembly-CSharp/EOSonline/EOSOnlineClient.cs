@@ -15,44 +15,69 @@ public class EOSOnlineClient : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
+        if (Instance != null &&
+            Instance != this)
         {
             Destroy(gameObject);
             return;
         }
 
         Instance = this;
+
         DontDestroyOnLoad(gameObject);
     }
 
     private void OnEnable()
     {
-        if (EOSOnlineTransport.Instance != null)
-        {
-            EOSOnlineTransport.Instance.OnPeerConnected +=
-                OnPeerConnected;
-
-            EOSOnlineTransport.Instance.OnPeerDisconnected +=
-                OnPeerDisconnected;
-
-            EOSOnlineTransport.Instance.OnPacketReceived +=
-                OnPacketReceived;
-        }
+        SubscribeTransport();
     }
 
     private void OnDisable()
     {
-        if (EOSOnlineTransport.Instance != null)
+        UnsubscribeTransport();
+    }
+
+    private void SubscribeTransport()
+    {
+        if (EOSOnlineTransport.Instance == null)
         {
-            EOSOnlineTransport.Instance.OnPeerConnected -=
-                OnPeerConnected;
-
-            EOSOnlineTransport.Instance.OnPeerDisconnected -=
-                OnPeerDisconnected;
-
-            EOSOnlineTransport.Instance.OnPacketReceived -=
-                OnPacketReceived;
+            return;
         }
+
+        EOSOnlineTransport.Instance.OnPeerConnected -=
+            OnPeerConnected;
+
+        EOSOnlineTransport.Instance.OnPeerDisconnected -=
+            OnPeerDisconnected;
+
+        EOSOnlineTransport.Instance.OnPacketReceived -=
+            OnPacketReceived;
+
+        EOSOnlineTransport.Instance.OnPeerConnected +=
+            OnPeerConnected;
+
+        EOSOnlineTransport.Instance.OnPeerDisconnected +=
+            OnPeerDisconnected;
+
+        EOSOnlineTransport.Instance.OnPacketReceived +=
+            OnPacketReceived;
+    }
+
+    private void UnsubscribeTransport()
+    {
+        if (EOSOnlineTransport.Instance == null)
+        {
+            return;
+        }
+
+        EOSOnlineTransport.Instance.OnPeerConnected -=
+            OnPeerConnected;
+
+        EOSOnlineTransport.Instance.OnPeerDisconnected -=
+            OnPeerDisconnected;
+
+        EOSOnlineTransport.Instance.OnPacketReceived -=
+            OnPacketReceived;
     }
 
     public bool ConnectToHost(
@@ -77,6 +102,15 @@ public class EOSOnlineClient : MonoBehaviour
             return false;
         }
 
+        if (IsConnected)
+        {
+            Debug.LogWarning(
+                "[EOS CLIENT] Ya está conectado al host."
+            );
+
+            return true;
+        }
+
         hostUserId =
             productUserId;
 
@@ -93,6 +127,7 @@ public class EOSOnlineClient : MonoBehaviour
         if (!result)
         {
             hostUserId = null;
+            IsConnected = false;
 
             Debug.LogError(
                 "[EOS CLIENT] No se pudo iniciar la conexión."
@@ -189,7 +224,8 @@ public class EOSOnlineClient : MonoBehaviour
         }
 
         if (text != null &&
-            text.StartsWith("EOS_PLAYERS|",
+            text.StartsWith(
+                "EOS_PLAYERS|",
                 StringComparison.Ordinal))
         {
             Debug.Log(
@@ -234,6 +270,11 @@ public class EOSOnlineClient : MonoBehaviour
             return;
         }
 
+        if (EOSOnlineTransport.Instance == null)
+        {
+            return;
+        }
+
         EOSOnlineTransport.Instance.SendToHost(
             hostUserId,
             packet
@@ -257,21 +298,47 @@ public class EOSOnlineClient : MonoBehaviour
 
     public void Disconnect()
     {
-        if (EOSOnlineTransport.Instance != null)
-        {
-            EOSOnlineTransport.Instance.Disconnect();
-        }
+        /*
+         * El transporte es el único responsable
+         * del estado P2P.
+         *
+         * EOSOnlineSession se encarga del orden:
+         * Server -> Client -> Transport -> Session.
+         *
+         * Por eso NO llamamos Transport.Disconnect()
+         * aquí.
+         */
 
         IsConnected = false;
         hostUserId = null;
 
         Debug.Log(
-            "[EOS CLIENT] Cliente desconectado."
+            "[EOS CLIENT] Estado del cliente limpiado."
         );
     }
 
     private void OnApplicationQuit()
     {
-        Disconnect();
+        /*
+         * No tocamos el transporte aquí.
+         *
+         * EOSOnlineTransport es el único encargado
+         * del ciclo de vida P2P al cerrar Unity.
+         */
+        IsConnected = false;
+        hostUserId = null;
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeTransport();
+
+        IsConnected = false;
+        hostUserId = null;
+
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 }

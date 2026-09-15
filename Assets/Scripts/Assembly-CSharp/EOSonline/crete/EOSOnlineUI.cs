@@ -8,7 +8,8 @@ public class EOSOnlineUI : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
+        if (Instance != null &&
+            Instance != this)
         {
             Destroy(gameObject);
             return;
@@ -17,9 +18,31 @@ public class EOSOnlineUI : MonoBehaviour
         Instance = this;
     }
 
-    public void CreateOnlineGame()
+    private bool IsBusy()
     {
         if (operationInProgress)
+        {
+            return true;
+        }
+
+        if (EOSOnlineSession.Instance != null &&
+            EOSOnlineSession.Instance.IsOperationInProgress)
+        {
+            return true;
+        }
+
+        if (EOSAutoLogin.Instance != null &&
+            EOSAutoLogin.Instance.IsLoginInProgress)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    public void CreateOnlineGame()
+    {
+        if (IsBusy())
         {
             return;
         }
@@ -80,7 +103,7 @@ public class EOSOnlineUI : MonoBehaviour
 
     public void SearchOnlineGames()
     {
-        if (operationInProgress)
+        if (IsBusy())
         {
             return;
         }
@@ -141,7 +164,7 @@ public class EOSOnlineUI : MonoBehaviour
 
     public void JoinOnlineGame()
     {
-        if (operationInProgress)
+        if (IsBusy())
         {
             return;
         }
@@ -207,12 +230,31 @@ public class EOSOnlineUI : MonoBehaviour
             return;
         }
 
+        if (EOSOnlineSession.Instance.IsOperationInProgress)
+        {
+            /*
+             * Leave sigue permitido aunque haya una operación
+             * de creación/unión/búsqueda en curso.
+             *
+             * EOSOnlineSession se encarga de marcar el cierre
+             * antes de procesar los callbacks pendientes.
+             */
+        }
+
         Debug.Log(
             "[EOS UI] Saliendo de partida online..."
         );
 
-        EOSOnlineSession.Instance.LeaveOnlineGame();
-
         operationInProgress = false;
+
+        EOSOnlineSession.Instance.LeaveOnlineGame();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 }
