@@ -24,7 +24,6 @@ public class BattlePlayerList : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-
         ClearPlayerList();
         SetPlayerShowOrder();
     }
@@ -32,7 +31,6 @@ public class BattlePlayerList : MonoBehaviour
     private void OnEnable()
     {
         Instance = this;
-
         SetPlayerShowOrder();
 
         if (!hasPendingPlayerData)
@@ -114,26 +112,15 @@ public class BattlePlayerList : MonoBehaviour
         if (string.IsNullOrEmpty(playerName))
             return false;
 
-        if (IsPlayer(
-                HostShow,
-                playerName))
-        {
+        if (IsPlayer(HostShow, playerName))
             return true;
-        }
 
         if (GameManager.Instance != null &&
             GameManager.Instance.LocalPlayerSave != null &&
             GameManager.Instance.isServer &&
             !GameManager.Instance.isClient)
         {
-            string localName =
-                GameManager.Instance.LocalPlayerSave.playerName;
-
-            if (!string.IsNullOrEmpty(localName) &&
-                localName == playerName)
-            {
-                return true;
-            }
+            return GameManager.Instance.LocalPlayerSave.playerName == playerName;
         }
 
         return false;
@@ -158,16 +145,12 @@ public class BattlePlayerList : MonoBehaviour
 
     private void EnsureHostShow()
     {
-        string hostName =
-            GetLocalHostName();
+        string hostName = GetLocalHostName();
 
         if (string.IsNullOrEmpty(hostName))
             return;
 
-        ShowPlayer(
-            HostShow,
-            hostName
-        );
+        ShowPlayer(HostShow, hostName);
 
         if (HostShow != null)
             HostShow.transform.SetAsFirstSibling();
@@ -194,8 +177,7 @@ public class BattlePlayerList : MonoBehaviour
             show.SeedBank.OwnerShow = show;
     }
 
-    private void HidePlayer(
-        PlayerShow show)
+    private void HidePlayer(PlayerShow show)
     {
         if (show == null)
             return;
@@ -236,14 +218,10 @@ public class BattlePlayerList : MonoBehaviour
                     : null;
 
             hasPendingPlayerData = true;
-
             return;
         }
 
-        LoadAllSeedBankInternal(
-            players,
-            cardNum
-        );
+        LoadAllSeedBankInternal(players, cardNum);
     }
 
     private void LoadAllSeedBankInternal(
@@ -251,37 +229,22 @@ public class BattlePlayerList : MonoBehaviour
         List<int> cardNum)
     {
         ResetPlayerOrder();
-
         EnsureHostShow();
 
-        if (players == null ||
-            cardNum == null)
-        {
+        if (players == null || cardNum == null)
             return;
-        }
 
-        int count =
-            Mathf.Min(
-                players.Count,
-                cardNum.Count
-            );
+        int count = Mathf.Min(
+            players.Count,
+            cardNum.Count
+        );
 
         if (count <= 0)
             return;
 
-        AssignPlayers(
-            players,
-            count
-        );
-
-        CreatePlayerSeedBanks(
-            players,
-            cardNum,
-            count
-        );
-
+        AssignPlayers(players, count);
+        CreatePlayerSeedBanks(players, cardNum, count);
         UpdateAllMapSprites();
-
         SetPlayerShowOrder();
     }
 
@@ -318,18 +281,14 @@ public class BattlePlayerList : MonoBehaviour
     {
         for (int i = 0; i < count; i++)
         {
-            string playerName =
-                players[i];
+            string playerName = players[i];
 
             if (string.IsNullOrEmpty(playerName))
                 continue;
 
             if (IsHostPlayer(playerName))
             {
-                ShowPlayer(
-                    HostShow,
-                    playerName
-                );
+                ShowPlayer(HostShow, playerName);
 
                 if (HostShow != null)
                     HostShow.transform.SetAsFirstSibling();
@@ -337,52 +296,33 @@ public class BattlePlayerList : MonoBehaviour
                 continue;
             }
 
-            PlayerShow existing =
-                GetPlayerShow(playerName);
+            PlayerShow existing = GetPlayerShow(playerName);
 
             if (existing != null)
             {
-                ShowPlayer(
-                    existing,
-                    playerName
-                );
-
+                ShowPlayer(existing, playerName);
                 continue;
             }
 
-            AssignPlayerToFreeSlot(
-                playerName
-            );
+            AssignPlayerToFreeSlot(playerName);
         }
     }
 
-    private void AssignPlayerToFreeSlot(
-        string playerName)
+    private void AssignPlayerToFreeSlot(string playerName)
     {
-        if (string.IsNullOrEmpty(playerName))
-            return;
-
-        if (IsHostPlayer(playerName))
-            return;
-
-        if (TryAssign(
-                Player2Show,
-                playerName))
+        if (string.IsNullOrEmpty(playerName) ||
+            IsHostPlayer(playerName))
         {
             return;
         }
 
-        if (TryAssign(
-                Player3Show,
-                playerName))
-        {
+        if (TryAssign(Player2Show, playerName))
             return;
-        }
 
-        TryAssign(
-            Player4Show,
-            playerName
-        );
+        if (TryAssign(Player3Show, playerName))
+            return;
+
+        TryAssign(Player4Show, playerName);
     }
 
     private bool TryAssign(
@@ -395,11 +335,7 @@ public class BattlePlayerList : MonoBehaviour
             return false;
         }
 
-        ShowPlayer(
-            show,
-            playerName
-        );
-
+        ShowPlayer(show, playerName);
         return true;
     }
 
@@ -410,26 +346,17 @@ public class BattlePlayerList : MonoBehaviour
     {
         for (int i = 0; i < count; i++)
         {
-            string playerName =
-                players[i];
+            string playerName = players[i];
 
             if (string.IsNullOrEmpty(playerName))
                 continue;
 
-            PlayerShow show =
-                GetPlayerShow(playerName);
+            PlayerShow show = GetPlayerShow(playerName);
 
-            if (show == null)
+            if (show == null && IsHostPlayer(playerName))
             {
-                if (IsHostPlayer(playerName))
-                {
-                    ShowPlayer(
-                        HostShow,
-                        playerName
-                    );
-
-                    show = HostShow;
-                }
+                ShowPlayer(HostShow, playerName);
+                show = HostShow;
             }
 
             if (show == null ||
@@ -438,18 +365,11 @@ public class BattlePlayerList : MonoBehaviour
                 continue;
             }
 
-            show.SeedBank.OwnerShow =
-                show;
+            show.SeedBank.OwnerShow = show;
 
-            int amount =
-                Mathf.Max(
-                    0,
-                    cardNum[i]
-                );
+            int amount = Mathf.Max(0, cardNum[i]);
 
-            show.SeedBank.SpawnCardSlot(
-                amount
-            );
+            show.SeedBank.SpawnCardSlot(amount);
         }
     }
 
@@ -462,34 +382,17 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        MapBase map =
-            MapManager.Instance.mapList[0];
+        MapBase map = MapManager.Instance.mapList[0];
 
         if (map == null)
             return;
 
-        Sprite sprite =
-            map.GotoSprite;
+        Sprite sprite = map.GotoSprite;
 
-        UpdateMapSprite(
-            HostShow,
-            sprite
-        );
-
-        UpdateMapSprite(
-            Player2Show,
-            sprite
-        );
-
-        UpdateMapSprite(
-            Player3Show,
-            sprite
-        );
-
-        UpdateMapSprite(
-            Player4Show,
-            sprite
-        );
+        UpdateMapSprite(HostShow, sprite);
+        UpdateMapSprite(Player2Show, sprite);
+        UpdateMapSprite(Player3Show, sprite);
+        UpdateMapSprite(Player4Show, sprite);
     }
 
     private void UpdateMapSprite(
@@ -503,20 +406,15 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        show.MapSprite.sprite =
-            sprite;
+        show.MapSprite.sprite = sprite;
     }
 
-    public void PreviewPlant(
-        PlantPreview apply)
+    public void PreviewPlant(PlantPreview apply)
     {
         if (!CanPreview(apply))
             return;
 
-        PlayerShow show =
-            GetPlayerShow(
-                apply.PlayerName
-            );
+        PlayerShow show = GetPlayerShow(apply.PlayerName);
 
         if (show == null)
             return;
@@ -538,10 +436,7 @@ public class BattlePlayerList : MonoBehaviour
         if (grid == null)
             return;
 
-        ShowGridSelector(
-            show,
-            grid
-        );
+        ShowGridSelector(show, grid);
 
         if (show.plantInGrid == null)
         {
@@ -568,22 +463,16 @@ public class BattlePlayerList : MonoBehaviour
         }
         else
         {
-            show.plantInGrid.UpdateForCreate(
-                grid
-            );
+            show.plantInGrid.UpdateForCreate(grid);
         }
     }
 
-    public void PreviewZombie(
-        ZombiePreview apply)
+    public void PreviewZombie(ZombiePreview apply)
     {
         if (!CanPreview(apply))
             return;
 
-        PlayerShow show =
-            GetPlayerShow(
-                apply.PlayerName
-            );
+        PlayerShow show = GetPlayerShow(apply.PlayerName);
 
         if (show == null)
             return;
@@ -605,10 +494,7 @@ public class BattlePlayerList : MonoBehaviour
         if (grid == null)
             return;
 
-        ShowGridSelector(
-            show,
-            grid
-        );
+        ShowGridSelector(show, grid);
 
         if (show.zombieInGrid == null)
         {
@@ -638,14 +524,11 @@ public class BattlePlayerList : MonoBehaviour
         }
         else
         {
-            show.zombieInGrid.UpdateForCreate(
-                grid
-            );
+            show.zombieInGrid.UpdateForCreate(grid);
         }
     }
 
-    private bool CanPreview(
-        PlantPreview apply)
+    private bool CanPreview(PlantPreview apply)
     {
         if (apply == null ||
             GameManager.Instance == null ||
@@ -668,8 +551,7 @@ public class BattlePlayerList : MonoBehaviour
                );
     }
 
-    private bool CanPreview(
-        ZombiePreview apply)
+    private bool CanPreview(ZombiePreview apply)
     {
         if (apply == null ||
             GameManager.Instance == null ||
@@ -706,14 +588,10 @@ public class BattlePlayerList : MonoBehaviour
 
         show.GridSeletor.transform.position =
             grid.Position +
-            new Vector2(
-                -0.5f,
-                0.3f
-            );
+            new Vector2(-0.5f, 0.3f);
     }
 
-    private void ClearPlantPreview(
-        PlayerShow show)
+    private void ClearPlantPreview(PlayerShow show)
     {
         if (show.plantInGrid != null)
         {
@@ -730,8 +608,7 @@ public class BattlePlayerList : MonoBehaviour
         HideGridSelector(show);
     }
 
-    private void ClearZombiePreview(
-        PlayerShow show)
+    private void ClearZombiePreview(PlayerShow show)
     {
         if (show.zombieInGrid != null)
         {
@@ -747,8 +624,7 @@ public class BattlePlayerList : MonoBehaviour
         HideGridSelector(show);
     }
 
-    private void HideGridSelector(
-        PlayerShow show)
+    private void HideGridSelector(PlayerShow show)
     {
         if (show != null &&
             show.GridSeletor != null)
@@ -765,8 +641,7 @@ public class BattlePlayerList : MonoBehaviour
         if (!CanUsePlayerPreview(playerName))
             return;
 
-        PlayerShow show =
-            GetPlayerShow(playerName);
+        PlayerShow show = GetPlayerShow(playerName);
 
         if (show == null)
             return;
@@ -786,10 +661,7 @@ public class BattlePlayerList : MonoBehaviour
         if (grid == null)
             return;
 
-        ShowGridSelector(
-            show,
-            grid
-        );
+        ShowGridSelector(show, grid);
     }
 
     public void PlayShovelAnimation(
@@ -823,10 +695,7 @@ public class BattlePlayerList : MonoBehaviour
 
         anim.transform.position =
             grid.Position +
-            new Vector2(
-                0.5f,
-                0.5f
-            );
+            new Vector2(0.5f, 0.5f);
 
         anim.Play(
             "Shovel",
@@ -862,11 +731,8 @@ public class BattlePlayerList : MonoBehaviour
         Vector3 position,
         int sound)
     {
-        if (sound != 1 &&
-            sound != 2)
-        {
+        if (sound != 1 && sound != 2)
             return;
-        }
 
         if (AudioManager.Instance == null ||
             GameManager.Instance == null ||
@@ -875,8 +741,7 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        bool first =
-            Random.Range(0, 2) == 0;
+        bool first = Random.Range(0, 2) == 0;
 
         if (sound == 1)
         {
@@ -924,10 +789,7 @@ public class BattlePlayerList : MonoBehaviour
 
         anim.transform.position =
             pos +
-            new Vector2(
-                0.24f,
-                -0.45f
-            );
+            new Vector2(0.24f, -0.45f);
 
         anim.Play(
             type == 1
@@ -948,8 +810,7 @@ public class BattlePlayerList : MonoBehaviour
         }
     }
 
-    private bool CanUsePlayerPreview(
-        string playerName)
+    private bool CanUsePlayerPreview(string playerName)
     {
         if (LV.Instance == null ||
             GameManager.Instance == null ||
@@ -966,9 +827,7 @@ public class BattlePlayerList : MonoBehaviour
 
         return LV.Instance.CurrLVType != LVType.PvP ||
                PvPSelector.Instance == null ||
-               PvPSelector.Instance.IsSameTeam(
-                   playerName
-               );
+               PvPSelector.Instance.IsSameTeam(playerName);
     }
 
     public void SelectCard(
@@ -977,8 +836,7 @@ public class BattlePlayerList : MonoBehaviour
         ZombieType zType,
         bool noAnim)
     {
-        PlayerShow show =
-            GetPlayerShow(playerName);
+        PlayerShow show = GetPlayerShow(playerName);
 
         if (show == null ||
             show.SeedBank == null ||
@@ -988,6 +846,11 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
+        /*
+         * La carta real pertenece al SeedBank local.
+         * Se usa solamente como referencia para obtener
+         * la carta correspondiente y bloquearla.
+         */
         UIPlantCardNC card =
             type == PlantType.Nope
                 ? SeedBank.Instance.GetZombieNc(zType)
@@ -1021,22 +884,19 @@ public class BattlePlayerList : MonoBehaviour
         if (!card.IsUnLock)
             sameTeam = false;
 
+        /*
+         * El SeedBank remoto crea su propio estado visual.
+         * La carta original solamente sirve para el bloqueo global.
+         */
         show.SeedBank.ChooseCard(
             card,
             sameTeam && !noAnim
         );
 
-        /*
-         * El Host no pasa por SocketClient -> SocketServer,
-         * porque el Host es el servidor.
-         *
-         * Por eso debemos transmitir manualmente su selección
-         * a los demás clientes.
-         */
         if (IsLocalHostPlayer(playerName) &&
             SocketServer.Instance != null)
         {
-            SelectCard networkCard =
+            SocketServer.Instance.SelectCard(
                 new SelectCard
                 {
                     PlayerName = playerName,
@@ -1044,20 +904,7 @@ public class BattlePlayerList : MonoBehaviour
                     zombieType = zType,
                     noAnim = noAnim,
                     isBack = false
-                };
-
-            Debug.Log(
-                "[BattlePlayerList] HOST seleccionó carta -> " +
-                "Player=" +
-                playerName +
-                " | Plant=" +
-                type +
-                " | Zombie=" +
-                zType
-            );
-
-            SocketServer.Instance.SelectCard(
-                networkCard
+                }
             );
         }
     }
@@ -1066,8 +913,7 @@ public class BattlePlayerList : MonoBehaviour
         string playerName,
         int cardId)
     {
-        PlayerShow show =
-            GetPlayerShow(playerName);
+        PlayerShow show = GetPlayerShow(playerName);
 
         if (show == null ||
             show.SeedBank == null ||
@@ -1076,6 +922,11 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
+        /*
+         * ClearChoose ahora obtiene desde el slot remoto
+         * qué carta estaba ocupando ese slot y libera
+         * correctamente su IsChoosed.
+         */
         bool needAnim = true;
 
         if (LV.Instance.CurrLVType == LVType.PvP)
@@ -1096,39 +947,22 @@ public class BattlePlayerList : MonoBehaviour
             needAnim
         );
 
-        /*
-         * Igual que con SelectCard:
-         * el Host debe enviar manualmente el cambio
-         * a los demás clientes.
-         */
         if (IsLocalHostPlayer(playerName) &&
             SocketServer.Instance != null)
         {
-            SelectCard networkCard =
+            SocketServer.Instance.SelectCard(
                 new SelectCard
                 {
                     PlayerName = playerName,
                     cardId = cardId,
                     isBack = true,
                     noAnim = !needAnim
-                };
-
-            Debug.Log(
-                "[BattlePlayerList] HOST canceló carta -> " +
-                "Player=" +
-                playerName +
-                " | CardId=" +
-                cardId
-            );
-
-            SocketServer.Instance.SelectCard(
-                networkCard
+                }
             );
         }
     }
 
-    private bool IsLocalHostPlayer(
-        string playerName)
+    private bool IsLocalHostPlayer(string playerName)
     {
         if (string.IsNullOrEmpty(playerName) ||
             GameManager.Instance == null ||
@@ -1154,8 +988,7 @@ public class BattlePlayerList : MonoBehaviour
                IsPrepared(Player4Show);
     }
 
-    private bool IsPrepared(
-        PlayerShow show)
+    private bool IsPrepared(PlayerShow show)
     {
         if (show == null ||
             !show.gameObject.activeSelf ||
@@ -1253,20 +1086,9 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        UpdatePlayerSlot(
-            Player2Show,
-            players
-        );
-
-        UpdatePlayerSlot(
-            Player3Show,
-            players
-        );
-
-        UpdatePlayerSlot(
-            Player4Show,
-            players
-        );
+        UpdatePlayerSlot(Player2Show, players);
+        UpdatePlayerSlot(Player3Show, players);
+        UpdatePlayerSlot(Player4Show, players);
 
         for (int i = 0; i < players.Count; i++)
         {
@@ -1283,9 +1105,7 @@ public class BattlePlayerList : MonoBehaviour
                 continue;
             }
 
-            AssignPlayerToFreeSlot(
-                players[i].Name
-            );
+            AssignPlayerToFreeSlot(players[i].Name);
         }
 
         SetPlayerShowOrder();
@@ -1302,10 +1122,7 @@ public class BattlePlayerList : MonoBehaviour
         }
 
         if (show.nameText == null ||
-            !Contain(
-                players,
-                show.nameText.text
-            ))
+            !Contain(players, show.nameText.text))
         {
             HidePlayer(show);
         }
@@ -1330,25 +1147,14 @@ public class BattlePlayerList : MonoBehaviour
         return false;
     }
 
-    private bool Contain2(
-        string name)
+    private bool Contain2(string name)
     {
-        return IsPlayer(
-                   Player2Show,
-                   name
-               ) ||
-               IsPlayer(
-                   Player3Show,
-                   name
-               ) ||
-               IsPlayer(
-                   Player4Show,
-                   name
-               );
+        return IsPlayer(Player2Show, name) ||
+               IsPlayer(Player3Show, name) ||
+               IsPlayer(Player4Show, name);
     }
 
-    private void ClearPreview(
-        PlayerShow show)
+    private void ClearPreview(PlayerShow show)
     {
         if (show == null)
             return;

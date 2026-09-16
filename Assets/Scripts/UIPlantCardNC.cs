@@ -168,67 +168,67 @@ public class UIPlantCardNC : MonoBehaviour, IPointerDownHandler, IEventSystemHan
                 );
             }
 
-            if (GameManager.Instance != null)
+            if (GameManager.Instance == null ||
+                GameManager.Instance.LocalPlayerSave == null)
             {
-                /*
-                 * CLIENTE
-                 *
-                 * El cliente manda la selección al servidor.
-                 * El servidor posteriormente la distribuye.
-                 */
-                if (GameManager.Instance.isClient &&
-                    SocketClient.Instance != null)
-                {
-                    SelectCard selectCard = new SelectCard
-                    {
-                        plantType = CardPlantType,
-                        zombieType = CardZombieType,
-                        isBack = false
-                    };
-
-                    SocketClient.Instance.SelectCard(
-                        selectCard
-                    );
-                }
-
-                /*
-                 * HOST / SERVIDOR
-                 *
-                 * El host no pasa por SocketClient.
-                 *
-                 * Antes se llamaba directamente a
-                 * SocketServer.SelectCard(), lo que hacía que
-                 * los demás jugadores recibieran la carta,
-                 * pero el OnlineSeedBank del propio host no
-                 * se actualizara.
-                 *
-                 * Ahora la selección pasa por BattlePlayerList,
-                 * que actualiza el OnlineSeedBank del host y
-                 * después la transmite a los clientes.
-                 */
-                if (GameManager.Instance.isServer &&
-                    !GameManager.Instance.isClient &&
-                    BattlePlayerList.Instance != null)
-                {
-                    string playerName = null;
-
-                    if (GameManager.Instance.LocalPlayerSave != null)
-                    {
-                        playerName =
-                            GameManager.Instance.LocalPlayerSave.playerName;
-                    }
-
-                    if (!string.IsNullOrEmpty(playerName))
-                    {
-                        BattlePlayerList.Instance.SelectCard(
-                            playerName,
-                            CardPlantType,
-                            CardZombieType,
-                            false
-                        );
-                    }
-                }
+                return;
             }
+
+            string playerName =
+                GameManager.Instance.LocalPlayerSave.playerName;
+
+            if (string.IsNullOrEmpty(playerName))
+                return;
+
+            /*
+             * ACTUALIZACIÓN LOCAL
+             *
+             * Tanto el HOST como el CLIENTE deben actualizar
+             * su propio OnlineSeedBank.
+             *
+             * El SocketClient no devuelve al cliente su propia
+             * selección porque la filtra mediante PlayerName.
+             */
+            if (BattlePlayerList.Instance != null)
+            {
+                BattlePlayerList.Instance.SelectCard(
+                    playerName,
+                    CardPlantType,
+                    CardZombieType,
+                    false
+                );
+            }
+
+            /*
+             * CLIENTE
+             *
+             * Envía la selección al servidor.
+             */
+            if (GameManager.Instance.isClient &&
+                SocketClient.Instance != null)
+            {
+                SelectCard selectCard = new SelectCard
+                {
+                    plantType = CardPlantType,
+                    zombieType = CardZombieType,
+                    isBack = false
+                };
+
+                SocketClient.Instance.SelectCard(
+                    selectCard
+                );
+            }
+
+            /*
+             * HOST
+             *
+             * BattlePlayerList.SelectCard() ya se encarga
+             * de transmitir la selección del host mediante
+             * SocketServer.
+             *
+             * No hacemos otro SocketServer.SelectCard()
+             * aquí para evitar duplicar el paquete.
+             */
 
             return;
         }
