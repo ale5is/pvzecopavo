@@ -39,8 +39,12 @@ public class UIPlantCard : MonoBehaviour
 
         set
         {
-            if (image == null || maskImg == null || cardState == value)
+            if (image == null ||
+                maskImg == null ||
+                cardState == value)
+            {
                 return;
+            }
 
             switch (value)
             {
@@ -50,16 +54,31 @@ public class UIPlantCard : MonoBehaviour
                     break;
 
                 case CardState.NotCD:
-                    image.color = new Color(0.75f, 0.75f, 0.75f);
+                    image.color =
+                        new Color(
+                            0.75f,
+                            0.75f,
+                            0.75f
+                        );
                     break;
 
                 case CardState.NotSun:
                     maskImg.fillAmount = 0f;
-                    image.color = new Color(0.75f, 0.75f, 0.75f);
+                    image.color =
+                        new Color(
+                            0.75f,
+                            0.75f,
+                            0.75f
+                        );
                     break;
 
                 case CardState.NotAll:
-                    image.color = new Color(0.5f, 0.5f, 0.5f);
+                    image.color =
+                        new Color(
+                            0.5f,
+                            0.5f,
+                            0.5f
+                        );
                     break;
             }
 
@@ -104,12 +123,17 @@ public class UIPlantCard : MonoBehaviour
                 if (PlantManager.Instance == null)
                     return;
 
-                plant = PlantManager.Instance.GetNewPlant(CardPlantType);
+                plant =
+                    PlantManager.Instance.GetNewPlant(
+                        CardPlantType
+                    );
 
                 if (plant != null)
+                {
                     plant.transform.SetParent(
                         PlantManager.Instance.transform
                     );
+                }
             }
             else if (plant != null)
             {
@@ -125,16 +149,29 @@ public class UIPlantCard : MonoBehaviour
             image = GetComponent<Image>();
 
         if (maskImg == null)
-            maskImg = transform.Find("mask")?.GetComponent<Image>();
+        {
+            Transform mask =
+                transform.Find("mask");
+
+            if (mask != null)
+            {
+                maskImg =
+                    mask.GetComponent<Image>();
+            }
+        }
 
         if (WantSunText == null)
         {
             Transform textTransform =
-                transform.Find("CardSunNumText");
+                transform.Find(
+                    "CardSunNumText"
+                );
 
             if (textTransform != null)
+            {
                 WantSunText =
                     textTransform.GetComponent<Text>();
+            }
         }
 
         if (image != null)
@@ -148,29 +185,46 @@ public class UIPlantCard : MonoBehaviour
 
     private void InitThis()
     {
-        if (image == null || maskImg == null)
+        if (image == null ||
+            maskImg == null)
+        {
             return;
+        }
 
         if (maskImg.material != null)
+        {
             maskImg.material =
-                Instantiate(maskImg.material);
+                Instantiate(
+                    maskImg.material
+                );
+        }
 
         if (image.material != null)
+        {
             image.material =
-                Instantiate(image.material);
+                Instantiate(
+                    image.material
+                );
+        }
 
         sprite = image.sprite;
         isChoosed = false;
 
         if (PlayerManager.Instance != null)
-            PlayerManager.Instance.AddSunNumUpdateActionListener(
-                CheckState
-            );
+        {
+            PlayerManager.Instance
+                .AddSunNumUpdateActionListener(
+                    CheckState
+                );
+        }
 
         if (LVManager.Instance != null)
-            LVManager.Instance.AddLVStartActionListenr(
-                OnLVStartAction
-            );
+        {
+            LVManager.Instance
+                .AddLVStartActionListenr(
+                    OnLVStartAction
+                );
+        }
 
         CanPlace = true;
     }
@@ -203,7 +257,13 @@ public class UIPlantCard : MonoBehaviour
         }
 
         string playerName =
-            ownerSeedBank.OwnerShow.nameText.name;
+            ownerSeedBank
+                .OwnerShow
+                .nameText
+                .text;
+
+        if (string.IsNullOrEmpty(playerName))
+            return;
 
         float sunNum =
             PlayerManager.Instance.GetSunNum(
@@ -233,12 +293,19 @@ public class UIPlantCard : MonoBehaviour
             return;
 
         if (CDCoroutine != null)
-            StopCoroutine(CDCoroutine);
+        {
+            StopCoroutine(
+                CDCoroutine
+            );
+        }
 
         CanPlace = false;
         maskImg.fillAmount = 1f;
 
-        CDCoroutine = StartCoroutine(CalCD());
+        CDCoroutine =
+            StartCoroutine(
+                CalCD()
+            );
     }
 
     private IEnumerator CalCD()
@@ -259,10 +326,14 @@ public class UIPlantCard : MonoBehaviour
             currTimeForCd -= 0.1f
         )
         {
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(
+                0.1f
+            );
 
             if (maskImg != null)
+            {
                 maskImg.fillAmount -= calCD;
+            }
         }
 
         CanPlace = true;
@@ -274,74 +345,144 @@ public class UIPlantCard : MonoBehaviour
         if (nC == null)
             return;
 
+        if (ownerSeedBank == null)
+        {
+            Debug.LogWarning(
+                "UIPlantCard.AddChoose: " +
+                gameObject.name +
+                " no tiene ownerSeedBank."
+            );
+
+            return;
+        }
+
+        if (ownerSeedBank.OwnerShow == null)
+        {
+            Debug.LogWarning(
+                "UIPlantCard.AddChoose: " +
+                gameObject.name +
+                " no tiene OwnerShow."
+            );
+
+            return;
+        }
+
         InitThis();
 
         isImitater = false;
 
-        if (maskImg != null && maskImg.material != null)
-            maskImg.material.SetInt("_OpenGray", 0);
+        if (maskImg != null &&
+            maskImg.material != null)
+        {
+            maskImg.material.SetInt(
+                "_OpenGray",
+                0
+            );
+        }
 
-        if (image != null && image.material != null)
-            image.material.SetInt("_OpenGray", 0);
+        if (image != null &&
+            image.material != null)
+        {
+            image.material.SetInt(
+                "_OpenGray",
+                0
+            );
+        }
 
         myPlantCard = nC;
         isChoosed = true;
 
-        if (myPlantCard.CardPlantType == PlantType.Imitater)
+        if (myPlantCard.CardPlantType ==
+            PlantType.Imitater)
         {
             isImitater = true;
 
-            if (image != null && image.material != null)
-                image.material.SetInt("_OpenGray", 1);
+            if (image != null &&
+                image.material != null)
+            {
+                image.material.SetInt(
+                    "_OpenGray",
+                    1
+                );
+            }
 
-            if (maskImg != null && maskImg.material != null)
-                maskImg.material.SetInt("_OpenGray", 1);
+            if (maskImg != null &&
+                maskImg.material != null)
+            {
+                maskImg.material.SetInt(
+                    "_OpenGray",
+                    1
+                );
+            }
 
             UIPlantCard preCard =
-                ownerSeedBank != null
-                    ? ownerSeedBank.GetPreCard(this)
-                    : null;
+                ownerSeedBank.GetPreCard(
+                    this
+                );
 
             if (preCard == null)
             {
                 if (SeedChooser.Instance != null)
+                {
                     myPlantCard =
-                        SeedChooser.Instance.GetCardInfo(1);
+                        SeedChooser.Instance
+                            .GetCardInfo(1);
+                }
             }
             else if (SeedBank.Instance != null)
             {
                 myPlantCard =
-                    SeedBank.Instance.GetPlantNc(
-                        preCard.CardPlantType
-                    );
+                    SeedBank.Instance
+                        .GetPlantNc(
+                            preCard.CardPlantType
+                        );
             }
         }
 
         if (myPlantCard == null)
             return;
 
-        NeedSun = myPlantCard.NeedNum;
-        isNeedSun = myPlantCard.isNeedSun;
-        CDTime = myPlantCard.CDTime;
-        CardPlantType = myPlantCard.CardPlantType;
-        CardZombieType = myPlantCard.CardZombieType;
+        NeedSun =
+            myPlantCard.NeedNum;
+
+        isNeedSun =
+            myPlantCard.isNeedSun;
+
+        CDTime =
+            myPlantCard.CDTime;
+
+        CardPlantType =
+            myPlantCard.CardPlantType;
+
+        CardZombieType =
+            myPlantCard.CardZombieType;
 
         if (image != null)
-            image.sprite = myPlantCard.OwnerSprite;
+        {
+            image.sprite =
+                myPlantCard.OwnerSprite;
+        }
 
         if (maskImg != null)
-            maskImg.sprite = myPlantCard.OwnerSprite;
+        {
+            maskImg.sprite =
+                myPlantCard.OwnerSprite;
+        }
 
         if (WantSunText != null)
-            WantSunText.text = NeedSun.ToString();
+        {
+            WantSunText.text =
+                NeedSun.ToString();
+        }
 
         if (isImitater &&
             SeedBank.Instance != null)
         {
             myPlantCard =
-                SeedBank.Instance.GetPlantNc(
-                    PlantType.Imitater
-                );
+                SeedBank.Instance
+                    .GetPlantNc(
+                        PlantType.Imitater
+                    );
         }
 
         if (LV.Instance != null &&
@@ -352,31 +493,44 @@ public class UIPlantCard : MonoBehaviour
             NeedSun = 0;
 
             if (WantSunText != null)
+            {
                 WantSunText.text = "0";
+            }
         }
     }
 
     public void ClearChoose()
     {
         if (image != null)
+        {
             image.sprite = sprite;
+        }
 
         if (maskImg != null)
+        {
             maskImg.sprite = sprite;
+        }
 
         if (WantSunText != null)
+        {
             WantSunText.text = "";
+        }
 
         isChoosed = false;
         NeedSun = 0;
         CDTime = 0f;
         CardPlantType = PlantType.Nope;
+        CardZombieType = default;
+        myPlantCard = null;
+        isImitater = false;
     }
 
     public void ClearChoose(bool noAnimation)
     {
         if (myPlantCard != null)
+        {
             myPlantCard.IsChoosed = false;
+        }
     }
 
     public void ClearChooseOk()
@@ -385,6 +539,15 @@ public class UIPlantCard : MonoBehaviour
 
     public void DestroyCardSlot()
     {
+        if (CDCoroutine != null)
+        {
+            StopCoroutine(
+                CDCoroutine
+            );
+
+            CDCoroutine = null;
+        }
+
         Destroy(gameObject);
     }
 }

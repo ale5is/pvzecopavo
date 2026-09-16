@@ -230,6 +230,10 @@ public class SeedChooser : MonoBehaviour
             startButton == null ||
             seedBank == null)
         {
+            Debug.LogError(
+                "[SeedChooser] StartMove BLOQUEADO: falta una referencia."
+            );
+
             return;
         }
 
@@ -256,7 +260,13 @@ public class SeedChooser : MonoBehaviour
         }
 
         if (Camera.main == null || rectTransform == null)
+        {
+            Debug.LogError(
+                "[SeedChooser] StartMove BLOQUEADO: Camera.main o RectTransform es null."
+            );
+
             return;
+        }
 
         float targetX =
             Camera.main.WorldToScreenPoint(
@@ -271,20 +281,69 @@ public class SeedChooser : MonoBehaviour
 
     public void StartRunLv(bool synClient = false)
     {
-        if (gameManager == null ||
-            lvManager == null)
+        Debug.Log(
+            $"[SeedChooser] StartRunLv RECIBIDO | synClient={synClient}"
+        );
+
+        if (gameManager == null)
         {
+            Debug.LogError(
+                "[SeedChooser] StartRunLv BLOQUEADO: gameManager == null"
+            );
+
             return;
         }
 
-        if (!gameManager.isClient || synClient)
+        if (lvManager == null)
         {
-            StartCoroutine(
-                DoMove(-800f, true)
+            Debug.LogError(
+                "[SeedChooser] StartRunLv BLOQUEADO: lvManager == null"
             );
 
-            lvManager.StartRunLv();
+            return;
         }
+
+        Debug.Log(
+            $"[SeedChooser] gameManager.isClient={gameManager.isClient}"
+        );
+
+        bool canStart =
+            !gameManager.isClient || synClient;
+
+        Debug.Log(
+            $"[SeedChooser] canStart={canStart}"
+        );
+
+        if (!canStart)
+        {
+            Debug.Log(
+                "[SeedChooser] NO inicia porque es cliente y synClient=false."
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            "[SeedChooser] Iniciando DoMove(-800, true)"
+        );
+
+        StartCoroutine(
+            DoMove(-800f, true)
+        );
+
+        Debug.Log(
+            "[SeedChooser] DoMove iniciado."
+        );
+
+        Debug.Log(
+            "[SeedChooser] Llamando lvManager.StartRunLv()..."
+        );
+
+        lvManager.StartRunLv();
+
+        Debug.Log(
+            "[SeedChooser] lvManager.StartRunLv() EJECUTADO."
+        );
     }
 
     public void Prepare()
@@ -294,10 +353,18 @@ public class SeedChooser : MonoBehaviour
             battlePlayerList == null ||
             gameManager == null)
         {
+            Debug.LogError(
+                "[SeedChooser] Prepare BLOQUEADO: falta una referencia."
+            );
+
             return;
         }
 
         isPrepare = !isPrepare;
+
+        Debug.Log(
+            $"[SeedChooser] Prepare -> isPrepare={isPrepare}"
+        );
 
         startButton.StartText.text =
             isPrepare
@@ -310,8 +377,16 @@ public class SeedChooser : MonoBehaviour
                 isPrepare = isPrepare
             };
 
+        Debug.Log(
+            "[SeedChooser] Enviando SelectPrepare al servidor."
+        );
+
         socketClient.SelectPrepare(
             selectPrepare
+        );
+
+        Debug.Log(
+            "[SeedChooser] SelectPrepare enviado."
         );
 
         if (gameManager.LocalPlayerSave != null)
@@ -319,6 +394,10 @@ public class SeedChooser : MonoBehaviour
             battlePlayerList.UpdateState(
                 gameManager.LocalPlayerSave.playerName,
                 isPrepare
+            );
+
+            Debug.Log(
+                $"[SeedChooser] Estado local actualizado: {gameManager.LocalPlayerSave.playerName} -> {isPrepare}"
             );
         }
     }
@@ -328,7 +407,17 @@ public class SeedChooser : MonoBehaviour
         bool isOut)
     {
         if (rectTransform == null)
+        {
+            Debug.LogError(
+                "[SeedChooser] DoMove BLOQUEADO: rectTransform == null"
+            );
+
             yield break;
+        }
+
+        Debug.Log(
+            $"[SeedChooser] DoMove iniciado | target={targetPosX} | actual={rectTransform.position.x} | isOut={isOut}"
+        );
 
         while (Mathf.Abs(
             targetPosX - rectTransform.position.x
@@ -356,10 +445,22 @@ public class SeedChooser : MonoBehaviour
         finalPosition.x = targetPosX;
         rectTransform.position = finalPosition;
 
+        Debug.Log(
+            $"[SeedChooser] DoMove TERMINADO | posición={rectTransform.position.x}"
+        );
+
         if (isOut)
         {
+            Debug.Log(
+                "[SeedChooser] DoMove -> limpiando selección y desactivando SeedChooser."
+            );
+
             ClearAllChoose();
             gameObject.SetActive(false);
+
+            Debug.Log(
+                "[SeedChooser] SeedChooser desactivado."
+            );
         }
     }
 

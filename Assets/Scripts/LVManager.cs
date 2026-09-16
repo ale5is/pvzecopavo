@@ -12,6 +12,7 @@ public class LVManager : MonoBehaviour
 
     [Header("Battle UI")]
     [SerializeField] private BattlePlayerList battlePlayerList;
+    [SerializeField] private FlagMeter FlagMeterui;
 
     public bool LvSpawnisOver;
     public bool BootyIsAppeared;
@@ -34,8 +35,15 @@ public class LVManager : MonoBehaviour
     private UnityAction LvStartAction;
     private Coroutine RestSpawnCoroutine;
     private Coroutine AutoNextWaveCoroutine;
+    private Coroutine StartGameCoroutine;
+    private Coroutine StartSubLevelCoroutine;
+
     private bool isWaitSpawn;
     private bool waitingGoNextWave;
+
+    private bool levelStarting;
+    private bool levelReady;
+    private bool startLvSucceeded;
 
     public bool InGame =>
         MapManager.Instance != null &&
@@ -74,9 +82,16 @@ public class LVManager : MonoBehaviour
 
         set
         {
+            if (value < 0)
+                value = 0;
+
             currLVWave = value;
 
+            if (!levelReady)
+                return;
+
             if (LV.Instance != null &&
+                LV.Instance.Weights != null &&
                 LV.Instance.Weights.Count > 0 &&
                 value < LV.Instance.Weights[0].Count)
             {
@@ -129,6 +144,7 @@ public class LVManager : MonoBehaviour
             }
 
             if (LV.Instance != null &&
+                LV.Instance.SubLvs != null &&
                 (LV.Instance.SubLvs.Count > CurrSubLv ||
                  IsRestTime))
             {
@@ -216,52 +232,187 @@ public class LVManager : MonoBehaviour
         LoadLVBag loadBag,
         int LVId)
     {
+        if (levelStarting)
+            return;
+
         if (InGame)
             return;
 
         if (GameManager.Instance == null)
+        {
+            Debug.LogError(
+                "LVManager: GameManager.Instance es null."
+            );
             return;
+        }
 
         if (GameManager.Instance.isClient &&
             loadBag == null)
         {
+            Debug.LogError(
+                "LVManager: el cliente recibió un LoadLVBag null."
+            );
             return;
         }
 
-        AudioManager.Instance.StopBgAudio();
-        CameraControl.Instance.InAcvment = false;
-        PvPSelector.Instance.CloseSelector();
-        LevelSelector.Instance.CloseSelector();
-        UIManager.Instance.LogPanel.Close();
-        UIManager.Instance.SetPanel.CloseSetPanel();
-        AlmanacScence.Instance.BackMenu();
-        GobalLight.Instance.InitIntensity();
+        levelStarting = true;
+        levelReady = false;
+        startLvSucceeded = false;
 
-        StartLv(
-            loadBag,
-            LVId,
-            true
-        );
+        StopLevelCoroutines();
 
-        PlayerManager.Instance.ResetSunNum();
-        GoOtherMap.Instance.LoadInit();
-        PlantManager.Instance.LoadLvStartPlant();
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.StopBgAudio();
 
-        Timetable.Instance.UpdateTempt(
-            CameraControl.Instance.CurrMap
-        );
+        if (CameraControl.Instance != null)
+            CameraControl.Instance.InAcvment = false;
 
-        Timetable.Instance.gameObject.SetActive(
-            LV.Instance.CurrLVType != LVType.IZombie &&
-            LV.Instance.CurrLVType != LVType.VaseBreaker
+        if (PvPSelector.Instance != null)
+            PvPSelector.Instance.CloseSelector();
+
+        if (LevelSelector.Instance != null)
+            LevelSelector.Instance.CloseSelector();
+
+        if (UIManager.Instance != null)
+        {
+            if (UIManager.Instance.LogPanel != null)
+                UIManager.Instance.LogPanel.Close();
+
+            if (UIManager.Instance.SetPanel != null)
+                UIManager.Instance.SetPanel.CloseSetPanel();
+
+            if (UIManager.Instance.BattleUI != null)
+                UIManager.Instance.BattleUI.SetActive(true);
+
+            UIManager.Instance.OpenBattleUI();
+        }
+
+        if (AlmanacScence.Instance != null)
+            AlmanacScence.Instance.BackMenu();
+
+        if (GobalLight.Instance != null)
+            GobalLight.Instance.InitIntensity();
+
+        StartGameCoroutine = StartCoroutine(
+            StartGameRoutine(
+                loadBag,
+                LVId
+            )
         );
     }
 
-    private void StartLv(
+    private IEnumerator StartGameRoutine(
+        LoadLVBag loadBag,
+        int LVId)
+    {
+        yield return null;
+
+        if (!GameManager.Instance)
+        {
+            FailLevelStart(
+                "GameManager.Instance desapareció durante el arranque."
+            );
+            yield break;
+        }
+
+        yield return WaitForBattleUI();
+
+        if (!startLvSucceeded)
+        {
+            yield return StartCoroutine(
+                StartLv(
+                    loadBag,
+                    LVId,
+                    true
+                )
+            );
+        }
+
+        if (!startLvSucceeded)
+        {
+            FailLevelStart(
+                "StartLv no pudo completar la inicialización del nivel."
+            );
+            yield break;
+        }
+
+        if (PlayerManager.Instance != null)
+            PlayerManager.Instance.ResetSunNum();
+
+        if (GoOtherMap.Instance != null)
+            GoOtherMap.Instance.LoadInit();
+
+        if (PlantManager.Instance != null)
+            PlantManager.Instance.LoadLvStartPlant();
+
+        if (Timetable.Instance != null &&
+            CameraControl.Instance != null &&
+            LV.Instance != null)
+        {
+            Timetable.Instance.UpdateTempt(
+                CameraControl.Instance.CurrMap
+            );
+
+            Timetable.Instance.gameObject.SetActive(
+                LV.Instance.CurrLVType != LVType.IZombie &&
+                LV.Instance.CurrLVType != LVType.VaseBreaker
+            );
+        }
+
+        levelReady = true;
+        levelStarting = false;
+        StartGameCoroutine = null;
+
+        if (currLVState == LVState.Fighting)
+            StartPendingLevelActions();
+    }
+
+    private IEnumerator WaitForBattleUI()
+    {
+        float timeout = 10f;
+        float timer = 0f;
+
+        while (timer < timeout)
+        {
+            bool uiReady =
+                UIManager.Instance != null;
+
+            bool seedBankReady =
+                SeedBank.Instance != null;
+
+            bool flagReady =
+                FlagMeter.Instance != null;
+
+            if (uiReady &&
+                seedBankReady &&
+                flagReady)
+            {
+                yield break;
+            }
+
+            timer += Time.unscaledDeltaTime;
+
+            yield return null;
+        }
+
+        Debug.LogError(
+            "LVManager: BattleUI no terminó de inicializarse. " +
+            "UIManager=" +
+            (UIManager.Instance != null) +
+            ", SeedBank=" +
+            (SeedBank.Instance != null) +
+            ", FlagMeter=" +
+            (FlagMeter.Instance != null)
+        );
+    }
+
+    private IEnumerator StartLv(
         LoadLVBag loadBag,
         int LVId,
         bool needloadLv)
     {
+        startLvSucceeded = false;
+
         if (GameManager.Instance == null ||
             LV.Instance == null ||
             SpectatorList.Instance == null)
@@ -269,7 +420,25 @@ public class LVManager : MonoBehaviour
             Debug.LogError(
                 "LVManager: faltan GameManager, LV o SpectatorList."
             );
-            return;
+            yield break;
+        }
+
+        yield return WaitForBattleUI();
+
+        if (FlagMeter.Instance == null)
+        {
+            Debug.LogError(
+                "LVManager: FlagMeter.Instance sigue siendo null después de esperar BattleUI."
+            );
+            yield break;
+        }
+
+        if (SeedBank.Instance == null)
+        {
+            Debug.LogError(
+                "LVManager: SeedBank.Instance sigue siendo null después de esperar BattleUI."
+            );
+            yield break;
         }
 
         int lvSeed =
@@ -280,13 +449,57 @@ public class LVManager : MonoBehaviour
 
         CurrLVState = LVState.Start;
 
-        if (GameManager.Instance.isClient &&
-            loadBag != null)
+        bool isClient =
+            GameManager.Instance.isClient;
+
+        bool isServer =
+            GameManager.Instance.isServer;
+
+        if (isClient)
         {
+            if (loadBag == null)
+            {
+                Debug.LogError(
+                    "LVManager: el cliente recibió loadBag null."
+                );
+                yield break;
+            }
+
+            if (loadBag.NameList == null ||
+                loadBag.CardNumList == null)
+            {
+                Debug.LogError(
+                    "LVManager: LoadLVBag no contiene listas de jugadores/cartas."
+                );
+                yield break;
+            }
+
+            if (loadBag.NameList.Count !=
+                loadBag.CardNumList.Count)
+            {
+                Debug.LogError(
+                    "LVManager: NameList y CardNumList tienen cantidades diferentes."
+                );
+                yield break;
+            }
+
+            if (loadBag.BoolTypes == null ||
+                loadBag.BoolTypes.Count == 0)
+            {
+                Debug.LogError(
+                    "LVManager: LoadLVBag.BoolTypes está vacío."
+                );
+                yield break;
+            }
+
             lvSeed = loadBag.LvSeed;
 
             if (needloadLv)
-                LV.Instance.ClientLoadLv(loadBag);
+            {
+                LV.Instance.ClientLoadLv(
+                    loadBag
+                );
+            }
 
             if (SpectatorList.Instance.LocalIsSpectator)
             {
@@ -294,6 +507,14 @@ public class LVManager : MonoBehaviour
             }
             else
             {
+                if (GameManager.Instance.LocalPlayerSave == null)
+                {
+                    Debug.LogError(
+                        "LVManager: LocalPlayerSave es null en cliente."
+                    );
+                    yield break;
+                }
+
                 for (
                     int i = 0;
                     i < loadBag.NameList.Count;
@@ -320,6 +541,14 @@ public class LVManager : MonoBehaviour
                 loadBag.CardNumList
             );
 
+            if (FlagMeter.Instance == null)
+            {
+                Debug.LogError(
+                    "LVManager: FlagMeter.Instance desapareció durante el arranque del cliente."
+                );
+                yield break;
+            }
+
             FlagMeter.Instance.SetLvlName(
                 LV.Instance.LvName,
                 loadBag.BoolTypes[0]
@@ -329,12 +558,24 @@ public class LVManager : MonoBehaviour
         List<string> players =
             SpectatorList.Instance.GetNoSpectatorPlayerList();
 
-        List<int> cardNums = new();
+        if (players == null)
+            players = new List<string>();
 
-        if (GameManager.Instance.isServer)
+        List<int> cardNums =
+            new List<int>();
+
+        if (isServer)
         {
             if (needloadLv)
             {
+                if (LevelSelector.Instance == null)
+                {
+                    Debug.LogError(
+                        "LVManager: LevelSelector.Instance es null en servidor."
+                    );
+                    yield break;
+                }
+
                 LV.Instance.LoadLV(
                     LVId,
                     LevelSelector.Instance.IsEasy,
@@ -345,6 +586,14 @@ public class LVManager : MonoBehaviour
 
             if (LV.Instance.CurrLVType == LVType.PvP)
             {
+                if (PvPSelector.Instance == null)
+                {
+                    Debug.LogError(
+                        "LVManager: PvPSelector.Instance es null."
+                    );
+                    yield break;
+                }
+
                 CalculatePvPCardNumbers(
                     players,
                     cardNums
@@ -369,13 +618,24 @@ public class LVManager : MonoBehaviour
                     cardNums
                 );
 
-            SocketServer.Instance.LoadLv(bag);
+            if (SocketServer.Instance != null)
+            {
+                SocketServer.Instance.LoadLv(bag);
+            }
         }
 
-        if (!GameManager.Instance.isClient)
+        if (!isClient)
         {
             if (needloadLv)
             {
+                if (LevelSelector.Instance == null)
+                {
+                    Debug.LogError(
+                        "LVManager: LevelSelector.Instance es null."
+                    );
+                    yield break;
+                }
+
                 LV.Instance.LoadLV(
                     LVId,
                     LevelSelector.Instance.IsEasy,
@@ -384,7 +644,7 @@ public class LVManager : MonoBehaviour
                 );
             }
 
-            if (!GameManager.Instance.isServer)
+            if (!isServer)
             {
                 if (LV.Instance.CardNum >= 0)
                 {
@@ -393,6 +653,14 @@ public class LVManager : MonoBehaviour
                 }
                 else
                 {
+                    if (GameManager.Instance.LocalPlayerSave == null)
+                    {
+                        Debug.LogError(
+                            "LVManager: LocalPlayerSave es null."
+                        );
+                        yield break;
+                    }
+
                     int extraCards =
                         GameManager.Instance.LocalPlayerSave
                             .SpItems
@@ -411,11 +679,12 @@ public class LVManager : MonoBehaviour
             if (needloadLv &&
                 LV.Instance.CurrLVType == LVType.Normal)
             {
-                MapManager.Instance.CreateAllMower();
+                if (MapManager.Instance != null)
+                    MapManager.Instance.CreateAllMower();
             }
         }
 
-        if (GameManager.Instance.isServer)
+        if (isServer)
         {
             LoadBattlePlayerList(
                 players,
@@ -423,16 +692,46 @@ public class LVManager : MonoBehaviour
             );
         }
 
-        UIManager.Instance.BattleUI?.SetActive(true);
+        yield return null;
+
+        if (UIManager.Instance == null)
+        {
+            Debug.LogError(
+                "LVManager: UIManager.Instance es null después de cargar el nivel."
+            );
+            yield break;
+        }
+
+        if (UIManager.Instance.BattleUI != null)
+            UIManager.Instance.BattleUI.SetActive(true);
+
         UIManager.Instance.OpenBattleUI();
 
-        if (!GameManager.Instance.isClient)
+        yield return WaitForBattleUI();
+
+        if (FlagMeter.Instance == null)
+        {
+            Debug.LogError(
+                "LVManager: FlagMeter.Instance no existe después de OpenBattleUI()."
+            );
+            yield break;
+        }
+
+        if (!isClient)
         {
             SumWeight();
 
             FlagMeter.Instance.CreateFlag(
                 AllWeight
             );
+
+            if (LevelSelector.Instance == null)
+            {
+                Debug.LogError(
+                    "LVManager: LevelSelector.Instance es null al configurar FlagMeter."
+                );
+                yield break;
+            }
 
             FlagMeter.Instance.SetLvlName(
                 LV.Instance.LvName,
@@ -447,7 +746,10 @@ public class LVManager : MonoBehaviour
             LvTotalTime > 0)
         {
             Vector2 position =
-                new(-3.5f, 0f);
+                new Vector2(
+                    -3.5f,
+                    0f
+                );
 
             if (LV.Instance.CurrLVType == LVType.PvP)
             {
@@ -530,7 +832,8 @@ public class LVManager : MonoBehaviour
 
                 PlayChooseCardBgAudio();
 
-                ZombieManager.Instance.ShowZombie();
+                if (ZombieManager.Instance != null)
+                    ZombieManager.Instance.ShowZombie();
 
                 CameraControl.Instance.MoveForLVStart(
                     LVStartCameraAction
@@ -553,6 +856,32 @@ public class LVManager : MonoBehaviour
             LVStartEFOver();
             LV.Instance.SpSeedBankMove();
         }
+
+        startLvSucceeded = true;
+    }
+
+    private void StartPendingLevelActions()
+    {
+        if (!levelReady)
+            return;
+
+        if (currLVState != LVState.Fighting)
+            return;
+    }
+
+    private void FailLevelStart(string reason)
+    {
+        startLvSucceeded = false;
+        levelReady = false;
+        levelStarting = false;
+
+        if (!string.IsNullOrEmpty(reason))
+            Debug.LogError(
+                "LVManager: " + reason
+            );
+
+        StartGameCoroutine = null;
+        StartSubLevelCoroutine = null;
     }
 
     private void LoadBattlePlayerList(
@@ -570,14 +899,6 @@ public class LVManager : MonoBehaviour
         GameObject battleObject =
             battlePlayerList.gameObject;
 
-        /*
-         * BattlePlayerList puede estar desactivado al iniciar
-         * para que la UI no sea visible.
-         *
-         * Lo activamos antes de usar sus OnlineSeedBank.
-         * Al activarse, Unity ejecuta Awake() de los componentes
-         * que todavía no habían sido inicializados.
-         */
         if (!battleObject.activeSelf)
             battleObject.SetActive(true);
 
@@ -659,6 +980,9 @@ public class LVManager : MonoBehaviour
 
         SeedBank.Instance.CardNum = 0;
 
+        if (GameManager.Instance.LocalPlayerSave == null)
+            return;
+
         for (int i = 0; i < players.Count; i++)
         {
             if (
@@ -678,6 +1002,12 @@ public class LVManager : MonoBehaviour
         List<string> players,
         List<int> cardNums)
     {
+        if (GameManager.Instance.LocalPlayerSave == null)
+        {
+            SeedBank.Instance.CardNum = 0;
+            return;
+        }
+
         int cardNum =
             LV.Instance.CardNum >= 0
                 ? LV.Instance.CardNum
@@ -698,7 +1028,7 @@ public class LVManager : MonoBehaviour
         }
 
         List<int> slots =
-            new(cardNum);
+            new List<int>(cardNum);
 
         for (int i = 0; i < cardNum; i++)
             slots.Add(0);
@@ -724,7 +1054,7 @@ public class LVManager : MonoBehaviour
         List<string> players,
         List<int> cardNums)
     {
-        LoadLVBag bag = new()
+        LoadLVBag bag = new LoadLVBag
         {
             LvId = LVId,
             LvSeed = lvSeed,
@@ -746,8 +1076,11 @@ public class LVManager : MonoBehaviour
             }
         };
 
-        List<ZombieType> zombieTypes = new();
-        List<int> zombieSplits = new();
+        List<ZombieType> zombieTypes =
+            new List<ZombieType>();
+
+        List<int> zombieSplits =
+            new List<int>();
 
         for (
             int i = 0;
@@ -758,8 +1091,13 @@ public class LVManager : MonoBehaviour
             List<ZombieType> types =
                 LV.Instance.ZombieTypes[i];
 
-            zombieSplits.Add(types.Count);
-            zombieTypes.AddRange(types);
+            zombieSplits.Add(
+                types.Count
+            );
+
+            zombieTypes.AddRange(
+                types
+            );
         }
 
         bag.ZTypesSplit = zombieSplits;
@@ -855,12 +1193,59 @@ public class LVManager : MonoBehaviour
         LevelSelector.Instance.StartCurrGame();
     }
 
+    private void StopLevelCoroutines()
+    {
+        if (StartGameCoroutine != null)
+        {
+            StopCoroutine(
+                StartGameCoroutine
+            );
+
+            StartGameCoroutine = null;
+        }
+
+        if (StartSubLevelCoroutine != null)
+        {
+            StopCoroutine(
+                StartSubLevelCoroutine
+            );
+
+            StartSubLevelCoroutine = null;
+        }
+
+        if (RestSpawnCoroutine != null)
+        {
+            StopCoroutine(
+                RestSpawnCoroutine
+            );
+
+            RestSpawnCoroutine = null;
+        }
+
+        if (AutoNextWaveCoroutine != null)
+        {
+            StopCoroutine(
+                AutoNextWaveCoroutine
+            );
+
+            AutoNextWaveCoroutine = null;
+        }
+
+        isWaitSpawn = false;
+        waitingGoNextWave = false;
+        CanHandNextWave = false;
+    }
+
     private void ResetScence()
     {
         ResetLv();
 
         PassTime = 0;
         CurrSubLv = 0;
+
+        levelReady = false;
+        levelStarting = false;
+        startLvSucceeded = false;
 
         GobalLight.Instance.gobalLight.intensity = 1f;
 
@@ -899,7 +1284,7 @@ public class LVManager : MonoBehaviour
             );
         }
 
-        StopAllCoroutines();
+        StopLevelCoroutines();
 
         GameManager.Instance.SaveSAInfo();
 
@@ -1339,11 +1724,17 @@ public class LVManager : MonoBehaviour
 
     private void OnAllZombieDeadAction()
     {
+        if (!levelReady)
+            return;
+
         CurrLVWave++;
 
-        ZombieManager.Instance.RemoveAllZombieDeadAction(
-            OnAllZombieDeadAction
-        );
+        if (ZombieManager.Instance != null)
+        {
+            ZombieManager.Instance.RemoveAllZombieDeadAction(
+                OnAllZombieDeadAction
+            );
+        }
 
         if (AutoNextWaveCoroutine != null)
             StopCoroutine(
@@ -1439,6 +1830,9 @@ public class LVManager : MonoBehaviour
                 WaitTimeDo(
                     () =>
                     {
+                        if (!levelReady)
+                            return;
+
                         AllTime();
                         isWaitSpawn = false;
                         AutoStartNextWave();
@@ -1471,6 +1865,13 @@ public class LVManager : MonoBehaviour
 
     private void AutoStartNextWave()
     {
+        if (!levelReady)
+            return;
+
+        if (GameManager.Instance == null ||
+            GameManager.Instance.isClient)
+            return;
+
         StartCoroutine(
             NextWave()
         );
@@ -1478,11 +1879,22 @@ public class LVManager : MonoBehaviour
 
     public void OnZombieDeadEvent()
     {
+        if (!levelReady)
+            return;
+
         CheckNextWaveBtn();
     }
 
     private void CheckNextWaveBtn()
     {
+        if (!levelReady ||
+            MapManager.Instance == null ||
+            LV.Instance == null ||
+            ZombieManager.Instance == null)
+        {
+            return;
+        }
+
         int limit =
             MapManager.Instance.mapList.Count * 2;
 
@@ -1501,6 +1913,9 @@ public class LVManager : MonoBehaviour
 
     public void NextWaveBtnEvent()
     {
+        if (!levelReady)
+            return;
+
         if (CanHandNextWave)
             OnAllZombieDeadAction();
     }
@@ -1540,12 +1955,15 @@ public class LVManager : MonoBehaviour
 
     private IEnumerator NextWave()
     {
+        if (!levelReady)
+            yield break;
+
         isBigWave = false;
         CanHandNextWave = false;
 
         NextWaveBtn.Instance.CloseBtn();
 
-        List<int> waveWeights = new();
+        List<int> waveWeights = new List<int>();
 
         for (
             int i = 0;
@@ -1564,7 +1982,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            WaveComing wave = new();
+            WaveComing wave = new WaveComing();
 
             if (bigWave)
             {
@@ -1604,9 +2022,12 @@ public class LVManager : MonoBehaviour
                 GameManager.Instance.AudioConf.Awooga
             );
 
-            FlagMeter.Instance.FlagRise(
-                BIGwaveNum++
-            );
+            if (FlagMeter.Instance != null)
+            {
+                FlagMeter.Instance.FlagRise(
+                    BIGwaveNum++
+                );
+            }
 
             for (
                 int i = 0;
@@ -1812,9 +2233,12 @@ public class LVManager : MonoBehaviour
 
                     waveWeights[i] -= weight;
 
-                    FlagMeter.Instance.UpdateHead(
-                        weight
-                    );
+                    if (FlagMeter.Instance != null)
+                    {
+                        FlagMeter.Instance.UpdateHead(
+                            weight
+                        );
+                    }
                 }
                 else
                 {
@@ -1845,9 +2269,12 @@ public class LVManager : MonoBehaviour
             }
         }
 
-        ZombieManager.Instance.AddAllZombieDeadAction(
-            OnAllZombieDeadAction
-        );
+        if (ZombieManager.Instance != null)
+        {
+            ZombieManager.Instance.AddAllZombieDeadAction(
+                OnAllZombieDeadAction
+            );
+        }
 
         AutoNextWaveCoroutine =
             StartCoroutine(
@@ -1878,7 +2305,7 @@ public class LVManager : MonoBehaviour
             int item =
                 (int)(sunNum / 500f) + 1;
 
-            List<int> waveWeights = new();
+            List<int> waveWeights = new List<int>();
 
             for (
                 int i = 0;
@@ -2075,7 +2502,7 @@ public class LVManager : MonoBehaviour
             i++
         )
         {
-            List<int> weights = new();
+            List<int> weights = new List<int>();
 
             for (
                 int j = 0;
@@ -2300,7 +2727,36 @@ public class LVManager : MonoBehaviour
 
     private void GoNextSubLv()
     {
+        if (StartSubLevelCoroutine != null)
+            return;
+
+        if (LV.Instance == null ||
+            LV.Instance.SubLvs == null ||
+            CurrSubLv >= LV.Instance.SubLvs.Count)
+        {
+            return;
+        }
+
+        StartSubLevelCoroutine =
+            StartCoroutine(
+                GoNextSubLvRoutine()
+            );
+    }
+
+    private IEnumerator GoNextSubLvRoutine()
+    {
+        levelReady = false;
+        startLvSucceeded = false;
+
         ResetLv();
+
+        if (LV.Instance == null ||
+            LV.Instance.SubLvs == null ||
+            CurrSubLv >= LV.Instance.SubLvs.Count)
+        {
+            StartSubLevelCoroutine = null;
+            yield break;
+        }
 
         LV.Instance.ReadSubLv(
             LV.Instance.SubLvs[CurrSubLv]
@@ -2308,11 +2764,28 @@ public class LVManager : MonoBehaviour
 
         CurrSubLv++;
 
-        StartLv(
-            null,
-            0,
-            false
+        yield return WaitForBattleUI();
+
+        yield return StartCoroutine(
+            StartLv(
+                null,
+                0,
+                false
+            )
         );
+
+        if (!startLvSucceeded)
+        {
+            Debug.LogError(
+                "LVManager: no se pudo iniciar el siguiente subnivel."
+            );
+
+            StartSubLevelCoroutine = null;
+            yield break;
+        }
+
+        levelReady = true;
+        StartSubLevelCoroutine = null;
     }
 
     public void SkipRest()
@@ -2347,6 +2820,9 @@ public class LVManager : MonoBehaviour
     public void ClientShowBigWave(
         WaveComing bigWave)
     {
+        if (!levelReady)
+            return;
+
         if (bigWave.WaveType == 0)
         {
             isBigWave = false;
@@ -2371,9 +2847,12 @@ public class LVManager : MonoBehaviour
                             GameManager.Instance.AudioConf.Awooga
                         );
 
-                        FlagMeter.Instance.FlagRise(
-                            BIGwaveNum++
-                        );
+                        if (FlagMeter.Instance != null)
+                        {
+                            FlagMeter.Instance.FlagRise(
+                                BIGwaveNum++
+                            );
+                        }
                     },
                     bigWave.WaitTime
                 )

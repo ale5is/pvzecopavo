@@ -7,17 +7,12 @@ public class PlayerList : MonoBehaviour
     public static PlayerList Instance;
 
     public GameObject QuitButton;
-
     public GameObject PasswordButton;
 
     public TextMesh HostName;
-
     public TextMesh Name1;
-
     public TextMesh Name2;
-
     public TextMesh Name3;
-
     public TextMesh Tip;
 
     public int PlayerNum;
@@ -25,8 +20,12 @@ public class PlayerList : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-
         ClearPlayerList();
+    }
+
+    private void OnEnable()
+    {
+        RefreshPlayerList();
     }
 
     private void ClearPlayerList()
@@ -34,39 +33,39 @@ public class PlayerList : MonoBehaviour
         PlayerNum = 0;
 
         if (HostName != null)
-        {
             HostName.text = "";
-        }
 
         if (Name1 != null)
-        {
             Name1.text = "";
-        }
 
         if (Name2 != null)
-        {
             Name2.text = "";
-        }
 
         if (Name3 != null)
-        {
             Name3.text = "";
-        }
 
         if (QuitButton != null)
-        {
             QuitButton.SetActive(false);
-        }
 
         if (PasswordButton != null)
-        {
             PasswordButton.SetActive(false);
-        }
 
         if (Tip != null)
-        {
             Tip.text = "多人游戏未开启";
+    }
+
+    public void RefreshPlayerList()
+    {
+        if (SocketServer.Instance == null)
+        {
+            ClearPlayerList();
+            return;
         }
+
+        PlayerInfo host = SocketServer.Instance.GetHostPlayer();
+        List<PlayerInfo> players = SocketServer.Instance.GetPlayers();
+
+        UpdatePlayerList(host, players);
     }
 
     public void UpdatePlayerList(
@@ -75,10 +74,11 @@ public class PlayerList : MonoBehaviour
     {
         PlayerNum = 1;
 
+        if (Host == null)
+            PlayerNum = 0;
+
         if (players != null)
-        {
             PlayerNum += players.Count;
-        }
 
         if (Tip != null)
         {
@@ -89,9 +89,13 @@ public class PlayerList : MonoBehaviour
             {
                 Tip.text = "多人游戏已开启";
             }
-            else
+            else if (Host != null)
             {
                 Tip.text = "已加入多人游戏";
+            }
+            else
+            {
+                Tip.text = "多人游戏未开启";
             }
         }
 
@@ -99,35 +103,25 @@ public class PlayerList : MonoBehaviour
             GameManager.Instance.isOnline)
         {
             if (QuitButton != null)
-            {
                 QuitButton.SetActive(true);
-            }
         }
         else
         {
             if (QuitButton != null)
-            {
                 QuitButton.SetActive(false);
-            }
 
             if (PasswordButton != null)
-            {
                 PasswordButton.SetActive(false);
-            }
 
             if (Tip != null)
-            {
                 Tip.text = "多人游戏未开启";
-            }
         }
 
         if (GameManager.Instance != null &&
             GameManager.Instance.isServer)
         {
             if (PasswordButton != null)
-            {
                 PasswordButton.SetActive(true);
-            }
         }
 
         if (Host != null &&
@@ -136,84 +130,41 @@ public class PlayerList : MonoBehaviour
             GameManager.Instance.HostName = Host.Name;
         }
 
-        if (Host != null)
+        if (HostName != null)
         {
-            if (HostName != null)
-            {
-                HostName.text = Host.Name;
-            }
+            HostName.text = Host != null
+                ? Host.Name
+                : "";
         }
-        else
-        {
-            if (HostName != null)
-            {
-                HostName.text = "";
-            }
-        }
+
+        if (Name1 != null)
+            Name1.text = "";
+
+        if (Name2 != null)
+            Name2.text = "";
+
+        if (Name3 != null)
+            Name3.text = "";
 
         if (players == null)
-        {
-            if (Name1 != null)
-            {
-                Name1.text = "";
-            }
-
-            if (Name2 != null)
-            {
-                Name2.text = "";
-            }
-
-            if (Name3 != null)
-            {
-                Name3.text = "";
-            }
-
             return;
-        }
 
         if (players.Count > 0 && players[0] != null)
         {
             if (Name1 != null)
-            {
                 Name1.text = players[0].Name;
-            }
-        }
-        else
-        {
-            if (Name1 != null)
-            {
-                Name1.text = "";
-            }
         }
 
         if (players.Count > 1 && players[1] != null)
         {
             if (Name2 != null)
-            {
                 Name2.text = players[1].Name;
-            }
-        }
-        else
-        {
-            if (Name2 != null)
-            {
-                Name2.text = "";
-            }
         }
 
         if (players.Count > 2 && players[2] != null)
         {
             if (Name3 != null)
-            {
                 Name3.text = players[2].Name;
-            }
-        }
-        else
-        {
-            if (Name3 != null)
-            {
-                Name3.text = "";
-            }
         }
     }
 }

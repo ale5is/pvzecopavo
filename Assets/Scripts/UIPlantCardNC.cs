@@ -146,30 +146,36 @@ public class UIPlantCardNC : MonoBehaviour, IPointerDownHandler, IEventSystemHan
             SeedChooser.Instance != null &&
             !SeedChooser.Instance.isPrepare)
         {
-            if (SeedBank.Instance.ChooseCard(this))
+            if (!SeedBank.Instance.ChooseCard(this))
+                return;
+
+            IsChoosed = true;
+
+            if (haveSound &&
+                AudioManager.Instance != null &&
+                GameManager.Instance != null &&
+                GameManager.Instance.AudioConf != null)
             {
-                IsChoosed = true;
+                AudioClip tapAudio =
+                    Random.Range(0, 2) == 1
+                        ? GameManager.Instance.AudioConf.Tap
+                        : GameManager.Instance.AudioConf.Tap2;
 
-                if (haveSound &&
-                    AudioManager.Instance != null &&
-                    GameManager.Instance != null &&
-                    GameManager.Instance.AudioConf != null)
-                {
-                    AudioClip tapAudio =
-                        Random.Range(0, 2) == 1
-                            ? GameManager.Instance.AudioConf.Tap
-                            : GameManager.Instance.AudioConf.Tap2;
-
-                    AudioManager.Instance.PlayEFAudio(
-                        tapAudio,
-                        transform.position,
-                        isAll: true
-                    );
-                }
+                AudioManager.Instance.PlayEFAudio(
+                    tapAudio,
+                    transform.position,
+                    isAll: true
+                );
             }
 
             if (GameManager.Instance != null)
             {
+                /*
+                 * CLIENTE
+                 *
+                 * El cliente manda la selección al servidor.
+                 * El servidor posteriormente la distribuye.
+                 */
                 if (GameManager.Instance.isClient &&
                     SocketClient.Instance != null)
                 {
@@ -180,22 +186,47 @@ public class UIPlantCardNC : MonoBehaviour, IPointerDownHandler, IEventSystemHan
                         isBack = false
                     };
 
-                    SocketClient.Instance.SelectCard(selectCard);
+                    SocketClient.Instance.SelectCard(
+                        selectCard
+                    );
                 }
 
+                /*
+                 * HOST / SERVIDOR
+                 *
+                 * El host no pasa por SocketClient.
+                 *
+                 * Antes se llamaba directamente a
+                 * SocketServer.SelectCard(), lo que hacía que
+                 * los demás jugadores recibieran la carta,
+                 * pero el OnlineSeedBank del propio host no
+                 * se actualizara.
+                 *
+                 * Ahora la selección pasa por BattlePlayerList,
+                 * que actualiza el OnlineSeedBank del host y
+                 * después la transmite a los clientes.
+                 */
                 if (GameManager.Instance.isServer &&
-                    SocketServer.Instance != null)
+                    !GameManager.Instance.isClient &&
+                    BattlePlayerList.Instance != null)
                 {
-                    SelectCard selectCard = new SelectCard
-                    {
-                        PlayerName =
-                            GameManager.Instance.LocalPlayerSave.playerName,
-                        plantType = CardPlantType,
-                        zombieType = CardZombieType,
-                        isBack = false
-                    };
+                    string playerName = null;
 
-                    SocketServer.Instance.SelectCard(selectCard);
+                    if (GameManager.Instance.LocalPlayerSave != null)
+                    {
+                        playerName =
+                            GameManager.Instance.LocalPlayerSave.playerName;
+                    }
+
+                    if (!string.IsNullOrEmpty(playerName))
+                    {
+                        BattlePlayerList.Instance.SelectCard(
+                            playerName,
+                            CardPlantType,
+                            CardZombieType,
+                            false
+                        );
+                    }
                 }
             }
 

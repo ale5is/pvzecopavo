@@ -107123,10 +107123,10 @@ RectTransform:
   - {fileID: 3916}
   - {fileID: 4221}
   - {fileID: 4760}
+  - {fileID: 4555}
   - {fileID: 3874}
   - {fileID: 4455}
   - {fileID: 4772}
-  - {fileID: 4555}
   - {fileID: 4056}
   - {fileID: 4823}
   - {fileID: 4530}
@@ -117038,6 +117038,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   battlePlayerList: {fileID: 5914}
+  FlagMeterui: {fileID: 5428}
   LvSpawnisOver: 0
   BootyIsAppeared: 0
   OnlyBooty: {fileID: 0}
@@ -128433,7 +128434,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.35797712}
+  m_AnchoredPosition: {x: 0, y: 0.000025987625}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!1 &313557439
@@ -130926,7 +130927,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.35797712}
+  m_AnchoredPosition: {x: 0, y: 0.000025987625}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &423918493
@@ -134396,7 +134397,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 2079240341}
   m_Direction: 2
   m_Value: 0
-  m_Size: 0.99894124
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -154091,7 +154092,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 891658939}
   m_Direction: 2
   m_Value: 0
-  m_Size: 0.99894124
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:

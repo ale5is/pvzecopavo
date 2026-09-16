@@ -4,59 +4,73 @@ using UnityEngine.UI;
 
 public class PlayerShow : MonoBehaviour, IPointerEnterHandler, IEventSystemHandler, IPointerExitHandler
 {
-	public Image State;
+    public Image State;
 
-	public Image MapSprite;
+    public Image MapSprite;
 
-	public Text nameText;
+    public Text nameText;
 
-	public OnlineSeedBank SeedBank;
+    public OnlineSeedBank SeedBank;
 
-	public PlantBase plantInGrid;
+    public PlantBase plantInGrid;
 
-	public ZombieBase zombieInGrid;
+    public ZombieBase zombieInGrid;
 
-	public Animator GridSeletor;
+    public Animator GridSeletor;
 
-	public TextMesh GridSeletorName;
+    public TextMesh GridSeletorName;
 
-	private bool isPrepare;
+    private bool isPrepare;
 
-	public bool IsPrepare
-	{
-		get
-		{
-			return isPrepare;
-		}
-		set
-		{
-			isPrepare = value;
-			if (SpectatorList.Instance.IsSpectator(nameText.text))
-			{
-				State.color = new Color(0.5f, 0.5f, 0.5f);
-				isPrepare = true;
-			}
-			else if (isPrepare)
-			{
-				State.color = new Color(0f, 1f, 0f);
-			}
-			else
-			{
-				State.color = new Color(1f, 0.432f, 0f);
-			}
-		}
-	}
+    public bool IsPrepare
+    {
+        get
+        {
+            return isPrepare;
+        }
+        set
+        {
+            isPrepare = value;
 
-	public void OnPointerEnter(PointerEventData eventData)
-	{
-		if (!SpectatorList.Instance.IsSpectator(nameText.text) && !(nameText.text == GameManager.Instance.LocalPlayerSave.playerName))
-		{
-			SeedBank.transform.localScale = new Vector2(1f, 1f);
-		}
-	}
+            if (SpectatorList.Instance != null &&
+                SpectatorList.Instance.IsSpectator(nameText.text))
+            {
+                State.color = new Color(0.5f, 0.5f, 0.5f);
+                isPrepare = true;
+            }
+            else if (isPrepare)
+            {
+                State.color = new Color(0f, 1f, 0f);
+            }
+            else
+            {
+                State.color = new Color(1f, 0.432f, 0f);
+            }
+        }
+    }
 
-	public void OnPointerExit(PointerEventData eventData)
-	{
-		SeedBank.transform.localScale = new Vector2(0f, 0f);
-	}
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (SeedBank == null)
+            return;
+
+        bool isSpectator =
+            SpectatorList.Instance != null &&
+            SpectatorList.Instance.IsSpectator(nameText.text);
+
+        if (!isSpectator)
+        {
+            SeedBank.transform.localScale =
+                new Vector3(1f, 1f, 1f);
+        }
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (SeedBank == null)
+            return;
+
+        SeedBank.transform.localScale =
+            new Vector3(0f, 0f, 0f);
+    }
 }

@@ -29,7 +29,7 @@ public class OnlineSeedBank : MonoBehaviour
         }
         set
         {
-            choosedNum = value;
+            choosedNum = Mathf.Max(0, value);
 
             if (choosedNum >= CardNum)
                 isFull = true;
@@ -176,18 +176,50 @@ public class OnlineSeedBank : MonoBehaviour
             return;
         }
 
+        int newCardNum =
+            Mathf.Max(
+                0,
+                soltNum
+            );
+
+        /*
+         * Si ya tenemos exactamente la cantidad
+         * de slots solicitada, no reconstruimos
+         * el SeedBank.
+         *
+         * Esto evita borrar las cartas que ya
+         * fueron restauradas mediante ChooseCard().
+         */
+        if (slotList.Count == newCardNum)
+        {
+            bool validSlots = true;
+
+            for (int i = 0;
+                 i < slotList.Count;
+                 i++)
+            {
+                if (slotList[i] == null)
+                {
+                    validSlots = false;
+                    break;
+                }
+            }
+
+            if (validSlots)
+            {
+                CardNum = newCardNum;
+
+                UpdateSeedBankSize();
+
+                return;
+            }
+        }
+
         ClearCardSlot();
 
-        CardNum = Mathf.Max(
-            0,
-            soltNum
-        );
+        CardNum = newCardNum;
 
-        seedBank.sizeDelta =
-            new Vector2(
-                18f + CardNum * 48f,
-                seedBank.sizeDelta.y
-            );
+        UpdateSeedBankSize();
 
         for (int i = 0;
              i < CardNum;
@@ -217,11 +249,13 @@ public class OnlineSeedBank : MonoBehaviour
                 );
 
                 Object.Destroy(obj);
+
                 continue;
             }
 
             component.transform.SetParent(
-                group
+                group,
+                false
             );
 
             component.CardId = i;
@@ -240,6 +274,18 @@ public class OnlineSeedBank : MonoBehaviour
                     1f
                 );
         }
+    }
+
+    private void UpdateSeedBankSize()
+    {
+        if (seedBank == null)
+            return;
+
+        seedBank.sizeDelta =
+            new Vector2(
+                18f + CardNum * 48f,
+                seedBank.sizeDelta.y
+            );
     }
 
     public void ClearCardSlot()
@@ -378,7 +424,8 @@ public class OnlineSeedBank : MonoBehaviour
         int cardId,
         bool needAnim)
     {
-        ChoosedNum--;
+        if (ChoosedNum > 0)
+            ChoosedNum--;
 
         UIPlantCard uIPlantCard = null;
 

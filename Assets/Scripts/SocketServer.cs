@@ -2914,7 +2914,15 @@ public class SocketServer : MonoBehaviour
             }
         );
     }
+    public List<PlayerInfo> GetPlayers()
+    {
+        return new List<PlayerInfo>(players);
+    }
 
+    public PlayerInfo GetHostPlayer()
+    {
+        return HostPlayer;
+    }
     private void UpdatePlayerLists()
     {
         if (battlePlayerList == null)
