@@ -17,10 +17,34 @@ public class BattlePlayerList : MonoBehaviour
     private int ShovelAnimNum;
     private int HammerAnimNum;
 
+    // Datos recibidos mientras el objeto estaba desactivado.
+    private List<string> pendingPlayers;
+    private List<int> pendingCardNum;
+
+    private bool hasPendingPlayerData;
+
     private void Awake()
     {
         Instance = this;
         ClearPlayerList();
+    }
+
+    private void OnEnable()
+    {
+        Instance = this;
+
+        if (hasPendingPlayerData)
+        {
+            hasPendingPlayerData = false;
+
+            LoadAllSeedBankInternal(
+                pendingPlayers,
+                pendingCardNum
+            );
+
+            pendingPlayers = null;
+            pendingCardNum = null;
+        }
     }
 
     private void ClearPlayerList()
@@ -34,24 +58,28 @@ public class BattlePlayerList : MonoBehaviour
     private PlayerShow GetPlayerShow(string playerName)
     {
         if (HostShow != null &&
+            HostShow.nameText != null &&
             HostShow.nameText.text == playerName)
         {
             return HostShow;
         }
 
         if (Player2Show != null &&
+            Player2Show.nameText != null &&
             Player2Show.nameText.text == playerName)
         {
             return Player2Show;
         }
 
         if (Player3Show != null &&
+            Player3Show.nameText != null &&
             Player3Show.nameText.text == playerName)
         {
             return Player3Show;
         }
 
         if (Player4Show != null &&
+            Player4Show.nameText != null &&
             Player4Show.nameText.text == playerName)
         {
             return Player4Show;
@@ -65,42 +93,36 @@ public class BattlePlayerList : MonoBehaviour
         string playerName)
     {
         if (show == null)
-        {
             return;
-        }
 
         show.gameObject.SetActive(true);
 
-        show.nameText.text = playerName;
-        show.GridSeletorName.text = playerName;
+        if (show.nameText != null)
+            show.nameText.text = playerName;
+
+        if (show.GridSeletorName != null)
+            show.GridSeletorName.text = playerName;
+
         show.IsPrepare = false;
     }
 
     private void HidePlayer(PlayerShow show)
     {
         if (show == null)
-        {
             return;
-        }
 
         ClearPreview(show);
 
         if (show.nameText != null)
-        {
             show.nameText.text = "";
-        }
 
         if (show.GridSeletorName != null)
-        {
             show.GridSeletorName.text = "";
-        }
 
         show.IsPrepare = false;
 
         if (show.SeedBank != null)
-        {
             show.SeedBank.ClearCardSlot();
-        }
 
         show.gameObject.SetActive(false);
     }
@@ -109,61 +131,217 @@ public class BattlePlayerList : MonoBehaviour
         List<string> players,
         List<int> cardNum)
     {
-        Player2Show.IsPrepare = false;
-        Player3Show.IsPrepare = false;
-        Player4Show.IsPrepare = false;
-
-        Player2Show.transform.SetAsLastSibling();
-        Player3Show.transform.SetAsLastSibling();
-        Player4Show.transform.SetAsLastSibling();
-
-        for (int i = 0; i < players.Count && i < cardNum.Count; i++)
+        // Si el BattlePlayerList todavía está desactivado,
+        // guardamos los datos para procesarlos al activarse.
+        if (!gameObject.activeInHierarchy)
         {
-            PlayerShow show = GetPlayerShow(players[i]);
+            pendingPlayers =
+                players != null
+                    ? new List<string>(players)
+                    : null;
 
-            if (show != null &&
-                show.SeedBank != null)
+            pendingCardNum =
+                cardNum != null
+                    ? new List<int>(cardNum)
+                    : null;
+
+            hasPendingPlayerData = true;
+
+            return;
+        }
+
+        LoadAllSeedBankInternal(
+            players,
+            cardNum
+        );
+    }
+
+    private void LoadAllSeedBankInternal(
+        List<string> players,
+        List<int> cardNum)
+    {
+        if (Player2Show != null)
+            Player2Show.IsPrepare = false;
+
+        if (Player3Show != null)
+            Player3Show.IsPrepare = false;
+
+        if (Player4Show != null)
+            Player4Show.IsPrepare = false;
+
+        if (Player2Show != null)
+            Player2Show.transform.SetAsLastSibling();
+
+        if (Player3Show != null)
+            Player3Show.transform.SetAsLastSibling();
+
+        if (Player4Show != null)
+            Player4Show.transform.SetAsLastSibling();
+
+        if (players == null || cardNum == null)
+            return;
+
+        int count = Mathf.Min(
+            players.Count,
+            cardNum.Count
+        );
+
+        // Primero mostramos los jugadores.
+        for (int i = 0; i < count; i++)
+        {
+            string playerName = players[i];
+
+            if (string.IsNullOrEmpty(playerName))
+                continue;
+
+            PlayerShow show =
+                GetPlayerShow(playerName);
+
+            if (show != null)
             {
-                show.SeedBank.SpawnCardSlot(cardNum[i]);
+                if (!show.gameObject.activeSelf)
+                    ShowPlayer(
+                        show,
+                        playerName
+                    );
             }
         }
 
+        // Si todavía no existen los PlayerShow,
+        // asignamos los jugadores a los slots disponibles.
+        for (int i = 0; i < count; i++)
+        {
+            string playerName = players[i];
+
+            if (string.IsNullOrEmpty(playerName))
+                continue;
+
+            if (GetPlayerShow(playerName) != null)
+                continue;
+
+            if (Player2Show != null &&
+                !Player2Show.gameObject.activeSelf)
+            {
+                ShowPlayer(
+                    Player2Show,
+                    playerName
+                );
+            }
+            else if (Player3Show != null &&
+                     !Player3Show.gameObject.activeSelf)
+            {
+                ShowPlayer(
+                    Player3Show,
+                    playerName
+                );
+            }
+            else if (Player4Show != null &&
+                     !Player4Show.gameObject.activeSelf)
+            {
+                ShowPlayer(
+                    Player4Show,
+                    playerName
+                );
+            }
+        }
+
+        // Ahora que los PlayerShow ya tienen nombre,
+        // podemos crear sus SeedBank.
+        for (int i = 0; i < count; i++)
+        {
+            string playerName = players[i];
+
+            if (string.IsNullOrEmpty(playerName))
+                continue;
+
+            PlayerShow show =
+                GetPlayerShow(playerName);
+
+            if (show == null ||
+                show.SeedBank == null)
+            {
+                continue;
+            }
+
+            show.SeedBank.SpawnCardSlot(
+                cardNum[i]
+            );
+        }
+
+        UpdateAllMapSprites();
+    }
+
+    private void UpdateAllMapSprites()
+    {
         if (MapManager.Instance == null ||
+            MapManager.Instance.mapList == null ||
             MapManager.Instance.mapList.Count == 0)
         {
             return;
         }
 
+        MapBase map =
+            MapManager.Instance.mapList[0];
+
+        if (map == null)
+            return;
+
         Sprite mapSprite =
-            MapManager.Instance.mapList[0].GotoSprite;
+            map.GotoSprite;
 
-        if (HostShow.gameObject.activeSelf)
+        UpdateMapSprite(
+            HostShow,
+            mapSprite
+        );
+
+        UpdateMapSprite(
+            Player2Show,
+            mapSprite
+        );
+
+        UpdateMapSprite(
+            Player3Show,
+            mapSprite
+        );
+
+        UpdateMapSprite(
+            Player4Show,
+            mapSprite
+        );
+    }
+
+    private void UpdateMapSprite(
+        PlayerShow show,
+        Sprite mapSprite)
+    {
+        if (show == null ||
+            show.MapSprite == null ||
+            !show.gameObject.activeSelf)
         {
-            HostShow.MapSprite.sprite = mapSprite;
+            return;
         }
 
-        if (Player2Show.gameObject.activeSelf)
-        {
-            Player2Show.MapSprite.sprite = mapSprite;
-        }
-
-        if (Player3Show.gameObject.activeSelf)
-        {
-            Player3Show.MapSprite.sprite = mapSprite;
-        }
-
-        if (Player4Show.gameObject.activeSelf)
-        {
-            Player4Show.MapSprite.sprite = mapSprite;
-        }
+        show.MapSprite.sprite = mapSprite;
     }
 
     public void PreviewPlant(PlantPreview apply)
     {
+        if (apply == null)
+            return;
+
+        if (GameManager.Instance == null ||
+            GameManager.Instance.LocalPlayerSave == null ||
+            LV.Instance == null)
+        {
+            return;
+        }
+
         if (apply.PlayerName ==
             GameManager.Instance.LocalPlayerSave.playerName ||
             (LV.Instance.CurrLVType == LVType.PvP &&
-             !PvPSelector.Instance.IsSameTeam(apply.PlayerName)))
+             PvPSelector.Instance != null &&
+             !PvPSelector.Instance.IsSameTeam(
+                 apply.PlayerName)))
         {
             return;
         }
@@ -172,9 +350,7 @@ public class BattlePlayerList : MonoBehaviour
             GetPlayerShow(apply.PlayerName);
 
         if (show == null)
-        {
             return;
-        }
 
         if (apply.plantType == PlantType.Nope)
         {
@@ -190,9 +366,14 @@ public class BattlePlayerList : MonoBehaviour
                 show.plantInGrid = null;
             }
 
-            show.GridSeletor.gameObject.SetActive(false);
+            if (show.GridSeletor != null)
+                show.GridSeletor.gameObject.SetActive(false);
+
             return;
         }
+
+        if (MapManager.Instance == null)
+            return;
 
         Grid grid =
             MapManager.Instance.GetGridByWorldPos(
@@ -200,22 +381,29 @@ public class BattlePlayerList : MonoBehaviour
             );
 
         if (grid == null)
-        {
             return;
+
+        if (show.GridSeletor != null)
+        {
+            show.GridSeletor.gameObject.SetActive(true);
+
+            show.GridSeletor.transform.position =
+                grid.Position +
+                new Vector2(-0.5f, 0.3f);
         }
-
-        show.GridSeletor.gameObject.SetActive(true);
-
-        show.GridSeletor.transform.position =
-            grid.Position +
-            new Vector2(-0.5f, 0.3f);
 
         if (show.plantInGrid == null)
         {
+            if (PlantManager.Instance == null)
+                return;
+
             show.plantInGrid =
                 PlantManager.Instance.GetNewPlant(
                     apply.plantType
                 );
+
+            if (show.plantInGrid == null)
+                return;
 
             show.plantInGrid.transform.SetParent(
                 PlantManager.Instance.transform
@@ -235,10 +423,22 @@ public class BattlePlayerList : MonoBehaviour
 
     public void PreviewZombie(ZombiePreview apply)
     {
+        if (apply == null)
+            return;
+
+        if (GameManager.Instance == null ||
+            GameManager.Instance.LocalPlayerSave == null ||
+            LV.Instance == null)
+        {
+            return;
+        }
+
         if (apply.PlayerName ==
             GameManager.Instance.LocalPlayerSave.playerName ||
             (LV.Instance.CurrLVType == LVType.PvP &&
-             !PvPSelector.Instance.IsSameTeam(apply.PlayerName)))
+             PvPSelector.Instance != null &&
+             !PvPSelector.Instance.IsSameTeam(
+                 apply.PlayerName)))
         {
             return;
         }
@@ -247,9 +447,7 @@ public class BattlePlayerList : MonoBehaviour
             GetPlayerShow(apply.PlayerName);
 
         if (show == null)
-        {
             return;
-        }
 
         if (apply.zombieType == ZombieType.Nope)
         {
@@ -264,9 +462,14 @@ public class BattlePlayerList : MonoBehaviour
                 show.zombieInGrid = null;
             }
 
-            show.GridSeletor.gameObject.SetActive(false);
+            if (show.GridSeletor != null)
+                show.GridSeletor.gameObject.SetActive(false);
+
             return;
         }
+
+        if (MapManager.Instance == null)
+            return;
 
         Grid grid =
             MapManager.Instance.GetGridByWorldPos(
@@ -274,22 +477,32 @@ public class BattlePlayerList : MonoBehaviour
             );
 
         if (grid == null)
-        {
             return;
+
+        if (show.GridSeletor != null)
+        {
+            show.GridSeletor.gameObject.SetActive(true);
+
+            show.GridSeletor.transform.position =
+                grid.Position +
+                new Vector2(-0.5f, 0.3f);
         }
-
-        show.GridSeletor.gameObject.SetActive(true);
-
-        show.GridSeletor.transform.position =
-            grid.Position +
-            new Vector2(-0.5f, 0.3f);
 
         if (show.zombieInGrid == null)
         {
+            if (ZombieManager.Instance == null ||
+                PlantManager.Instance == null)
+            {
+                return;
+            }
+
             show.zombieInGrid =
                 ZombieManager.Instance.GetNewZombie(
                     apply.zombieType
                 );
+
+            if (show.zombieInGrid == null)
+                return;
 
             show.zombieInGrid.transform.SetParent(
                 PlantManager.Instance.transform
@@ -312,9 +525,17 @@ public class BattlePlayerList : MonoBehaviour
         Vector2 pos,
         bool isShow)
     {
+        if (GameManager.Instance == null ||
+            GameManager.Instance.LocalPlayerSave == null ||
+            LV.Instance == null)
+        {
+            return;
+        }
+
         if (playerName ==
             GameManager.Instance.LocalPlayerSave.playerName ||
             (LV.Instance.CurrLVType == LVType.PvP &&
+             PvPSelector.Instance != null &&
              !PvPSelector.Instance.IsSameTeam(playerName)))
         {
             return;
@@ -324,29 +545,33 @@ public class BattlePlayerList : MonoBehaviour
             GetPlayerShow(playerName);
 
         if (show == null)
-        {
             return;
-        }
 
         if (!isShow)
         {
-            show.GridSeletor.gameObject.SetActive(false);
+            if (show.GridSeletor != null)
+                show.GridSeletor.gameObject.SetActive(false);
+
             return;
         }
+
+        if (MapManager.Instance == null)
+            return;
 
         Grid grid =
             MapManager.Instance.GetGridByWorldPos(pos);
 
         if (grid == null)
-        {
             return;
+
+        if (show.GridSeletor != null)
+        {
+            show.GridSeletor.gameObject.SetActive(true);
+
+            show.GridSeletor.transform.position =
+                grid.Position +
+                new Vector2(-0.5f, 0.3f);
         }
-
-        show.GridSeletor.gameObject.SetActive(true);
-
-        show.GridSeletor.transform.position =
-            grid.Position +
-            new Vector2(-0.5f, 0.3f);
     }
 
     public void PlayShovelAnimation(
@@ -354,14 +579,23 @@ public class BattlePlayerList : MonoBehaviour
         int sound,
         string playerName)
     {
+        if (LV.Instance == null ||
+            MapManager.Instance == null)
+        {
+            return;
+        }
+
         if (LV.Instance.CurrLVType == LVType.PvP &&
+            PvPSelector.Instance != null &&
             !PvPSelector.Instance.IsSameTeam(playerName))
         {
             return;
         }
 
         Grid grid =
-            MapManager.Instance.GetGridByWorldPos(gridPos);
+            MapManager.Instance.GetGridByWorldPos(
+                gridPos
+            );
 
         if (grid == null ||
             ShovelAnims.Count == 0)
@@ -372,21 +606,33 @@ public class BattlePlayerList : MonoBehaviour
         ShovelAnimNum++;
 
         if (ShovelAnimNum >= ShovelAnims.Count)
-        {
             ShovelAnimNum = 0;
-        }
 
         Animator anim =
             ShovelAnims[ShovelAnimNum];
+
+        if (anim == null)
+            return;
 
         anim.transform.position =
             grid.Position +
             new Vector2(0.5f, 0.5f);
 
-        anim.Play("Shovel", 0, 0f);
+        anim.Play(
+            "Shovel",
+            0,
+            0f
+        );
 
         if (sound == 1)
         {
+            if (AudioManager.Instance == null ||
+                GameManager.Instance == null ||
+                GameManager.Instance.AudioConf == null)
+            {
+                return;
+            }
+
             if (Random.Range(1, 3) == 1)
             {
                 AudioManager.Instance.PlayEFAudio(
@@ -404,6 +650,13 @@ public class BattlePlayerList : MonoBehaviour
         }
         else if (sound == 2)
         {
+            if (AudioManager.Instance == null ||
+                GameManager.Instance == null ||
+                GameManager.Instance.AudioConf == null)
+            {
+                return;
+            }
+
             if (Random.Range(1, 3) == 1)
             {
                 AudioManager.Instance.PlayEFAudio(
@@ -426,31 +679,35 @@ public class BattlePlayerList : MonoBehaviour
         int type,
         string playerName)
     {
+        if (LV.Instance == null ||
+            MapManager.Instance == null)
+        {
+            return;
+        }
+
         if (LV.Instance.CurrLVType == LVType.PvP &&
+            PvPSelector.Instance != null &&
             !PvPSelector.Instance.IsSameTeam(playerName))
         {
             return;
         }
 
         if (HammerAnims.Count == 0)
-        {
             return;
-        }
 
         if (MapManager.Instance.GetGridByWorldPos(pos) == null)
-        {
             return;
-        }
 
         HammerAnimNum++;
 
         if (HammerAnimNum >= HammerAnims.Count)
-        {
             HammerAnimNum = 0;
-        }
 
         Animator anim =
             HammerAnims[HammerAnimNum];
+
+        if (anim == null)
+            return;
 
         anim.transform.position =
             pos +
@@ -473,10 +730,15 @@ public class BattlePlayerList : MonoBehaviour
             );
         }
 
-        AudioManager.Instance.PlayEFAudio(
-            GameManager.Instance.AudioConf.swing,
-            transform.position
-        );
+        if (AudioManager.Instance != null &&
+            GameManager.Instance != null &&
+            GameManager.Instance.AudioConf != null)
+        {
+            AudioManager.Instance.PlayEFAudio(
+                GameManager.Instance.AudioConf.swing,
+                transform.position
+            );
+        }
     }
 
     public void SelectCard(
@@ -488,7 +750,10 @@ public class BattlePlayerList : MonoBehaviour
         PlayerShow show =
             GetPlayerShow(playerName);
 
-        if (show == null)
+        if (show == null ||
+            show.SeedBank == null ||
+            SeedBank.Instance == null ||
+            LV.Instance == null)
         {
             return;
         }
@@ -498,19 +763,25 @@ public class BattlePlayerList : MonoBehaviour
                 ? SeedBank.Instance.GetZombieNc(zType)
                 : SeedBank.Instance.GetPlantNc(type);
 
+        if (card == null)
+            return;
+
         bool sameTeam = true;
 
         if (LV.Instance.CurrLVType == LVType.PvP)
         {
+            if (PvPSelector.Instance == null)
+                return;
+
             sameTeam =
                 PvPSelector.Instance.IsSameTeam(
-                    show.nameText.text
+                    show.nameText != null
+                        ? show.nameText.text
+                        : playerName
                 );
 
             if (sameTeam)
-            {
                 card.IsChoosed = true;
-            }
         }
         else
         {
@@ -518,9 +789,7 @@ public class BattlePlayerList : MonoBehaviour
         }
 
         if (!card.IsUnLock)
-        {
             sameTeam = false;
-        }
 
         show.SeedBank.ChooseCard(
             card,
@@ -535,7 +804,9 @@ public class BattlePlayerList : MonoBehaviour
         PlayerShow show =
             GetPlayerShow(playerName);
 
-        if (show == null)
+        if (show == null ||
+            show.SeedBank == null ||
+            LV.Instance == null)
         {
             return;
         }
@@ -544,9 +815,14 @@ public class BattlePlayerList : MonoBehaviour
 
         if (LV.Instance.CurrLVType == LVType.PvP)
         {
+            if (PvPSelector.Instance == null)
+                return;
+
             needAnim =
                 PvPSelector.Instance.IsSameTeam(
-                    show.nameText.text
+                    show.nameText != null
+                        ? show.nameText.text
+                        : playerName
                 );
         }
 
@@ -558,19 +834,25 @@ public class BattlePlayerList : MonoBehaviour
 
     public bool CheckPrepare()
     {
-        if (Player2Show.nameText.text != "" &&
+        if (Player2Show != null &&
+            Player2Show.nameText != null &&
+            Player2Show.nameText.text != "" &&
             !Player2Show.IsPrepare)
         {
             return false;
         }
 
-        if (Player3Show.nameText.text != "" &&
+        if (Player3Show != null &&
+            Player3Show.nameText != null &&
+            Player3Show.nameText.text != "" &&
             !Player3Show.IsPrepare)
         {
             return false;
         }
 
-        if (Player4Show.nameText.text != "" &&
+        if (Player4Show != null &&
+            Player4Show.nameText != null &&
+            Player4Show.nameText.text != "" &&
             !Player4Show.IsPrepare)
         {
             return false;
@@ -583,18 +865,20 @@ public class BattlePlayerList : MonoBehaviour
         string playerName,
         Vector2 pos)
     {
+        if (MapManager.Instance == null)
+            return;
+
         MapBase map =
             MapManager.Instance.GetCurrMap(pos);
 
         if (map == null)
-        {
             return;
-        }
 
         PlayerShow show =
             GetPlayerShow(playerName);
 
-        if (show != null)
+        if (show != null &&
+            show.MapSprite != null)
         {
             show.MapSprite.sprite =
                 map.GotoSprite;
@@ -654,9 +938,7 @@ public class BattlePlayerList : MonoBehaviour
         }
 
         if (players == null)
-        {
             return;
-        }
 
         UpdatePlayerSlot(
             Player2Show,
@@ -675,29 +957,33 @@ public class BattlePlayerList : MonoBehaviour
 
         for (int i = 0; i < players.Count; i++)
         {
+            if (players[i] == null)
+                continue;
+
             string playerName =
                 players[i].Name;
 
             if (Contain2(playerName))
-            {
                 continue;
-            }
 
-            if (!Player2Show.gameObject.activeSelf)
+            if (Player2Show != null &&
+                !Player2Show.gameObject.activeSelf)
             {
                 ShowPlayer(
                     Player2Show,
                     playerName
                 );
             }
-            else if (!Player3Show.gameObject.activeSelf)
+            else if (Player3Show != null &&
+                     !Player3Show.gameObject.activeSelf)
             {
                 ShowPlayer(
                     Player3Show,
                     playerName
                 );
             }
-            else if (!Player4Show.gameObject.activeSelf)
+            else if (Player4Show != null &&
+                     !Player4Show.gameObject.activeSelf)
             {
                 ShowPlayer(
                     Player4Show,
@@ -717,9 +1003,11 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        if (!Contain(
-            players,
-            show.nameText.text))
+        if (show.nameText == null ||
+            !Contain(
+                players,
+                show.nameText.text
+            ))
         {
             HidePlayer(show);
         }
@@ -729,9 +1017,13 @@ public class BattlePlayerList : MonoBehaviour
         List<PlayerInfo> players,
         string name)
     {
+        if (players == null)
+            return false;
+
         for (int i = 0; i < players.Count; i++)
         {
-            if (players[i].Name == name)
+            if (players[i] != null &&
+                players[i].Name == name)
             {
                 return true;
             }
@@ -743,20 +1035,24 @@ public class BattlePlayerList : MonoBehaviour
     private bool Contain2(string name)
     {
         return
-            (Player2Show.gameObject.activeSelf &&
+            (Player2Show != null &&
+             Player2Show.gameObject.activeSelf &&
+             Player2Show.nameText != null &&
              Player2Show.nameText.text == name) ||
-            (Player3Show.gameObject.activeSelf &&
+            (Player3Show != null &&
+             Player3Show.gameObject.activeSelf &&
+             Player3Show.nameText != null &&
              Player3Show.nameText.text == name) ||
-            (Player4Show.gameObject.activeSelf &&
+            (Player4Show != null &&
+             Player4Show.gameObject.activeSelf &&
+             Player4Show.nameText != null &&
              Player4Show.nameText.text == name);
     }
 
     private void ClearPreview(PlayerShow show)
     {
         if (show == null)
-        {
             return;
-        }
 
         if (show.plantInGrid != null)
         {

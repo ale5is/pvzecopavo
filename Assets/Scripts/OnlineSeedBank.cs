@@ -3,177 +3,469 @@ using UnityEngine;
 
 public class OnlineSeedBank : MonoBehaviour
 {
-	public int CardNum = 4;
+    public int CardNum = 4;
 
-	private int DecidedCardNum;
+    private int DecidedCardNum;
+    private int choosedNum;
 
-	private int choosedNum;
+    public bool isFull;
+    public bool isCanClick;
 
-	public bool isFull;
+    public Transform group;
+    public PlayerShow OwnerShow;
 
-	public bool isCanClick;
+    private RectTransform seedBank;
 
-	public Transform group;
+    private List<UIPlantCard> slotList =
+        new List<UIPlantCard>();
 
-	public PlayerShow OwnerShow;
+    private bool isInitialized;
 
-	private RectTransform seedBank;
+    public int ChoosedNum
+    {
+        get
+        {
+            return choosedNum;
+        }
+        set
+        {
+            choosedNum = value;
 
-	private List<UIPlantCard> slotList = new List<UIPlantCard>();
+            if (choosedNum >= CardNum)
+                isFull = true;
+            else
+                isFull = false;
+        }
+    }
 
-	public int ChoosedNum
-	{
-		get
-		{
-			return choosedNum;
-		}
-		set
-		{
-			choosedNum = value;
-			if (choosedNum >= CardNum)
-			{
-				isFull = true;
-			}
-			else
-			{
-				isFull = false;
-			}
-		}
-	}
+    private void Awake()
+    {
+        Initialize();
+    }
 
-	private void Start()
-	{
-		seedBank = base.transform.GetComponent<RectTransform>();
-		isFull = false;
-		isCanClick = true;
-	}
+    private void Initialize()
+    {
+        if (isInitialized)
+            return;
 
-	public UIPlantCard GetPreCard(UIPlantCard pC)
-	{
-		int num = slotList.IndexOf(pC);
-		if (num <= 0)
-		{
-			return null;
-		}
-		return slotList[num - 1];
-	}
+        seedBank =
+            transform as RectTransform;
 
-	public void UpdateCD(int cardID, bool isClear)
-	{
-		for (int i = 0; i < slotList.Count; i++)
-		{
-			if (slotList[i].CardId == cardID)
-			{
-				if (!isClear)
-				{
-					slotList[i].CDEnter();
-				}
-				else
-				{
-					slotList[i].currTimeForCd = 0f;
-				}
-				break;
-			}
-		}
-	}
+        isFull = false;
+        isCanClick = true;
 
-	public void UpdateSunNum(int sunNum)
-	{
-	}
+        isInitialized = true;
+    }
 
-	public void SpawnCardSlot(int soltNum)
-	{
-		ClearCardSlot();
-		CardNum = soltNum;
-		seedBank.sizeDelta = new Vector2(18 + CardNum * 48, seedBank.sizeDelta.y);
-		for (int i = 0; i < CardNum; i++)
-		{
-			UIPlantCard component = Object.Instantiate(GameManager.Instance.GameConf.UICardSlot).GetComponent<UIPlantCard>();
-			component.transform.SetParent(group);
-			component.CardId = i;
-			component.ownerSeedBank = this;
-			slotList.Add(component);
-			component.transform.localScale = new Vector3(1f, 1f);
-		}
-	}
+    private bool EnsureInitialized()
+    {
+        if (!isInitialized ||
+            seedBank == null)
+        {
+            seedBank =
+                transform as RectTransform;
 
-	public void ClearCardSlot()
-	{
-		for (int i = 0; i < slotList.Count; i++)
-		{
-			if (slotList[i].isChoosed)
-			{
-				if (GameManager.Instance.isServer && LVManager.Instance.GameIsStart)
-				{
-					SeedBank.Instance.AddCard(slotList[i].CardPlantType, slotList[i].CardZombieType, slotList[i].currTimeForCd, CanUnChoose: true, canAddSlot: true);
-				}
-				slotList[i].ClearChoose(noAnimation: false);
-				ChoosedNum--;
-			}
-			slotList[i].DestroyCardSlot();
-		}
-		ChoosedNum = 0;
-		slotList.Clear();
-	}
+            if (seedBank == null)
+            {
+                Debug.LogError(
+                    "OnlineSeedBank: " +
+                    gameObject.name +
+                    " no tiene RectTransform."
+                );
 
-	public void ChooseCard(UIPlantCardNC nC, bool needAnim)
-	{
-		for (int i = 0; i < slotList.Count; i++)
-		{
-			if (!slotList[i].isChoosed)
-			{
-				DecidedCardNum = i;
-				break;
-			}
-		}
-		slotList[DecidedCardNum].isChoosed = true;
-		ChoosedNum++;
-		if (needAnim)
-		{
-			UIPlantCardAnimation component = PoolManager.Instance.GetObj(GameManager.Instance.GameConf.CardSlotAnimation).GetComponent<UIPlantCardAnimation>();
-			component.transform.SetParent(UIManager.Instance.transform);
-			component.CreateInit(nC.transform.position, nC, null);
-			component.PlayChooseAnimation(OwnerShow.transform.position);
-		}
-		slotList[DecidedCardNum].AddChoose(nC);
-	}
+                return false;
+            }
 
-	public void ClearChoose(int cardId, bool needAnim)
-	{
-		ChoosedNum--;
-		UIPlantCard uIPlantCard = null;
-		for (int i = 0; i < slotList.Count; i++)
-		{
-			if (slotList[i].CardId == cardId)
-			{
-				uIPlantCard = slotList[i];
-				break;
-			}
-		}
-		if (!(uIPlantCard == null))
-		{
-			uIPlantCard.ClearChoose();
-			if (needAnim)
-			{
-				uIPlantCard.myPlantCard.IsChoosed = false;
-				UIPlantCardAnimation component = PoolManager.Instance.GetObj(GameManager.Instance.GameConf.CardSlotAnimation).GetComponent<UIPlantCardAnimation>();
-				component.transform.SetParent(UIManager.Instance.transform);
-				component.CreateInit(uIPlantCard.transform.position, uIPlantCard.myPlantCard, null);
-				component.PlayChooseAnimation(uIPlantCard.myPlantCard.transform.position);
-			}
-		}
-	}
+            isFull = false;
+            isCanClick = true;
 
-	public bool ClearCD(PlantType type)
-	{
-		for (int i = 0; i < slotList.Count; i++)
-		{
-			if (slotList[i].CardPlantType == type && slotList[i].currTimeForCd > 0f)
-			{
-				slotList[i].currTimeForCd = 0f;
-				return true;
-			}
-		}
-		return false;
-	}
+            isInitialized = true;
+        }
+
+        return true;
+    }
+
+    public UIPlantCard GetPreCard(
+        UIPlantCard pC)
+    {
+        int num =
+            slotList.IndexOf(pC);
+
+        if (num <= 0)
+            return null;
+
+        return slotList[num - 1];
+    }
+
+    public void UpdateCD(
+        int cardID,
+        bool isClear)
+    {
+        for (int i = 0;
+             i < slotList.Count;
+             i++)
+        {
+            UIPlantCard card =
+                slotList[i];
+
+            if (card == null)
+                continue;
+
+            if (card.CardId == cardID)
+            {
+                if (!isClear)
+                {
+                    card.CDEnter();
+                }
+                else
+                {
+                    card.currTimeForCd = 0f;
+                }
+
+                break;
+            }
+        }
+    }
+
+    public void UpdateSunNum(
+        int sunNum)
+    {
+    }
+
+    public void SpawnCardSlot(
+        int soltNum)
+    {
+        if (!EnsureInitialized())
+            return;
+
+        if (group == null)
+        {
+            Debug.LogError(
+                "OnlineSeedBank: " +
+                gameObject.name +
+                " no tiene asignado el Group."
+            );
+
+            return;
+        }
+
+        if (GameManager.Instance == null)
+        {
+            Debug.LogError(
+                "OnlineSeedBank: GameManager.Instance es null."
+            );
+
+            return;
+        }
+
+        if (GameManager.Instance.GameConf == null)
+        {
+            Debug.LogError(
+                "OnlineSeedBank: GameManager.Instance.GameConf es null."
+            );
+
+            return;
+        }
+
+        if (GameManager.Instance.GameConf.UICardSlot == null)
+        {
+            Debug.LogError(
+                "OnlineSeedBank: GameConf.UICardSlot es null."
+            );
+
+            return;
+        }
+
+        ClearCardSlot();
+
+        CardNum = Mathf.Max(
+            0,
+            soltNum
+        );
+
+        seedBank.sizeDelta =
+            new Vector2(
+                18f + CardNum * 48f,
+                seedBank.sizeDelta.y
+            );
+
+        for (int i = 0;
+             i < CardNum;
+             i++)
+        {
+            GameObject obj =
+                Object.Instantiate(
+                    GameManager.Instance.GameConf.UICardSlot
+                );
+
+            if (obj == null)
+            {
+                Debug.LogError(
+                    "OnlineSeedBank: No se pudo crear UICardSlot."
+                );
+
+                continue;
+            }
+
+            UIPlantCard component =
+                obj.GetComponent<UIPlantCard>();
+
+            if (component == null)
+            {
+                Debug.LogError(
+                    "OnlineSeedBank: UICardSlot no tiene UIPlantCard."
+                );
+
+                Object.Destroy(obj);
+                continue;
+            }
+
+            component.transform.SetParent(
+                group
+            );
+
+            component.CardId = i;
+
+            component.ownerSeedBank =
+                this;
+
+            slotList.Add(
+                component
+            );
+
+            component.transform.localScale =
+                new Vector3(
+                    1f,
+                    1f,
+                    1f
+                );
+        }
+    }
+
+    public void ClearCardSlot()
+    {
+        for (int i = 0;
+             i < slotList.Count;
+             i++)
+        {
+            UIPlantCard card =
+                slotList[i];
+
+            if (card == null)
+                continue;
+
+            if (card.isChoosed)
+            {
+                if (GameManager.Instance != null &&
+                    GameManager.Instance.isServer &&
+                    LVManager.Instance != null &&
+                    LVManager.Instance.GameIsStart)
+                {
+                    if (SeedBank.Instance != null)
+                    {
+                        SeedBank.Instance.AddCard(
+                            card.CardPlantType,
+                            card.CardZombieType,
+                            card.currTimeForCd,
+                            CanUnChoose: true,
+                            canAddSlot: true
+                        );
+                    }
+                }
+
+                card.ClearChoose(
+                    noAnimation: false
+                );
+
+                ChoosedNum--;
+            }
+
+            card.DestroyCardSlot();
+        }
+
+        ChoosedNum = 0;
+
+        slotList.Clear();
+    }
+
+    public void ChooseCard(
+        UIPlantCardNC nC,
+        bool needAnim)
+    {
+        if (nC == null)
+            return;
+
+        if (slotList.Count == 0)
+            return;
+
+        DecidedCardNum = -1;
+
+        for (int i = 0;
+             i < slotList.Count;
+             i++)
+        {
+            UIPlantCard card =
+                slotList[i];
+
+            if (card != null &&
+                !card.isChoosed)
+            {
+                DecidedCardNum = i;
+                break;
+            }
+        }
+
+        if (DecidedCardNum < 0 ||
+            DecidedCardNum >= slotList.Count)
+        {
+            return;
+        }
+
+        UIPlantCard selectedCard =
+            slotList[DecidedCardNum];
+
+        if (selectedCard == null)
+            return;
+
+        selectedCard.isChoosed = true;
+
+        ChoosedNum++;
+
+        if (needAnim)
+        {
+            if (PoolManager.Instance == null ||
+                GameManager.Instance == null ||
+                GameManager.Instance.GameConf == null ||
+                GameManager.Instance.GameConf.CardSlotAnimation == null ||
+                UIManager.Instance == null)
+            {
+                selectedCard.AddChoose(nC);
+                return;
+            }
+
+            UIPlantCardAnimation component =
+                PoolManager.Instance.GetObj(
+                    GameManager.Instance.GameConf.CardSlotAnimation
+                ).GetComponent<UIPlantCardAnimation>();
+
+            if (component != null)
+            {
+                component.transform.SetParent(
+                    UIManager.Instance.transform
+                );
+
+                if (OwnerShow != null)
+                {
+                    component.CreateInit(
+                        nC.transform.position,
+                        nC,
+                        null
+                    );
+
+                    component.PlayChooseAnimation(
+                        OwnerShow.transform.position
+                    );
+                }
+            }
+        }
+
+        selectedCard.AddChoose(
+            nC
+        );
+    }
+
+    public void ClearChoose(
+        int cardId,
+        bool needAnim)
+    {
+        ChoosedNum--;
+
+        UIPlantCard uIPlantCard = null;
+
+        for (int i = 0;
+             i < slotList.Count;
+             i++)
+        {
+            UIPlantCard card =
+                slotList[i];
+
+            if (card == null)
+                continue;
+
+            if (card.CardId == cardId)
+            {
+                uIPlantCard = card;
+                break;
+            }
+        }
+
+        if (uIPlantCard == null)
+            return;
+
+        uIPlantCard.ClearChoose();
+
+        if (!needAnim)
+            return;
+
+        if (uIPlantCard.myPlantCard == null)
+            return;
+
+        uIPlantCard.myPlantCard.IsChoosed =
+            false;
+
+        if (PoolManager.Instance == null ||
+            GameManager.Instance == null ||
+            GameManager.Instance.GameConf == null ||
+            GameManager.Instance.GameConf.CardSlotAnimation == null ||
+            UIManager.Instance == null)
+        {
+            return;
+        }
+
+        UIPlantCardAnimation component =
+            PoolManager.Instance.GetObj(
+                GameManager.Instance.GameConf.CardSlotAnimation
+            ).GetComponent<UIPlantCardAnimation>();
+
+        if (component == null)
+            return;
+
+        component.transform.SetParent(
+            UIManager.Instance.transform
+        );
+
+        component.CreateInit(
+            uIPlantCard.transform.position,
+            uIPlantCard.myPlantCard,
+            null
+        );
+
+        component.PlayChooseAnimation(
+            uIPlantCard.myPlantCard.transform.position
+        );
+    }
+
+    public bool ClearCD(
+        PlantType type)
+    {
+        for (int i = 0;
+             i < slotList.Count;
+             i++)
+        {
+            UIPlantCard card =
+                slotList[i];
+
+            if (card == null)
+                continue;
+
+            if (card.CardPlantType == type &&
+                card.currTimeForCd > 0f)
+            {
+                card.currTimeForCd = 0f;
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

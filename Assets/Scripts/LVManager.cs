@@ -11,7 +11,7 @@ public class LVManager : MonoBehaviour
     public static LVManager Instance;
 
     [Header("Battle UI")]
-    
+    [SerializeField] private BattlePlayerList battlePlayerList;
 
     public bool LvSpawnisOver;
     public bool BootyIsAppeared;
@@ -37,13 +37,20 @@ public class LVManager : MonoBehaviour
     private bool isWaitSpawn;
     private bool waitingGoNextWave;
 
-    public bool InGame => MapManager.Instance.mapList.Count > 0;
-    public bool GameIsStart => currLVState == LVState.Fighting;
+    public bool InGame =>
+        MapManager.Instance != null &&
+        MapManager.Instance.mapList != null &&
+        MapManager.Instance.mapList.Count > 0;
+
+    public bool GameIsStart =>
+        currLVState == LVState.Fighting;
+
     public bool IsRestTime { get; private set; }
 
     public LVState CurrLVState
     {
         get => currLVState;
+
         private set
         {
             currLVState = value;
@@ -64,94 +71,138 @@ public class LVManager : MonoBehaviour
     public int CurrLVWave
     {
         get => currLVWave;
+
         set
         {
             currLVWave = value;
 
-            if (value < LV.Instance.Weights[0].Count)
+            if (LV.Instance != null &&
+                LV.Instance.Weights.Count > 0 &&
+                value < LV.Instance.Weights[0].Count)
             {
                 AutoStartNextWave();
                 return;
             }
 
             LvSpawnisOver = true;
-            SocketServer.Instance.BigWaveComing(
-                new WaveComing { WaveType = 3 }
-            );
+
+            if (SocketServer.Instance != null)
+            {
+                SocketServer.Instance.BigWaveComing(
+                    new WaveComing
+                    {
+                        WaveType = 3
+                    }
+                );
+            }
         }
     }
 
     public int LvTotalTime
     {
         get => lvTotalTime;
+
         set
         {
-            if (GameManager.Instance.isClient)
+            if (GameManager.Instance == null ||
+                GameManager.Instance.isClient)
+            {
                 return;
+            }
 
             int previous = lvTotalTime;
 
             if (!StopSpawn)
-                lvTotalTime = value;
+                lvTotalTime = Mathf.Max(0, value);
 
-            if (lvTotalTime < 0)
-                lvTotalTime = 0;
-
-            if (lvTotalTime == 0)
-                FlagMeter.Instance.SetRestTimeText(null);
-
-            if (previous > 10 && lvTotalTime < 10)
-                SkipRestBtn.Instance.CloseBtn();
-
-            if (LV.Instance.SubLvs.Count > CurrSubLv || IsRestTime)
+            if (lvTotalTime == 0 &&
+                FlagMeter.Instance != null)
             {
-                if (previous > 0 && value == 0 && !waitingGoNextWave)
+                FlagMeter.Instance.SetRestTimeText(null);
+            }
+
+            if (previous > 10 &&
+                lvTotalTime < 10 &&
+                SkipRestBtn.Instance != null)
+            {
+                SkipRestBtn.Instance.CloseBtn();
+            }
+
+            if (LV.Instance != null &&
+                (LV.Instance.SubLvs.Count > CurrSubLv ||
+                 IsRestTime))
+            {
+                if (previous > 0 &&
+                    value == 0 &&
+                    !waitingGoNextWave)
                 {
                     if (!isWaitSpawn)
                         GoNextSubLv();
 
                     AllTime();
+
                     IsRestTime = false;
                     isWaitSpawn = false;
+
                     AutoStartNextWave();
 
-                    PlayEffect(GameManager.Instance.AudioConf.Awooga);
+                    if (GameManager.Instance.AudioConf != null)
+                    {
+                        PlayEffect(
+                            GameManager.Instance.AudioConf.Awooga
+                        );
+                    }
                 }
             }
 
-            FlagMeter.Instance.SetRestTimeText(
-                IsRestTime
-                    ? "下次进攻还有" + LvTotalTime + "秒"
-                    : null
-            );
+            if (FlagMeter.Instance != null)
+            {
+                FlagMeter.Instance.SetRestTimeText(
+                    IsRestTime
+                        ? "下次进攻还有" + LvTotalTime + "秒"
+                        : null
+                );
+            }
         }
     }
 
     private void Awake()
     {
         Instance = this;
+
+        if (battlePlayerList == null)
+        {
+            Debug.LogWarning(
+                "LVManager: BattlePlayerList no está asignado en el Inspector."
+            );
+        }
     }
 
     public string LvTypeName(LVType type)
     {
-        if (type == LVType.Normal)
-            return "普通模式";
+        switch (type)
+        {
+            case LVType.Normal:
+                return "普通模式";
 
-        if (type == LVType.PvP)
-            return "玩家对战";
+            case LVType.PvP:
+                return "玩家对战";
 
-        if (type == LVType.IZombie)
-            return "我是僵尸";
+            case LVType.IZombie:
+                return "我是僵尸";
 
-        if (type == LVType.VaseBreaker)
-            return "砸罐子";
+            case LVType.VaseBreaker:
+                return "砸罐子";
 
-        return "";
+            default:
+                return "";
+        }
     }
 
     private void PlayEffect(AudioClip audio)
     {
-        if (AudioManager.Instance != null && audio != null)
+        if (audio != null &&
+            AudioManager.Instance != null)
         {
             AudioManager.Instance.PlayEFAudio(
                 audio,
@@ -161,10 +212,21 @@ public class LVManager : MonoBehaviour
         }
     }
 
-    public void StartGame(LoadLVBag loadBag, int LVId)
+    public void StartGame(
+        LoadLVBag loadBag,
+        int LVId)
     {
-        if (InGame || (GameManager.Instance.isClient && loadBag == null))
+        if (InGame)
             return;
+
+        if (GameManager.Instance == null)
+            return;
+
+        if (GameManager.Instance.isClient &&
+            loadBag == null)
+        {
+            return;
+        }
 
         AudioManager.Instance.StopBgAudio();
         CameraControl.Instance.InAcvment = false;
@@ -175,12 +237,19 @@ public class LVManager : MonoBehaviour
         AlmanacScence.Instance.BackMenu();
         GobalLight.Instance.InitIntensity();
 
-        StartLv(loadBag, LVId, true);
+        StartLv(
+            loadBag,
+            LVId,
+            true
+        );
 
         PlayerManager.Instance.ResetSunNum();
         GoOtherMap.Instance.LoadInit();
         PlantManager.Instance.LoadLvStartPlant();
-        Timetable.Instance.UpdateTempt(CameraControl.Instance.CurrMap);
+
+        Timetable.Instance.UpdateTempt(
+            CameraControl.Instance.CurrMap
+        );
 
         Timetable.Instance.gameObject.SetActive(
             LV.Instance.CurrLVType != LVType.IZombie &&
@@ -193,14 +262,26 @@ public class LVManager : MonoBehaviour
         int LVId,
         bool needloadLv)
     {
-        int lvSeed = UnityEngine.Random.Range(
-            1000000,
-            9999999
-        );
+        if (GameManager.Instance == null ||
+            LV.Instance == null ||
+            SpectatorList.Instance == null)
+        {
+            Debug.LogError(
+                "LVManager: faltan GameManager, LV o SpectatorList."
+            );
+            return;
+        }
+
+        int lvSeed =
+            UnityEngine.Random.Range(
+                1000000,
+                9999999
+            );
 
         CurrLVState = LVState.Start;
 
-        if (GameManager.Instance.isClient && loadBag != null)
+        if (GameManager.Instance.isClient &&
+            loadBag != null)
         {
             lvSeed = loadBag.LvSeed;
 
@@ -213,13 +294,19 @@ public class LVManager : MonoBehaviour
             }
             else
             {
-                for (int i = 0; i < loadBag.NameList.Count; i++)
+                for (
+                    int i = 0;
+                    i < loadBag.NameList.Count;
+                    i++
+                )
                 {
                     if (
                         loadBag.NameList[i] !=
                         GameManager.Instance.LocalPlayerSave.playerName
                     )
+                    {
                         continue;
+                    }
 
                     SeedBank.Instance.CardNum =
                         loadBag.CardNumList[i];
@@ -228,7 +315,7 @@ public class LVManager : MonoBehaviour
                 }
             }
 
-            BattlePlayerList.Instance.LoadAllSeedBank(
+            LoadBattlePlayerList(
                 loadBag.NameList,
                 loadBag.CardNumList
             );
@@ -258,145 +345,29 @@ public class LVManager : MonoBehaviour
 
             if (LV.Instance.CurrLVType == LVType.PvP)
             {
-                int cardNum = PvPSelector.Instance.CardNum;
-                int redCount =
-                    PvPSelector.Instance.RedTeamNames.Count;
-                int blueCount =
-                    PvPSelector.Instance.BlueTeamNames.Count;
-
-                int redBase = cardNum / redCount;
-                int redExtra = cardNum % redCount;
-
-                int blueBase = cardNum / blueCount;
-                int blueExtra = cardNum % blueCount;
-
-                bool redAssigned = false;
-                bool blueAssigned = false;
-
-                foreach (string player in players)
-                {
-                    if (
-                        PvPSelector.Instance.RedTeamNames
-                            .Contains(player)
-                    )
-                    {
-                        cardNums.Add(
-                            redAssigned
-                                ? redBase
-                                : redBase + redExtra
-                        );
-
-                        redAssigned = true;
-                    }
-                    else if (
-                        PvPSelector.Instance.BlueTeamNames
-                            .Contains(player)
-                    )
-                    {
-                        cardNums.Add(
-                            blueAssigned
-                                ? blueBase
-                                : blueBase + blueExtra
-                        );
-
-                        blueAssigned = true;
-                    }
-                }
-
-                SeedBank.Instance.CardNum = 0;
-
-                for (int i = 0; i < players.Count; i++)
-                {
-                    if (
-                        players[i] !=
-                        GameManager.Instance.LocalPlayerSave.playerName
-                    )
-                        continue;
-
-                    SeedBank.Instance.CardNum =
-                        cardNums[i];
-
-                    break;
-                }
+                CalculatePvPCardNumbers(
+                    players,
+                    cardNums
+                );
             }
             else
             {
-                int cardNum =
-                    LV.Instance.CardNum >= 0
-                        ? LV.Instance.CardNum
-                        : GameManager.Instance.LocalPlayerSave.CardSlotNum +
-                          GameManager.Instance.LocalPlayerSave.SpItems
-                              .FindAll(
-                                  x => x == SpItem.StoreCardSlot
-                              )
-                              .Count;
-
-                if (!LV.Instance.BanMultyCardAdd)
-                    cardNum += players.Count - 1;
-
-                List<int> slots = new(cardNum);
-
-                for (int i = 0; i < cardNum; i++)
-                    slots.Add(0);
-
-                List<List<int>> split =
-                    MyTool.SplitByNumberOfLists(
-                        slots,
-                        players.Count
-                    );
-
-                foreach (List<int> list in split)
-                    cardNums.Add(list.Count);
-
-                SeedBank.Instance.CardNum =
-                    split[0].Count;
+                CalculateNormalCardNumbers(
+                    players,
+                    cardNums
+                );
             }
 
             if (SpectatorList.Instance.LocalIsSpectator)
                 SeedBank.Instance.CardNum = 0;
 
-            LoadLVBag bag = new()
-            {
-                LvId = LVId,
-                LvSeed = lvSeed,
-                LvName = LV.Instance.LvName,
-                dayBgm = LV.Instance.DayBgm,
-                nightBgm = LV.Instance.NightBgm,
-                BankType = LV.Instance.CurrBankType,
-                SeedBankType = LV.Instance.CurrSeedBankType,
-                LoadMapTypes = LV.Instance.LoadMapTypes,
-                LvSpStates = LV.Instance.LvSpStates,
-                CardNumList = cardNums,
-                NameList = players,
-                BoolTypes = new List<bool>
-                {
-                    LevelSelector.Instance.IsEasy,
-                    LV.Instance.EnableShovel,
-                    LV.Instance.EnablePlantGlove,
-                    LV.Instance.EnableZombieGlove
-                }
-            };
-
-            List<ZombieType> zombieTypes = new();
-            List<int> zombieSplits = new();
-
-            for (
-                int i = 0;
-                i < LV.Instance.ZombieTypes.Count;
-                i++
-            )
-            {
-                zombieSplits.Add(
-                    LV.Instance.ZombieTypes[i].Count
+            LoadLVBag bag =
+                CreateLoadLVBag(
+                    LVId,
+                    lvSeed,
+                    players,
+                    cardNums
                 );
-
-                zombieTypes.AddRange(
-                    LV.Instance.ZombieTypes[i]
-                );
-            }
-
-            bag.ZTypesSplit = zombieSplits;
-            bag.ZombieTypes = zombieTypes;
 
             SocketServer.Instance.LoadLv(bag);
         }
@@ -423,22 +394,22 @@ public class LVManager : MonoBehaviour
                 else
                 {
                     int extraCards =
-                        GameManager.Instance.LocalPlayerSave.SpItems
+                        GameManager.Instance.LocalPlayerSave
+                            .SpItems
                             .FindAll(
                                 x => x == SpItem.StoreCardSlot
                             )
                             .Count;
 
                     SeedBank.Instance.CardNum =
-                        GameManager.Instance.LocalPlayerSave.CardSlotNum +
+                        GameManager.Instance.LocalPlayerSave
+                            .CardSlotNum +
                         extraCards;
                 }
             }
 
-            if (
-                needloadLv &&
-                LV.Instance.CurrLVType == LVType.Normal
-            )
+            if (needloadLv &&
+                LV.Instance.CurrLVType == LVType.Normal)
             {
                 MapManager.Instance.CreateAllMower();
             }
@@ -446,7 +417,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            BattlePlayerList.Instance.LoadAllSeedBank(
+            LoadBattlePlayerList(
                 players,
                 cardNums
             );
@@ -471,12 +442,12 @@ public class LVManager : MonoBehaviour
 
         SeedBank.Instance.SpawnCardSlot();
 
-        if (
-            CurrSubLv == 0 ||
-            CurrSubLv > 0 && LvTotalTime > 0
-        )
+        if (CurrSubLv == 0 ||
+            CurrSubLv > 0 &&
+            LvTotalTime > 0)
         {
-            Vector2 position = new(-3.5f, 0f);
+            Vector2 position =
+                new(-3.5f, 0f);
 
             if (LV.Instance.CurrLVType == LVType.PvP)
             {
@@ -494,8 +465,8 @@ public class LVManager : MonoBehaviour
                 PlayChooseCardBgAudio();
             }
             else if (
-                LV.Instance.CurrLVType == LVType.IZombie
-            )
+                LV.Instance.CurrLVType ==
+                LVType.IZombie)
             {
                 LoadFixedCard(
                     LV.Instance.FixedCard
@@ -513,8 +484,7 @@ public class LVManager : MonoBehaviour
             }
             else if (
                 LV.Instance.CurrLVType ==
-                LVType.VaseBreaker
-            )
+                LVType.VaseBreaker)
             {
                 LoadFixedCard(
                     LV.Instance.FixedCard
@@ -559,6 +529,7 @@ public class LVManager : MonoBehaviour
                 UnityEngine.Random.InitState(lvSeed);
 
                 PlayChooseCardBgAudio();
+
                 ZombieManager.Instance.ShowZombie();
 
                 CameraControl.Instance.MoveForLVStart(
@@ -567,7 +538,8 @@ public class LVManager : MonoBehaviour
             }
         }
 
-        if (CurrSubLv > 0 && LvTotalTime == 0)
+        if (CurrSubLv > 0 &&
+            LvTotalTime == 0)
         {
             LoadFixedCard(
                 LV.Instance.FixedCard
@@ -583,21 +555,244 @@ public class LVManager : MonoBehaviour
         }
     }
 
+    private void LoadBattlePlayerList(
+        List<string> players,
+        List<int> cardNums)
+    {
+        if (battlePlayerList == null)
+        {
+            Debug.LogError(
+                "LVManager: BattlePlayerList no está asignado en el Inspector."
+            );
+            return;
+        }
+
+        GameObject battleObject =
+            battlePlayerList.gameObject;
+
+        /*
+         * BattlePlayerList puede estar desactivado al iniciar
+         * para que la UI no sea visible.
+         *
+         * Lo activamos antes de usar sus OnlineSeedBank.
+         * Al activarse, Unity ejecuta Awake() de los componentes
+         * que todavía no habían sido inicializados.
+         */
+        if (!battleObject.activeSelf)
+            battleObject.SetActive(true);
+
+        battlePlayerList.LoadAllSeedBank(
+            players,
+            cardNums
+        );
+    }
+
+    private void CalculatePvPCardNumbers(
+        List<string> players,
+        List<int> cardNums)
+    {
+        int cardNum =
+            PvPSelector.Instance.CardNum;
+
+        int redCount =
+            PvPSelector.Instance.RedTeamNames.Count;
+
+        int blueCount =
+            PvPSelector.Instance.BlueTeamNames.Count;
+
+        int redBase =
+            redCount > 0
+                ? cardNum / redCount
+                : 0;
+
+        int redExtra =
+            redCount > 0
+                ? cardNum % redCount
+                : 0;
+
+        int blueBase =
+            blueCount > 0
+                ? cardNum / blueCount
+                : 0;
+
+        int blueExtra =
+            blueCount > 0
+                ? cardNum % blueCount
+                : 0;
+
+        bool redAssigned = false;
+        bool blueAssigned = false;
+
+        foreach (string player in players)
+        {
+            if (
+                PvPSelector.Instance.RedTeamNames
+                    .Contains(player)
+            )
+            {
+                cardNums.Add(
+                    redAssigned
+                        ? redBase
+                        : redBase + redExtra
+                );
+
+                redAssigned = true;
+            }
+            else if (
+                PvPSelector.Instance.BlueTeamNames
+                    .Contains(player)
+            )
+            {
+                cardNums.Add(
+                    blueAssigned
+                        ? blueBase
+                        : blueBase + blueExtra
+                );
+
+                blueAssigned = true;
+            }
+            else
+            {
+                cardNums.Add(0);
+            }
+        }
+
+        SeedBank.Instance.CardNum = 0;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (
+                players[i] ==
+                GameManager.Instance.LocalPlayerSave.playerName
+            )
+            {
+                SeedBank.Instance.CardNum =
+                    cardNums[i];
+
+                break;
+            }
+        }
+    }
+
+    private void CalculateNormalCardNumbers(
+        List<string> players,
+        List<int> cardNums)
+    {
+        int cardNum =
+            LV.Instance.CardNum >= 0
+                ? LV.Instance.CardNum
+                : GameManager.Instance.LocalPlayerSave.CardSlotNum +
+                  GameManager.Instance.LocalPlayerSave.SpItems
+                      .FindAll(
+                          x => x == SpItem.StoreCardSlot
+                      )
+                      .Count;
+
+        if (!LV.Instance.BanMultyCardAdd)
+            cardNum += players.Count - 1;
+
+        if (players.Count == 0)
+        {
+            SeedBank.Instance.CardNum = 0;
+            return;
+        }
+
+        List<int> slots =
+            new(cardNum);
+
+        for (int i = 0; i < cardNum; i++)
+            slots.Add(0);
+
+        List<List<int>> split =
+            MyTool.SplitByNumberOfLists(
+                slots,
+                players.Count
+            );
+
+        foreach (List<int> list in split)
+            cardNums.Add(list.Count);
+
+        SeedBank.Instance.CardNum =
+            split.Count > 0
+                ? split[0].Count
+                : 0;
+    }
+
+    private LoadLVBag CreateLoadLVBag(
+        int LVId,
+        int lvSeed,
+        List<string> players,
+        List<int> cardNums)
+    {
+        LoadLVBag bag = new()
+        {
+            LvId = LVId,
+            LvSeed = lvSeed,
+            LvName = LV.Instance.LvName,
+            dayBgm = LV.Instance.DayBgm,
+            nightBgm = LV.Instance.NightBgm,
+            BankType = LV.Instance.CurrBankType,
+            SeedBankType = LV.Instance.CurrSeedBankType,
+            LoadMapTypes = LV.Instance.LoadMapTypes,
+            LvSpStates = LV.Instance.LvSpStates,
+            CardNumList = cardNums,
+            NameList = players,
+            BoolTypes = new List<bool>
+            {
+                LevelSelector.Instance.IsEasy,
+                LV.Instance.EnableShovel,
+                LV.Instance.EnablePlantGlove,
+                LV.Instance.EnableZombieGlove
+            }
+        };
+
+        List<ZombieType> zombieTypes = new();
+        List<int> zombieSplits = new();
+
+        for (
+            int i = 0;
+            i < LV.Instance.ZombieTypes.Count;
+            i++
+        )
+        {
+            List<ZombieType> types =
+                LV.Instance.ZombieTypes[i];
+
+            zombieSplits.Add(types.Count);
+            zombieTypes.AddRange(types);
+        }
+
+        bag.ZTypesSplit = zombieSplits;
+        bag.ZombieTypes = zombieTypes;
+
+        return bag;
+    }
+
     private void PlayChooseCardBgAudio()
     {
         if (GameManager.Instance.isClient)
+        {
             StartCoroutine(
                 WaitTimeDo(
                     PLayChooseCard,
                     0.1f
                 )
             );
+        }
         else
+        {
             PLayChooseCard();
+        }
     }
 
     private void PLayChooseCard()
     {
+        if (AudioManager.Instance == null ||
+            SkyManager.Instance == null)
+        {
+            return;
+        }
+
         AudioManager.Instance.PlayBgAudio(
             SkyManager.Instance.GetIsDay()
                 ? BgmType.ChooseYourSeeds
@@ -629,7 +824,7 @@ public class LVManager : MonoBehaviour
         );
 
         CameraControl.Instance.SetPosition(
-            new Vector2(0f, -30f)
+            Vector2.down * 30f
         );
 
         StartSceneManager.Instance.LoadStartScence(
@@ -639,8 +834,6 @@ public class LVManager : MonoBehaviour
 
     public void ReStartGame()
     {
-        // StatsManager puede no existir en determinadas escenas.
-        // El reinicio no debe detenerse por eso.
         if (StatsManager.Instance != null)
         {
             StatsManager.Instance.AddStatsNum(
@@ -677,14 +870,13 @@ public class LVManager : MonoBehaviour
 
         UIManager.Instance.StopLVStartEF();
 
-        UIManager.Instance.OverPanel.gameObject.SetActive(
-            false
-        );
+        UIManager.Instance.OverPanel.gameObject.SetActive(false);
 
         PlantManager.Instance.LvReset();
         ZombieManager.Instance.LvReset();
         SkyManager.Instance.ResetAll();
         MapManager.Instance.ResetScence();
+
         PoolManager.Instance.ClearPool();
 
         UIManager.Instance.LogPanel.Close();
@@ -694,9 +886,7 @@ public class LVManager : MonoBehaviour
         Timetable.Instance.LvReset();
         EffectPanel.Instance.LvReset();
 
-        UIManager.Instance.LastStandBtn.gameObject.SetActive(
-            false
-        );
+        UIManager.Instance.LastStandBtn.gameObject.SetActive(false);
 
         for (
             int i = transform.childCount - 1;
@@ -735,7 +925,10 @@ public class LVManager : MonoBehaviour
         SeedBank.Instance.ClearCardSlot();
         SeedBank.Instance.StartMoveBack(false);
 
-        SetChoosers(false, false);
+        SetChoosers(
+            false,
+            false
+        );
 
         NextWaveBtn.Instance.CloseBtn();
         SkipRestBtn.Instance.CloseBtn();
@@ -757,6 +950,7 @@ public class LVManager : MonoBehaviour
         {
             SeedChooser.Instance.StopAllCoroutines();
             SeedChooser.Instance.ResetThis();
+
             SeedChooser.Instance.gameObject.SetActive(
                 seedChooser
             );
@@ -769,6 +963,7 @@ public class LVManager : MonoBehaviour
         {
             ZombieChooser.Instance.StopAllCoroutines();
             ZombieChooser.Instance.ResetThis();
+
             ZombieChooser.Instance.gameObject.SetActive(
                 zombieChooser
             );
@@ -793,9 +988,12 @@ public class LVManager : MonoBehaviour
             );
         }
 
-        StatsManager.Instance.AddStatsNum(
-            StatsEnum.FailNum
-        );
+        if (StatsManager.Instance != null)
+        {
+            StatsManager.Instance.AddStatsNum(
+                StatsEnum.FailNum
+            );
+        }
 
         StopAllCoroutines();
 
@@ -964,6 +1162,7 @@ public class LVManager : MonoBehaviour
                 )
                 {
                     LevelSelector.Instance.LoadLastLv();
+
                     StartGame(
                         null,
                         LV.Instance.CurrLvId
@@ -1045,6 +1244,9 @@ public class LVManager : MonoBehaviour
 
         List<string> players =
             SpectatorList.Instance.GetNoSpectatorPlayerList();
+
+        if (players.Count == 0)
+            return;
 
         List<List<CardType>> splitCards =
             MyTool.SplitByNumberOfLists(
@@ -1139,17 +1341,14 @@ public class LVManager : MonoBehaviour
     {
         CurrLVWave++;
 
-        ZombieManager.Instance
-            .RemoveAllZombieDeadAction(
-                OnAllZombieDeadAction
-            );
+        ZombieManager.Instance.RemoveAllZombieDeadAction(
+            OnAllZombieDeadAction
+        );
 
         if (AutoNextWaveCoroutine != null)
-        {
             StopCoroutine(
                 AutoNextWaveCoroutine
             );
-        }
 
         AutoNextWaveCoroutine = null;
     }
@@ -1230,10 +1429,11 @@ public class LVManager : MonoBehaviour
 
         if (CurrSubLv == 0)
         {
-            float time = UnityEngine.Random.Range(
-                LV.Instance.SetupTime.x,
-                LV.Instance.SetupTime.y
-            );
+            float time =
+                UnityEngine.Random.Range(
+                    LV.Instance.SetupTime.x,
+                    LV.Instance.SetupTime.y
+                );
 
             StartCoroutine(
                 WaitTimeDo(
@@ -1244,8 +1444,7 @@ public class LVManager : MonoBehaviour
                         AutoStartNextWave();
 
                         PlayEffect(
-                            GameManager.Instance
-                                .AudioConf.Awooga
+                            GameManager.Instance.AudioConf.Awooga
                         );
                     },
                     time
@@ -1259,11 +1458,9 @@ public class LVManager : MonoBehaviour
             SkipRestBtn.Instance.CanSkipWave();
 
             if (RestSpawnCoroutine != null)
-            {
                 StopCoroutine(
                     RestSpawnCoroutine
                 );
-            }
 
             RestSpawnCoroutine =
                 StartCoroutine(
@@ -1331,9 +1528,7 @@ public class LVManager : MonoBehaviour
         }
         else
         {
-            yield return new WaitForSeconds(
-                time
-            );
+            yield return new WaitForSeconds(time);
         }
 
         CanHandNextWave = false;
@@ -1432,8 +1627,7 @@ public class LVManager : MonoBehaviour
                 {
                     ZombieManager.Instance
                         .UpdateZombieOnRandomLine(
-                            LV.Instance
-                                .BigWaveFixedZombie[j],
+                            LV.Instance.BigWaveFixedZombie[j],
                             mapPos
                         );
                 }
@@ -1451,12 +1645,7 @@ public class LVManager : MonoBehaviour
         {
             if (StopSpawn)
             {
-                Debug.Log("等待中");
-
-                yield return new WaitForSeconds(
-                    1f
-                );
-
+                yield return new WaitForSeconds(1f);
                 continue;
             }
 
@@ -1504,8 +1693,7 @@ public class LVManager : MonoBehaviour
                         (
                             CurrLVWave >=
                                 LV.Instance.ProphaseLimitWave ||
-                            !LV.Instance
-                                .ProphaseLimitZombie
+                            !LV.Instance.ProphaseLimitZombie
                                 .Contains(type)
                         )
                     )
@@ -1528,33 +1716,33 @@ public class LVManager : MonoBehaviour
                     break;
                 }
 
+                MapBase map =
+                    MapManager.Instance.mapList[i];
+
                 Vector3 position =
-                    MapManager.Instance.mapList[i]
-                        .transform.position;
+                    map.transform.position;
+
+                bool spawned = false;
 
                 ZombieType zombieType =
                     LV.Instance.ZombieTypes[i][index];
 
-                bool spawned = false;
-
                 if (
-                    MapManager.Instance.mapList[i]
-                        .SpSpawnZombie(
-                            out Vector2 pos,
-                            out int spCode
-                        )
+                    map.SpSpawnZombie(
+                        out Vector2 pos,
+                        out int spCode
+                    )
                 )
                 {
                     spawned = true;
 
                     if (spCode == 0)
                     {
-                        ZombieManager.Instance
-                            .MapSPZombie(
-                                zombieType,
-                                pos,
-                                MapManager.Instance.mapList[i]
-                            );
+                        ZombieManager.Instance.MapSPZombie(
+                            zombieType,
+                            pos,
+                            map
+                        );
                     }
                     else if (spCode == 1)
                     {
@@ -1586,7 +1774,8 @@ public class LVManager : MonoBehaviour
                     UnityEngine.Random.Range(
                         0f,
                         1f
-                    ) <= LV.Instance.BungiSpRate &&
+                    ) <=
+                        LV.Instance.BungiSpRate &&
                     ZombieManager.Instance
                         .UpdateBungiZombieOnRandomLine(
                             zombieType,
@@ -1612,13 +1801,14 @@ public class LVManager : MonoBehaviour
 
                 if (spawned || attempts > 10)
                 {
-                    int weight = Mathf.Min(
-                        ZombieManager.Instance
-                            .GetZombieWeight(
-                                zombieType
-                            ),
-                        waveWeights[i]
-                    );
+                    int weight =
+                        Mathf.Min(
+                            ZombieManager.Instance
+                                .GetZombieWeight(
+                                    zombieType
+                                ),
+                            waveWeights[i]
+                        );
 
                     waveWeights[i] -= weight;
 
@@ -1738,7 +1928,7 @@ public class LVManager : MonoBehaviour
                         if (
                             ZombieManager.Instance
                                 .GetZombieWeight(type) <=
-                            waveWeights[i] ||
+                                waveWeights[i] ||
                             !LV.Instance.WeightLimit
                         )
                         {
@@ -1760,9 +1950,11 @@ public class LVManager : MonoBehaviour
                         break;
                     }
 
+                    MapBase map =
+                        MapManager.Instance.mapList[i];
+
                     Vector3 position =
-                        MapManager.Instance.mapList[i]
-                            .transform.position;
+                        map.transform.position;
 
                     ZombieType typeToSpawn =
                         LV.Instance.ZombieTypes[i][index];
@@ -1770,23 +1962,21 @@ public class LVManager : MonoBehaviour
                     bool spawned = false;
 
                     if (
-                        MapManager.Instance.mapList[i]
-                            .SpSpawnZombie(
-                                out Vector2 pos,
-                                out int spCode
-                            )
+                        map.SpSpawnZombie(
+                            out Vector2 pos,
+                            out int spCode
+                        )
                     )
                     {
                         spawned = true;
 
                         if (spCode == 0)
                         {
-                            ZombieManager.Instance
-                                .MapSPZombie(
-                                    typeToSpawn,
-                                    pos,
-                                    MapManager.Instance.mapList[i]
-                                );
+                            ZombieManager.Instance.MapSPZombie(
+                                typeToSpawn,
+                                pos,
+                                map
+                            );
                         }
                         else if (spCode == 1)
                         {
@@ -1815,13 +2005,14 @@ public class LVManager : MonoBehaviour
 
                     if (spawned || attempts > 10)
                     {
-                        int weight = Mathf.Min(
-                            ZombieManager.Instance
-                                .GetZombieWeight(
-                                    typeToSpawn
-                                ),
-                            waveWeights[i]
-                        );
+                        int weight =
+                            Mathf.Min(
+                                ZombieManager.Instance
+                                    .GetZombieWeight(
+                                        typeToSpawn
+                                    ),
+                                waveWeights[i]
+                            );
 
                         waveWeights[i] -= weight;
                     }
@@ -1913,8 +2104,11 @@ public class LVManager : MonoBehaviour
 
     public void ZombieNumChange(int num)
     {
-        if (!IsRestTime)
+        if (!IsRestTime ||
+            SkipRestBtn.Instance == null)
+        {
             return;
+        }
 
         if (num > 0)
             SkipRestBtn.Instance.CloseBtn();
@@ -1931,6 +2125,7 @@ public class LVManager : MonoBehaviour
         }
 
         AllWeight = 0;
+
         int bigWave = 0;
 
         for (
@@ -1940,10 +2135,8 @@ public class LVManager : MonoBehaviour
         )
         {
             if (
-                bigWave <
-                    LV.Instance.BigWaveNum.Count &&
-                i ==
-                    LV.Instance.BigWaveNum[bigWave]
+                bigWave < LV.Instance.BigWaveNum.Count &&
+                i == LV.Instance.BigWaveNum[bigWave]
             )
             {
                 bigWave++;
@@ -1996,9 +2189,12 @@ public class LVManager : MonoBehaviour
             );
         }
 
-        StatsManager.Instance.AddStatsNum(
-            StatsEnum.WinNum
-        );
+        if (StatsManager.Instance != null)
+        {
+            StatsManager.Instance.AddStatsNum(
+                StatsEnum.WinNum
+            );
+        }
 
         Booty booty =
             Instantiate(
@@ -2172,8 +2368,7 @@ public class LVManager : MonoBehaviour
                     () =>
                     {
                         PlayEffect(
-                            GameManager.Instance
-                                .AudioConf.Awooga
+                            GameManager.Instance.AudioConf.Awooga
                         );
 
                         FlagMeter.Instance.FlagRise(

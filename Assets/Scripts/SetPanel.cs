@@ -65,18 +65,15 @@ public class SetPanel : MonoBehaviour
 
     private bool isFullScreen;
     private bool QuickChatLimit;
+    private bool wasBattle;
 
     private static readonly WaitForSeconds QuickChatWait =
         new WaitForSeconds(1f);
 
     private void Start()
     {
-        if (GameManager.Instance != null &&
-            GameManager.Instance.isAndroid &&
-            GrapNoAndroid != null)
-        {
+        if (GameManager.Instance.isAndroid)
             GrapNoAndroid.SetActive(false);
-        }
     }
 
     private void PlayButtonSound()
@@ -84,141 +81,137 @@ public class SetPanel : MonoBehaviour
         AudioManager.Instance.PlayEFAudio(
             GameManager.Instance.AudioConf.ButtonClick,
             transform.position,
-            isAll: true
+            true
         );
     }
 
-    private void SetCheck(Image image, bool enabled)
+    private void SetActive(GameObject obj, bool value)
     {
-        if (image != null)
-        {
-            image.sprite = enabled
-                ? NormalSprite.Instance.CheckBoxYes
-                : NormalSprite.Instance.CheckBox;
-        }
+        obj.SetActive(value);
+    }
+
+    private void SetActive(Image image, bool value)
+    {
+        image.gameObject.SetActive(value);
+    }
+
+    private void SetCheck(Image image, bool value)
+    {
+        image.sprite = value
+            ? NormalSprite.Instance.CheckBoxYes
+            : NormalSprite.Instance.CheckBox;
     }
 
     private void SetMorePage(GameObject page)
     {
-        if (MOMainPage != null)
-            MOMainPage.SetActive(page == MOMainPage);
-
-        if (MOHardPage != null)
-            MOHardPage.SetActive(page == MOHardPage);
-
-        if (MOGraphicsPage != null)
-            MOGraphicsPage.SetActive(page == MOGraphicsPage);
-
-        if (MOQuickChatPage != null)
-            MOQuickChatPage.SetActive(page == MOQuickChatPage);
-
-        if (MOStatisticsPage != null)
-            MOStatisticsPage.SetActive(page == MOStatisticsPage);
+        MOMainPage.SetActive(page == MOMainPage);
+        MOHardPage.SetActive(page == MOHardPage);
+        MOGraphicsPage.SetActive(page == MOGraphicsPage);
+        MOQuickChatPage.SetActive(page == MOQuickChatPage);
+        MOStatisticsPage.SetActive(page == MOStatisticsPage);
     }
 
-    public void ShowPanel(bool isShow, bool isBattle)
+    private void SetGameSpeed()
     {
-        isOpen = isShow;
+        if (GameManager.Instance.isOnline)
+            return;
+
+        Time.timeScale = is2xSpeed ? 2f : 1f;
+    }
+
+    public void ShowPanel(bool show, bool battle)
+    {
+        isOpen = show;
+
+        if (show)
+            wasBattle = battle;
 
         PlayButtonSound();
 
-        if (!isShow)
+        if (!show)
         {
             GameManager.Instance.SaveSetting();
 
+            if (!GameManager.Instance.isOnline)
+            {
+                SetGameSpeed();
+
+                if (wasBattle)
+                    AudioManager.Instance.ResumeBgAudio();
+            }
+
+            AllMoreOptionPage.SetActive(false);
             gameObject.SetActive(false);
-
-            if (AllMoreOptionPage != null)
-                AllMoreOptionPage.SetActive(false);
-
             return;
         }
 
         gameObject.SetActive(true);
 
-        if (isBattle && !GameManager.Instance.isOnline)
+        if (battle)
         {
-            Time.timeScale = 0f;
+            if (!GameManager.Instance.isOnline)
+            {
+                Time.timeScale = 0f;
+                AudioManager.Instance.StopBgAudio();
 
-            AudioManager.Instance.PlayEFAudio(
-                GameManager.Instance.AudioConf.Pause,
-                transform.position,
-                isAll: true
+                if (GameManager.Instance.AudioConf.Pause != null)
+                {
+                    AudioManager.Instance.PlayEFAudio(
+                        GameManager.Instance.AudioConf.Pause,
+                        transform.position,
+                        true
+                    );
+                }
+            }
+
+            X2Speed.gameObject.SetActive(
+                !GameManager.Instance.isOnline
             );
 
-            AudioManager.Instance.StopBgAudio();
-        }
-        else if (!GameManager.Instance.isOnline)
-        {
-            Time.timeScale = is2xSpeed ? 2f : 1f;
-            AudioManager.Instance.PlayBgAudio(BgmType.Nope);
-        }
-
-        if (isBattle)
-        {
-            if (X2Speed != null)
-            {
-                X2Speed.gameObject.SetActive(
-                    !GameManager.Instance.isOnline
-                );
-            }
+            SetCheck(X2Speed, is2xSpeed);
 
             if (GameManager.Instance.isClient)
             {
-                SetActive(ClientQuit, true);
-                SetActive(BackMenu, false);
-                SetActive(Restart, false);
+                ClientQuit.SetActive(true);
+                BackMenu.SetActive(false);
+                Restart.SetActive(false);
             }
             else
             {
-                SetActive(ClientQuit, false);
-                SetActive(BackMenu, true);
+                ClientQuit.SetActive(false);
+                BackMenu.SetActive(true);
 
-                bool canRestart =
-                    LV.Instance != null &&
-                    LV.Instance.CurrLVType != LVType.PvP;
-
-                SetActive(Restart, canRestart);
+                Restart.SetActive(
+                    LV.Instance.CurrLVType != LVType.PvP
+                );
             }
 
-            // En batalla: Menú activo, Más opciones desactivado.
-            SetActive(BackMenu, true);
-            SetActive(MoreOption, false);
+            BackMenu.SetActive(true);
+            MoreOption.SetActive(false);
 
             ContinueText.text = "Continuar";
             ContinueText2.text = "Continuar";
         }
         else
         {
-            if (X2Speed != null)
-                X2Speed.gameObject.SetActive(false);
-
-            // Fuera de batalla: Menú desactivado, Más opciones activo.
-            SetActive(BackMenu, false);
-            SetActive(MoreOption, true);
-
-            SetActive(Restart, false);
-            SetActive(ClientQuit, false);
+            X2Speed.gameObject.SetActive(false);
+            BackMenu.SetActive(false);
+            MoreOption.SetActive(true);
+            Restart.SetActive(false);
+            ClientQuit.SetActive(false);
 
             ContinueText.text = "Aceptar";
             ContinueText2.text = "Aceptar";
-        }
-    }
 
-    private void SetActive(GameObject obj, bool active)
-    {
-        if (obj != null)
-            obj.SetActive(active);
+            if (!GameManager.Instance.isOnline)
+                SetGameSpeed();
+        }
     }
 
     public void LvReset()
     {
-        if (!is2xSpeed)
-            return;
-
-        Time.timeScale = 1f;
         is2xSpeed = false;
-
+        Time.timeScale = 1f;
         SetCheck(X2Speed, false);
     }
 
@@ -251,16 +244,12 @@ public class SetPanel : MonoBehaviour
         SetCheck(CardSlectorBt, SeedBank.Instance.CardSelector);
 
         QualitySettings.vSyncCount = isVsync ? 1 : 0;
-
         Application.targetFrameRate = SetFrameType(FrameType);
 
         if (!GameManager.Instance.isAndroid)
-        {
             ApplyResolution();
-        }
 
-        if (FrameDisObj != null)
-            FrameDisObj.SetActive(isDisFrame);
+        FrameDisObj.SetActive(isDisFrame);
     }
 
     private int SetFrameType(int frameType)
@@ -299,9 +288,10 @@ public class SetPanel : MonoBehaviour
                 break;
         }
 
-        FrameText.text = fps == -1
-            ? "Sin límite"
-            : fps.ToString();
+        FrameText.text =
+            fps == -1
+                ? "Sin límite"
+                : fps.ToString();
 
         return fps;
     }
@@ -314,11 +304,7 @@ public class SetPanel : MonoBehaviour
         UIManager.Instance.ConfirmPanel.InitEvent(
             () =>
             {
-                if (!GameManager.Instance.isOnline)
-                {
-                    Time.timeScale = 1f;
-                    AudioManager.Instance.StopBgAudio();
-                }
+                Time.timeScale = 1f;
 
                 PlayButtonSound();
 
@@ -340,18 +326,12 @@ public class SetPanel : MonoBehaviour
         string warn = "";
 
         if (LVManager.Instance.GameIsStart)
-        {
             warn = "*Esta versión no puede guardar el progreso actual*";
-        }
 
         UIManager.Instance.ConfirmPanel.InitEvent(
             () =>
             {
-                if (!GameManager.Instance.isOnline)
-                {
-                    Time.timeScale = 1f;
-                    AudioManager.Instance.StopBgAudio();
-                }
+                Time.timeScale = 1f;
 
                 PlayButtonSound();
 
@@ -377,9 +357,7 @@ public class SetPanel : MonoBehaviour
     private void InitMoreOption()
     {
         SetMorePage(MOMainPage);
-
-        if (StatsManager.Instance != null)
-            StatsManager.Instance.CloseViwer();
+        StatsManager.Instance.CloseViwer();
     }
 
     public void QuickChat1Btn()
@@ -424,7 +402,7 @@ public class SetPanel : MonoBehaviour
 
                 ChatInput.Instance.SendMessageToAll(
                     text,
-                    needName: true
+                    true
                 );
             }
         }
@@ -443,21 +421,17 @@ public class SetPanel : MonoBehaviour
 
     public void OpenMoreOption()
     {
-        if (AllMoreOptionPage != null)
-            AllMoreOptionPage.SetActive(true);
-
+        AllMoreOptionPage.SetActive(true);
         InitMoreOption();
         PlayButtonSound();
     }
 
     public void MoreOptionBack()
     {
-        if (MOMainPage != null && MOMainPage.activeSelf)
+        if (MOMainPage.activeSelf)
         {
             GameManager.Instance.SaveUserInfo();
-
-            if (AllMoreOptionPage != null)
-                AllMoreOptionPage.SetActive(false);
+            AllMoreOptionPage.SetActive(false);
         }
         else
         {
@@ -476,9 +450,7 @@ public class SetPanel : MonoBehaviour
     public void OpenStatisticsPage()
     {
         SetMorePage(MOStatisticsPage);
-
         StatsManager.Instance.LoadStats();
-
         PlayButtonSound();
     }
 
@@ -711,8 +683,7 @@ public class SetPanel : MonoBehaviour
     {
         isDisFrame = !isDisFrame;
 
-        if (FrameDisObj != null)
-            FrameDisObj.SetActive(isDisFrame);
+        FrameDisObj.SetActive(isDisFrame);
 
         SetCheck(
             FrameDisplayBt,
@@ -749,7 +720,7 @@ public class SetPanel : MonoBehaviour
 
     public void CloseSetPanel()
     {
-        ShowPanel(false, false);
+        ShowPanel(false, wasBattle);
     }
 
     public void FullScreenButton()
@@ -781,6 +752,9 @@ public class SetPanel : MonoBehaviour
 
     public void XSpeedButton()
     {
+        if (GameManager.Instance.isOnline)
+            return;
+
         is2xSpeed = !is2xSpeed;
 
         SetCheck(

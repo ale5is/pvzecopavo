@@ -31,10 +31,9 @@ public class SkyManager : MonoBehaviour
     [SerializeField] private LvItemManager lvItemManager;
     [SerializeField] private SocketServer socketServer;
     [SerializeField] private PlantManager plantManager;
-    [SerializeField] private PoolManager poolManager;
+
     [SerializeField] private SpectatorList spectatorList;
     [SerializeField] private PvPSelector pvpSelector;
-
     public Lightning lightning;
 
     public GameObject NormalLightning;
@@ -50,38 +49,28 @@ public class SkyManager : MonoBehaviour
     public bool DayLightCycle;
 
     private ParticleSystem.EmissionModule RainEmissionModule;
-
     private ParticleSystem.EmissionModule SnowEmissionModule;
-
     private ParticleSystem.EmissionModule HailEmissionModule;
 
     private bool isThunder;
-
     private bool canLightning;
-
     private int LightningTime;
 
     public int WindTime;
-
     public int CurrWindTime;
 
     private bool windTowardRight;
 
     private int rainScale;
-
     private int snowScale;
-
     private int windScale;
-
     private int hailScale;
 
     [SerializeField]
     private int time;
 
     public bool SunAutoCollect;
-
     public bool SlowSunAutoCollect;
-
     public bool isRainFog;
 
     public int Time
@@ -1684,12 +1673,61 @@ public class SkyManager : MonoBehaviour
     public void ClientSpawnSun(
         SunSpawn spawn)
     {
+        if (PoolManager.Instance == null)
+        {
+            Debug.LogError(
+                "SkyManager: PoolManager no está asignado."
+            );
+            return;
+        }
+
+        if (gameManager == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameManager no está asignado."
+            );
+            return;
+        }
+
+        if (gameManager.GameConf == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameConf es NULL."
+            );
+            return;
+        }
+
+        if (gameManager.GameConf.Sun == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameConf.Sun es NULL."
+            );
+            return;
+        }
+
+        GameObject sunObject =
+            PoolManager.Instance.GetObj(
+                gameManager.GameConf.Sun
+            );
+
+        if (sunObject == null)
+        {
+            Debug.LogError(
+                "SkyManager: PoolManager.GetObj() devolvió NULL para GameConf.Sun."
+            );
+            return;
+        }
+
         Sun component =
-            poolManager
-                .GetObj(
-                    gameManager.GameConf.Sun
-                )
-                .GetComponent<Sun>();
+            sunObject.GetComponent<Sun>();
+
+        if (component == null)
+        {
+            Debug.LogError(
+                "SkyManager: el prefab GameConf.Sun no tiene componente Sun."
+            );
+            return;
+        }
 
         component.transform.SetParent(
             transform
@@ -1705,10 +1743,35 @@ public class SkyManager : MonoBehaviour
         }
         else
         {
+            if (spectatorList == null)
+            {
+                Debug.LogError(
+                    "SkyManager: SpectatorList no está asignado."
+                );
+                return;
+            }
+
+            if (lv == null)
+            {
+                Debug.LogError(
+                    "SkyManager: LV no está asignado."
+                );
+                return;
+            }
+
+            if (pvpSelector == null)
+            {
+                Debug.LogError(
+                    "SkyManager: PvPSelector no está asignado."
+                );
+                return;
+            }
+
             if (!spectatorList.LocalIsSpectator &&
                 lv.CurrLVType == LVType.PvP &&
                 !pvpSelector.IsSameTeam(
-                    gameManager.HostName))
+                    gameManager.HostName
+                ))
             {
                 spawn.Pos =
                     new Vector2(
@@ -1736,18 +1799,79 @@ public class SkyManager : MonoBehaviour
         float DownY,
         SunType type)
     {
-        if (gameManager.isClient ||
-            lv.CurrLVType != LVType.Normal)
+        if (gameManager == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameManager no está asignado."
+            );
+            return;
+        }
+
+        if (gameManager.isClient)
         {
             return;
         }
 
+        if (lv == null)
+        {
+            Debug.LogError(
+                "SkyManager: LV no está asignado."
+            );
+            return;
+        }
+
+        if (lv.CurrLVType != LVType.Normal)
+        {
+            return;
+        }
+
+        if (PoolManager.Instance == null)
+        {
+            Debug.LogError(
+                "SkyManager: PoolManager no está asignado."
+            );
+            return;
+        }
+
+        if (gameManager.GameConf == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameConf es NULL."
+            );
+            return;
+        }
+
+        if (gameManager.GameConf.Sun == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameConf.Sun es NULL."
+            );
+            return;
+        }
+
+        GameObject sunObject =
+            PoolManager.Instance.GetObj(
+                gameManager.GameConf.Sun
+            );
+
+        if (sunObject == null)
+        {
+            Debug.LogError(
+                "SkyManager: PoolManager.GetObj() devolvió NULL para GameConf.Sun."
+            );
+            return;
+        }
+
         Sun component =
-            poolManager
-                .GetObj(
-                    gameManager.GameConf.Sun
-                )
-                .GetComponent<Sun>();
+            sunObject.GetComponent<Sun>();
+
+        if (component == null)
+        {
+            Debug.LogError(
+                "SkyManager: el prefab GameConf.Sun no tiene componente Sun."
+            );
+            return;
+        }
 
         component.transform.SetParent(
             transform
@@ -1763,6 +1887,14 @@ public class SkyManager : MonoBehaviour
 
         if (gameManager.isServer)
         {
+            if (socketServer == null)
+            {
+                Debug.LogError(
+                    "SkyManager: SocketServer no está asignado."
+                );
+                return;
+            }
+
             SunSpawn sunSpawn =
                 new SunSpawn();
 
@@ -1798,17 +1930,66 @@ public class SkyManager : MonoBehaviour
         SunType type,
         string Player)
     {
+        if (gameManager == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameManager no está asignado."
+            );
+            return;
+        }
+
         if (gameManager.isClient)
         {
             return;
         }
 
+        if (PoolManager.Instance == null)
+        {
+            Debug.LogError(
+                "SkyManager: PoolManager no está asignado."
+            );
+            return;
+        }
+
+        if (gameManager.GameConf == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameConf es NULL."
+            );
+            return;
+        }
+
+        if (gameManager.GameConf.Sun == null)
+        {
+            Debug.LogError(
+                "SkyManager: GameConf.Sun es NULL."
+            );
+            return;
+        }
+
+        GameObject sunObject =
+            PoolManager.Instance.GetObj(
+                gameManager.GameConf.Sun
+            );
+
+        if (sunObject == null)
+        {
+            Debug.LogError(
+                "SkyManager: PoolManager.GetObj() devolvió NULL para GameConf.Sun."
+            );
+            return;
+        }
+
         Sun component =
-            poolManager
-                .GetObj(
-                    gameManager.GameConf.Sun
-                )
-                .GetComponent<Sun>();
+            sunObject.GetComponent<Sun>();
+
+        if (component == null)
+        {
+            Debug.LogError(
+                "SkyManager: el prefab GameConf.Sun no tiene componente Sun."
+            );
+            return;
+        }
 
         component.transform.SetParent(
             transform
@@ -1825,6 +2006,14 @@ public class SkyManager : MonoBehaviour
 
         if (gameManager.isServer)
         {
+            if (socketServer == null)
+            {
+                Debug.LogError(
+                    "SkyManager: SocketServer no está asignado."
+                );
+                return;
+            }
+
             SunSpawn sunSpawn =
                 new SunSpawn();
 
