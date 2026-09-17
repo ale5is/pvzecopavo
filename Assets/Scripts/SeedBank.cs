@@ -103,6 +103,10 @@ public class SeedBank : MonoBehaviour
         }
     }
 
+    public int LastChosenCardId
+    {
+        get => DecidedCardNum;
+    }
     public int CurrOrderNum
     {
         get => currOrderNum;

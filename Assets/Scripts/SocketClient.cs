@@ -599,7 +599,8 @@ public class SocketClient : MonoBehaviour
                 {
                     BattlePlayerList.Instance?.CancelCard(
                         card.PlayerName,
-                        card.cardId);
+                        card.cardId
+                    );
                 }
                 else
                 {
@@ -607,7 +608,9 @@ public class SocketClient : MonoBehaviour
                         card.PlayerName,
                         card.plantType,
                         card.zombieType,
-                        card.noAnim);
+                        card.noAnim,
+                        card.cardId
+                    );
                 }
             }
         }

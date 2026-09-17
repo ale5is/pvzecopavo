@@ -831,54 +831,41 @@ public class BattlePlayerList : MonoBehaviour
     }
 
     public void SelectCard(
-        string playerName,
-        PlantType type,
-        ZombieType zType,
-        bool noAnim,
-        int cardId = -1)
+    string playerName,
+    PlantType plantType,
+    ZombieType zombieType,
+    bool noAnim,
+    int cardId = -1)
     {
         PlayerShow show = GetPlayerShow(playerName);
 
         if (show == null ||
-            show.SeedBank == null ||
-            SeedBank.Instance == null ||
-            LV.Instance == null)
+            show.SeedBank == null)
         {
             return;
         }
 
-        UIPlantCardNC card =
-            type == PlantType.Nope
-                ? SeedBank.Instance.GetZombieNc(zType)
-                : SeedBank.Instance.GetPlantNc(type);
+        UIPlantCardNC card = null;
+
+        if (SeedBank.Instance != null)
+        {
+            card = SeedBank.Instance.GetPlantNc(plantType);
+
+            if (card == null &&
+                zombieType != ZombieType.Nope)
+            {
+                card = SeedBank.Instance.GetZombieNc(zombieType);
+            }
+        }
 
         if (card == null)
             return;
 
-        bool sameTeam = true;
-
-        if (LV.Instance.CurrLVType == LVType.PvP)
-        {
-            if (PvPSelector.Instance == null)
-                return;
-
-            sameTeam =
-                PvPSelector.Instance.IsSameTeam(
-                    show.nameText != null
-                        ? show.nameText.text
-                        : playerName
-                );
-
-            if (sameTeam)
-                card.IsChoosed = true;
-        }
-        else
-        {
-            card.IsChoosed = true;
-        }
-
-        if (!card.IsUnLock)
-            sameTeam = false;
+        bool sameTeam =
+            LV.Instance == null ||
+            LV.Instance.CurrLVType != LVType.PvP ||
+            PvPSelector.Instance == null ||
+            PvPSelector.Instance.IsSameTeam(playerName);
 
         show.SeedBank.ChooseCard(
             card,
@@ -889,20 +876,21 @@ public class BattlePlayerList : MonoBehaviour
         if (IsLocalHostPlayer(playerName) &&
             SocketServer.Instance != null)
         {
+            SelectCard selectCard = new SelectCard
+            {
+                PlayerName = playerName,
+                plantType = plantType,
+                zombieType = zombieType,
+                isBack = false,
+                noAnim = noAnim,
+                cardId = cardId
+            };
+
             SocketServer.Instance.SelectCard(
-                new SelectCard
-                {
-                    PlayerName = playerName,
-                    plantType = type,
-                    zombieType = zType,
-                    cardId = cardId,
-                    noAnim = noAnim,
-                    isBack = false
-                }
+                selectCard
             );
         }
     }
-
     public void CancelCard(
         string playerName,
         int cardId)

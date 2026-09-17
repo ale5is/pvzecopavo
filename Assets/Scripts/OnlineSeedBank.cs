@@ -33,11 +33,7 @@ public class OnlineSeedBank : MonoBehaviour
         set
         {
             choosedNum = Mathf.Max(0, value);
-
-            if (choosedNum >= CardNum)
-                isFull = true;
-            else
-                isFull = false;
+            isFull = choosedNum >= CardNum;
         }
     }
 
@@ -51,8 +47,7 @@ public class OnlineSeedBank : MonoBehaviour
         if (isInitialized)
             return;
 
-        seedBank =
-            transform as RectTransform;
+        seedBank = transform as RectTransform;
 
         isFull = false;
         isCanClick = true;
@@ -62,37 +57,24 @@ public class OnlineSeedBank : MonoBehaviour
 
     private bool EnsureInitialized()
     {
-        if (!isInitialized ||
-            seedBank == null)
+        if (!isInitialized || seedBank == null)
         {
-            seedBank =
-                transform as RectTransform;
+            seedBank = transform as RectTransform;
 
             if (seedBank == null)
-            {
-                Debug.LogError(
-                    "OnlineSeedBank: " +
-                    gameObject.name +
-                    " no tiene RectTransform."
-                );
-
                 return false;
-            }
 
             isFull = false;
             isCanClick = true;
-
             isInitialized = true;
         }
 
         return true;
     }
 
-    public UIPlantCard GetPreCard(
-        UIPlantCard pC)
+    public UIPlantCard GetPreCard(UIPlantCard pC)
     {
-        int num =
-            slotList.IndexOf(pC);
+        int num = slotList.IndexOf(pC);
 
         if (num <= 0)
             return null;
@@ -100,16 +82,11 @@ public class OnlineSeedBank : MonoBehaviour
         return slotList[num - 1];
     }
 
-    public void UpdateCD(
-        int cardID,
-        bool isClear)
+    public void UpdateCD(int cardID, bool isClear)
     {
-        for (int i = 0;
-             i < slotList.Count;
-             i++)
+        for (int i = 0; i < slotList.Count; i++)
         {
-            UIPlantCard card =
-                slotList[i];
+            UIPlantCard card = slotList[i];
 
             if (card == null)
                 continue;
@@ -117,81 +94,43 @@ public class OnlineSeedBank : MonoBehaviour
             if (card.CardId == cardID)
             {
                 if (!isClear)
-                {
                     card.CDEnter();
-                }
                 else
-                {
                     card.currTimeForCd = 0f;
-                }
 
                 break;
             }
         }
     }
 
-    public void UpdateSunNum(
-        int sunNum)
+    public void UpdateSunNum(int sunNum)
     {
     }
 
-    public void SpawnCardSlot(
-        int soltNum)
+    public void SpawnCardSlot(int soltNum)
     {
         if (!EnsureInitialized())
             return;
 
         if (group == null)
-        {
-            Debug.LogError(
-                "OnlineSeedBank: " +
-                gameObject.name +
-                " no tiene asignado el Group."
-            );
-
             return;
-        }
 
         if (GameManager.Instance == null)
-        {
-            Debug.LogError(
-                "OnlineSeedBank: GameManager.Instance es null."
-            );
-
             return;
-        }
 
         if (GameManager.Instance.GameConf == null)
-        {
-            Debug.LogError(
-                "OnlineSeedBank: GameManager.Instance.GameConf es null."
-            );
-
             return;
-        }
 
         if (GameManager.Instance.GameConf.UICardSlot == null)
-        {
-            Debug.LogError(
-                "OnlineSeedBank: GameManager.Instance.GameConf.UICardSlot es null."
-            );
-
             return;
-        }
 
-        int newCardNum =
-            Mathf.Max(
-                0,
-                soltNum
-            );
+        int newCardNum = Mathf.Max(0, soltNum);
 
         if (slotList.Count == newCardNum)
         {
             bool validSlots = true;
 
-            for (int i = 0;
-                 i < slotList.Count;
-                 i++)
+            for (int i = 0; i < slotList.Count; i++)
             {
                 if (slotList[i] == null)
                 {
@@ -203,9 +142,7 @@ public class OnlineSeedBank : MonoBehaviour
             if (validSlots)
             {
                 CardNum = newCardNum;
-
                 UpdateSeedBankSize();
-
                 return;
             }
         }
@@ -216,35 +153,21 @@ public class OnlineSeedBank : MonoBehaviour
 
         UpdateSeedBankSize();
 
-        for (int i = 0;
-             i < CardNum;
-             i++)
+        for (int i = 0; i < CardNum; i++)
         {
-            GameObject obj =
-                Object.Instantiate(
-                    GameManager.Instance.GameConf.UICardSlot
-                );
+            GameObject obj = Object.Instantiate(
+                GameManager.Instance.GameConf.UICardSlot
+            );
 
             if (obj == null)
-            {
-                Debug.LogError(
-                    "OnlineSeedBank: No se pudo crear UICardSlot."
-                );
-
                 continue;
-            }
 
             UIPlantCard component =
                 obj.GetComponent<UIPlantCard>();
 
             if (component == null)
             {
-                Debug.LogError(
-                    "OnlineSeedBank: UICardSlot no tiene UIPlantCard."
-                );
-
                 Object.Destroy(obj);
-
                 continue;
             }
 
@@ -254,20 +177,12 @@ public class OnlineSeedBank : MonoBehaviour
             );
 
             component.CardId = i;
+            component.ownerSeedBank = this;
 
-            component.ownerSeedBank =
-                this;
-
-            slotList.Add(
-                component
-            );
+            slotList.Add(component);
 
             component.transform.localScale =
-                new Vector3(
-                    1f,
-                    1f,
-                    1f
-                );
+                new Vector3(1f, 1f, 1f);
         }
     }
 
@@ -287,12 +202,9 @@ public class OnlineSeedBank : MonoBehaviour
     {
         localCardToOnlineSlot.Clear();
 
-        for (int i = 0;
-             i < slotList.Count;
-             i++)
+        for (int i = 0; i < slotList.Count; i++)
         {
-            UIPlantCard card =
-                slotList[i];
+            UIPlantCard card = slotList[i];
 
             if (card == null)
                 continue;
@@ -302,24 +214,19 @@ public class OnlineSeedBank : MonoBehaviour
                 if (GameManager.Instance != null &&
                     GameManager.Instance.isServer &&
                     LVManager.Instance != null &&
-                    LVManager.Instance.GameIsStart)
+                    LVManager.Instance.GameIsStart &&
+                    SeedBank.Instance != null)
                 {
-                    if (SeedBank.Instance != null)
-                    {
-                        SeedBank.Instance.AddCard(
-                            card.CardPlantType,
-                            card.CardZombieType,
-                            card.currTimeForCd,
-                            CanUnChoose: true,
-                            canAddSlot: true
-                        );
-                    }
+                    SeedBank.Instance.AddCard(
+                        card.CardPlantType,
+                        card.CardZombieType,
+                        card.currTimeForCd,
+                        CanUnChoose: true,
+                        canAddSlot: true
+                    );
                 }
 
-                card.ClearChoose(
-                    noAnimation: false
-                );
-
+                card.ClearChoose(false);
                 ChoosedNum--;
             }
 
@@ -327,7 +234,6 @@ public class OnlineSeedBank : MonoBehaviour
         }
 
         ChoosedNum = 0;
-
         slotList.Clear();
     }
 
@@ -347,17 +253,17 @@ public class OnlineSeedBank : MonoBehaviour
         bool needAnim,
         int localCardId)
     {
-        if (nC == null)
+        if (nC == null ||
+            slotList.Count == 0)
+        {
             return;
-
-        if (slotList.Count == 0)
-            return;
+        }
 
         DecidedCardNum = -1;
 
         if (localCardId >= 0)
         {
-            UIPlantCard mappedCard = null;
+            UIPlantCard mappedCard;
 
             if (localCardToOnlineSlot.TryGetValue(
                     localCardId,
@@ -375,12 +281,9 @@ public class OnlineSeedBank : MonoBehaviour
             }
         }
 
-        for (int i = 0;
-             i < slotList.Count;
-             i++)
+        for (int i = 0; i < slotList.Count; i++)
         {
-            UIPlantCard card =
-                slotList[i];
+            UIPlantCard card = slotList[i];
 
             if (card != null &&
                 !card.isChoosed)
@@ -408,9 +311,8 @@ public class OnlineSeedBank : MonoBehaviour
 
         if (localCardId >= 0)
         {
-            localCardToOnlineSlot[
-                localCardId
-            ] = selectedCard;
+            localCardToOnlineSlot[localCardId] =
+                selectedCard;
         }
 
         if (needAnim)
@@ -451,77 +353,51 @@ public class OnlineSeedBank : MonoBehaviour
             }
         }
 
-        selectedCard.AddChoose(
-            nC
-        );
+        selectedCard.AddChoose(nC);
     }
 
     public void ClearChoose(
         int cardId,
         bool needAnim)
     {
-        UIPlantCard uIPlantCard = null;
+        UIPlantCard uiPlantCard = null;
 
         if (localCardToOnlineSlot.TryGetValue(
                 cardId,
-                out uIPlantCard))
+                out uiPlantCard))
         {
-            if (uIPlantCard == null)
+            if (uiPlantCard == null)
             {
-                localCardToOnlineSlot.Remove(
-                    cardId
-                );
+                localCardToOnlineSlot.Remove(cardId);
+                uiPlantCard = null;
             }
-            else if (!uIPlantCard.isChoosed)
+            else if (!uiPlantCard.isChoosed)
             {
-                localCardToOnlineSlot.Remove(
-                    cardId
-                );
-
-                uIPlantCard = null;
+                localCardToOnlineSlot.Remove(cardId);
+                uiPlantCard = null;
             }
         }
 
-        if (uIPlantCard == null)
-        {
-            for (int i = 0;
-                 i < slotList.Count;
-                 i++)
-            {
-                UIPlantCard card =
-                    slotList[i];
-
-                if (card == null)
-                    continue;
-
-                if (card.CardId == cardId)
-                {
-                    uIPlantCard = card;
-                    break;
-                }
-            }
-        }
-
-        if (uIPlantCard == null)
+        if (uiPlantCard == null)
             return;
+
+        UIPlantCardNC sourceCard =
+            uiPlantCard.myPlantCard;
 
         if (ChoosedNum > 0)
             ChoosedNum--;
 
-        localCardToOnlineSlot.Remove(
-            cardId
-        );
+        localCardToOnlineSlot.Remove(cardId);
 
-        uIPlantCard.ClearChoose();
+        uiPlantCard.ClearChoose();
+
+        if (sourceCard == null)
+            return;
+
+        sourceCard.IsChoosed = false;
 
         if (!needAnim)
             return;
-
-        if (uIPlantCard.myPlantCard == null)
-            return;
-
-        uIPlantCard.myPlantCard.IsChoosed =
-            false;
 
         if (PoolManager.Instance == null ||
             GameManager.Instance == null ||
@@ -545,25 +421,21 @@ public class OnlineSeedBank : MonoBehaviour
         );
 
         component.CreateInit(
-            uIPlantCard.transform.position,
-            uIPlantCard.myPlantCard,
+            uiPlantCard.transform.position,
+            sourceCard,
             null
         );
 
         component.PlayChooseAnimation(
-            uIPlantCard.myPlantCard.transform.position
+            sourceCard.transform.position
         );
     }
 
-    public bool ClearCD(
-        PlantType type)
+    public bool ClearCD(PlantType type)
     {
-        for (int i = 0;
-             i < slotList.Count;
-             i++)
+        for (int i = 0; i < slotList.Count; i++)
         {
-            UIPlantCard card =
-                slotList[i];
+            UIPlantCard card = slotList[i];
 
             if (card == null)
                 continue;

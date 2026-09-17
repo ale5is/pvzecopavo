@@ -647,14 +647,28 @@ public class SocketServer : MonoBehaviour
             return;
 
         card.PlayerName = player.Name;
+
         SelectCard(card);
 
         if (BattlePlayerList.Instance != null)
         {
             if (card.isBack)
-                BattlePlayerList.Instance.CancelCard(card.PlayerName, card.cardId);
+            {
+                BattlePlayerList.Instance.CancelCard(
+                    card.PlayerName,
+                    card.cardId
+                );
+            }
             else
-                BattlePlayerList.Instance.SelectCard(card.PlayerName, card.plantType, card.zombieType, card.noAnim);
+            {
+                BattlePlayerList.Instance.SelectCard(
+                    card.PlayerName,
+                    card.plantType,
+                    card.zombieType,
+                    card.noAnim,
+                    card.cardId
+                );
+            }
         }
     }
 
