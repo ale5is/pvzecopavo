@@ -234,6 +234,11 @@ public class BattlePlayerList : MonoBehaviour
         List<string> players,
         List<int> cardNum)
     {
+        // Cada carga de nivel debe empezar con los PlayerShow y sus
+        // OnlineSeedBank completamente limpios.
+        // Esto es especialmente importante al pasar al siguiente nivel
+        // sin destruir la escena.
+        ClearPlayerList();
         ResetPlayerOrder();
         EnsureHostShow();
 
