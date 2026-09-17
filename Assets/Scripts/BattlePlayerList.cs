@@ -834,7 +834,8 @@ public class BattlePlayerList : MonoBehaviour
         string playerName,
         PlantType type,
         ZombieType zType,
-        bool noAnim)
+        bool noAnim,
+        int cardId = -1)
     {
         PlayerShow show = GetPlayerShow(playerName);
 
@@ -846,11 +847,6 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        /*
-         * La carta real pertenece al SeedBank local.
-         * Se usa solamente como referencia para obtener
-         * la carta correspondiente y bloquearla.
-         */
         UIPlantCardNC card =
             type == PlantType.Nope
                 ? SeedBank.Instance.GetZombieNc(zType)
@@ -884,13 +880,10 @@ public class BattlePlayerList : MonoBehaviour
         if (!card.IsUnLock)
             sameTeam = false;
 
-        /*
-         * El SeedBank remoto crea su propio estado visual.
-         * La carta original solamente sirve para el bloqueo global.
-         */
         show.SeedBank.ChooseCard(
             card,
-            sameTeam && !noAnim
+            sameTeam && !noAnim,
+            cardId
         );
 
         if (IsLocalHostPlayer(playerName) &&
@@ -902,6 +895,7 @@ public class BattlePlayerList : MonoBehaviour
                     PlayerName = playerName,
                     plantType = type,
                     zombieType = zType,
+                    cardId = cardId,
                     noAnim = noAnim,
                     isBack = false
                 }
@@ -922,11 +916,6 @@ public class BattlePlayerList : MonoBehaviour
             return;
         }
 
-        /*
-         * ClearChoose ahora obtiene desde el slot remoto
-         * qué carta estaba ocupando ese slot y libera
-         * correctamente su IsChoosed.
-         */
         bool needAnim = true;
 
         if (LV.Instance.CurrLVType == LVType.PvP)

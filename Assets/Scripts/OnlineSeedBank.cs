@@ -19,6 +19,9 @@ public class OnlineSeedBank : MonoBehaviour
     private List<UIPlantCard> slotList =
         new List<UIPlantCard>();
 
+    private Dictionary<int, UIPlantCard> localCardToOnlineSlot =
+        new Dictionary<int, UIPlantCard>();
+
     private bool isInitialized;
 
     public int ChoosedNum
@@ -170,7 +173,7 @@ public class OnlineSeedBank : MonoBehaviour
         if (GameManager.Instance.GameConf.UICardSlot == null)
         {
             Debug.LogError(
-                "OnlineSeedBank: GameConf.UICardSlot es null."
+                "OnlineSeedBank: GameManager.Instance.GameConf.UICardSlot es null."
             );
 
             return;
@@ -182,14 +185,6 @@ public class OnlineSeedBank : MonoBehaviour
                 soltNum
             );
 
-        /*
-         * Si ya tenemos exactamente la cantidad
-         * de slots solicitada, no reconstruimos
-         * el SeedBank.
-         *
-         * Esto evita borrar las cartas que ya
-         * fueron restauradas mediante ChooseCard().
-         */
         if (slotList.Count == newCardNum)
         {
             bool validSlots = true;
@@ -290,6 +285,8 @@ public class OnlineSeedBank : MonoBehaviour
 
     public void ClearCardSlot()
     {
+        localCardToOnlineSlot.Clear();
+
         for (int i = 0;
              i < slotList.Count;
              i++)
@@ -338,6 +335,18 @@ public class OnlineSeedBank : MonoBehaviour
         UIPlantCardNC nC,
         bool needAnim)
     {
+        ChooseCard(
+            nC,
+            needAnim,
+            -1
+        );
+    }
+
+    public void ChooseCard(
+        UIPlantCardNC nC,
+        bool needAnim,
+        int localCardId)
+    {
         if (nC == null)
             return;
 
@@ -345,6 +354,26 @@ public class OnlineSeedBank : MonoBehaviour
             return;
 
         DecidedCardNum = -1;
+
+        if (localCardId >= 0)
+        {
+            UIPlantCard mappedCard = null;
+
+            if (localCardToOnlineSlot.TryGetValue(
+                    localCardId,
+                    out mappedCard))
+            {
+                if (mappedCard != null &&
+                    mappedCard.isChoosed)
+                {
+                    return;
+                }
+
+                localCardToOnlineSlot.Remove(
+                    localCardId
+                );
+            }
+        }
 
         for (int i = 0;
              i < slotList.Count;
@@ -376,6 +405,13 @@ public class OnlineSeedBank : MonoBehaviour
         selectedCard.isChoosed = true;
 
         ChoosedNum++;
+
+        if (localCardId >= 0)
+        {
+            localCardToOnlineSlot[
+                localCardId
+            ] = selectedCard;
+        }
 
         if (needAnim)
         {
@@ -424,30 +460,57 @@ public class OnlineSeedBank : MonoBehaviour
         int cardId,
         bool needAnim)
     {
-        if (ChoosedNum > 0)
-            ChoosedNum--;
-
         UIPlantCard uIPlantCard = null;
 
-        for (int i = 0;
-             i < slotList.Count;
-             i++)
+        if (localCardToOnlineSlot.TryGetValue(
+                cardId,
+                out uIPlantCard))
         {
-            UIPlantCard card =
-                slotList[i];
-
-            if (card == null)
-                continue;
-
-            if (card.CardId == cardId)
+            if (uIPlantCard == null)
             {
-                uIPlantCard = card;
-                break;
+                localCardToOnlineSlot.Remove(
+                    cardId
+                );
+            }
+            else if (!uIPlantCard.isChoosed)
+            {
+                localCardToOnlineSlot.Remove(
+                    cardId
+                );
+
+                uIPlantCard = null;
+            }
+        }
+
+        if (uIPlantCard == null)
+        {
+            for (int i = 0;
+                 i < slotList.Count;
+                 i++)
+            {
+                UIPlantCard card =
+                    slotList[i];
+
+                if (card == null)
+                    continue;
+
+                if (card.CardId == cardId)
+                {
+                    uIPlantCard = card;
+                    break;
+                }
             }
         }
 
         if (uIPlantCard == null)
             return;
+
+        if (ChoosedNum > 0)
+            ChoosedNum--;
+
+        localCardToOnlineSlot.Remove(
+            cardId
+        );
 
         uIPlantCard.ClearChoose();
 
