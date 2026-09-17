@@ -116,6 +116,16 @@ public class BattlePlayerList : MonoBehaviour
             return true;
 
         if (GameManager.Instance != null &&
+            !string.IsNullOrEmpty(GameManager.Instance.HostName))
+        {
+            return GameManager.Instance.HostName == playerName;
+        }
+
+        // Fallback por si HostName todavia no se sincronizo
+        // (por ejemplo, en el propio host antes del primer
+        // UpdatePlayerList): en ese caso, en la propia maquina
+        // del servidor, el nombre local coincide con el host.
+        if (GameManager.Instance != null &&
             GameManager.Instance.LocalPlayerSave != null &&
             GameManager.Instance.isServer)
         {
