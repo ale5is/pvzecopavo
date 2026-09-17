@@ -12270,7 +12270,7 @@ SpriteMask:
   m_BackSortingLayer: 0
   m_FrontSortingOrder: 0
   m_BackSortingOrder: 0
-  m_IsCustomRangeActive: 0
+  m_IsCustomRangeActive: 1
   m_SpriteSortPoint: 0
 --- !u!1 &1371939378208658
 GameObject:
@@ -12383,7 +12383,7 @@ Transform:
   m_GameObject: {fileID: 1372920208702427}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.6492, y: -1.3847, z: 0}
+  m_LocalPosition: {x: -0.6492, y: -1.39, z: 0}
   m_LocalScale: {x: 4.5648947, y: 0.9555048, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -12409,7 +12409,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 10758, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -12429,9 +12429,9 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 3
+  m_SortingOrder: 2
   m_Sprite: {fileID: 21300000, guid: 50b8c9f81c65e244489f97bdd35b3b9a, type: 2}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.40784317, g: 0.95294124, b: 0.9960785, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -15007,7 +15007,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 6
+  m_SortingOrder: 2
   m_Sprite: {fileID: 21300000, guid: 91b6cfec3094b1242a939804b1efbefc, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -15156,7 +15156,7 @@ SortingGroup:
   m_Enabled: 1
   m_SortingLayerID: 1495930015
   m_SortingLayer: 0
-  m_SortingOrder: 1904
+  m_SortingOrder: 1
   m_SortAtRoot: 0
 --- !u!95 &95704330047573733
 Animator:
@@ -15724,7 +15724,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 1
+  m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: 84486b5d661c84c4da34d844d71264b1, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -15762,6 +15762,14 @@ MonoBehaviour:
   targetTempt: 0
   fadeTempt: 0
   entityTempt: 0
+  timetable: {fileID: 0}
+  skyManager: {fileID: 0}
+  lv: {fileID: 0}
+  gobalLight: {fileID: 0}
+  seedBank: {fileID: 0}
+  playerManager: {fileID: 0}
+  gameManager: {fileID: 0}
+  gridSelectorPrefab: {fileID: 0}
   PoolSpark: {fileID: 4967328832014496}
   SnowScence: {fileID: 212043919389829319}
   SnowScences:
@@ -16072,7 +16080,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 2
+  m_SortingOrder: 1
   m_Sprite: {fileID: 21300000, guid: d7f60baf166b25946b88ee793949fb0c, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 0}
   m_FlipX: 0
@@ -18890,7 +18898,7 @@ SpriteMask:
   m_BackSortingLayer: 0
   m_FrontSortingOrder: 0
   m_BackSortingOrder: 0
-  m_IsCustomRangeActive: 0
+  m_IsCustomRangeActive: 1
   m_SpriteSortPoint: 0
 --- !u!1 &1985305603660343
 GameObject:
