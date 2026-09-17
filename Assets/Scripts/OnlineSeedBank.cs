@@ -422,6 +422,9 @@ public class OnlineSeedBank : MonoBehaviour
                 UIManager.Instance == null)
             {
                 selectedCard.AddChoose(nC);
+
+                nC.IsChoosed = true;
+
                 return;
             }
 
@@ -454,6 +457,8 @@ public class OnlineSeedBank : MonoBehaviour
         selectedCard.AddChoose(
             nC
         );
+
+        nC.IsChoosed = true;
     }
 
     public void ClearChoose(
