@@ -117,8 +117,7 @@ public class BattlePlayerList : MonoBehaviour
 
         if (GameManager.Instance != null &&
             GameManager.Instance.LocalPlayerSave != null &&
-            GameManager.Instance.isServer &&
-            !GameManager.Instance.isClient)
+            GameManager.Instance.isServer)
         {
             return GameManager.Instance.LocalPlayerSave.playerName == playerName;
         }
@@ -134,11 +133,8 @@ public class BattlePlayerList : MonoBehaviour
             return null;
         }
 
-        if (!GameManager.Instance.isServer ||
-            GameManager.Instance.isClient)
-        {
+        if (!GameManager.Instance.isServer)
             return null;
-        }
 
         return GameManager.Instance.LocalPlayerSave.playerName;
     }
@@ -831,11 +827,11 @@ public class BattlePlayerList : MonoBehaviour
     }
 
     public void SelectCard(
-    string playerName,
-    PlantType plantType,
-    ZombieType zombieType,
-    bool noAnim,
-    int cardId = -1)
+        string playerName,
+        PlantType plantType,
+        ZombieType zombieType,
+        bool noAnim,
+        int cardId = -1)
     {
         PlayerShow show = GetPlayerShow(playerName);
 
@@ -849,12 +845,18 @@ public class BattlePlayerList : MonoBehaviour
 
         if (SeedBank.Instance != null)
         {
-            card = SeedBank.Instance.GetPlantNc(plantType);
+            card =
+                SeedBank.Instance.GetPlantNc(
+                    plantType
+                );
 
             if (card == null &&
                 zombieType != ZombieType.Nope)
             {
-                card = SeedBank.Instance.GetZombieNc(zombieType);
+                card =
+                    SeedBank.Instance.GetZombieNc(
+                        zombieType
+                    );
             }
         }
 
@@ -865,7 +867,9 @@ public class BattlePlayerList : MonoBehaviour
             LV.Instance == null ||
             LV.Instance.CurrLVType != LVType.PvP ||
             PvPSelector.Instance == null ||
-            PvPSelector.Instance.IsSameTeam(playerName);
+            PvPSelector.Instance.IsSameTeam(
+                playerName
+            );
 
         show.SeedBank.ChooseCard(
             card,
@@ -876,21 +880,23 @@ public class BattlePlayerList : MonoBehaviour
         if (IsLocalHostPlayer(playerName) &&
             SocketServer.Instance != null)
         {
-            SelectCard selectCard = new SelectCard
-            {
-                PlayerName = playerName,
-                plantType = plantType,
-                zombieType = zombieType,
-                isBack = false,
-                noAnim = noAnim,
-                cardId = cardId
-            };
+            SelectCard selectCard =
+                new SelectCard
+                {
+                    PlayerName = playerName,
+                    plantType = plantType,
+                    zombieType = zombieType,
+                    isBack = false,
+                    noAnim = noAnim,
+                    cardId = cardId
+                };
 
             SocketServer.Instance.SelectCard(
                 selectCard
             );
         }
     }
+
     public void CancelCard(
         string playerName,
         int cardId)
@@ -948,11 +954,8 @@ public class BattlePlayerList : MonoBehaviour
             return false;
         }
 
-        if (!GameManager.Instance.isServer ||
-            GameManager.Instance.isClient)
-        {
+        if (!GameManager.Instance.isServer)
             return false;
-        }
 
         return playerName ==
                GameManager.Instance.LocalPlayerSave.playerName;
