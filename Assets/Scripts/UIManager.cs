@@ -8,6 +8,8 @@ public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
 
+    private const int GamePort = 45678;
+
     // =========================================================
     // REFERENCIAS DIRECTAS - INSPECTOR
     // =========================================================
@@ -254,7 +256,8 @@ public class UIManager : MonoBehaviour
 
         if (PortInput != null)
         {
-            PortInput.text = "45678";
+            PortInput.text = GamePort.ToString();
+            PortInput.interactable = false;
         }
     }
 
@@ -422,10 +425,7 @@ public class UIManager : MonoBehaviour
     {
         PlayButtonAudio();
 
-        if (
-            IpInput == null ||
-            PortInput == null
-        )
+        if (IpInput == null)
         {
             return;
         }
@@ -434,19 +434,13 @@ public class UIManager : MonoBehaviour
             !IPAddress.TryParse(
                 IpInput.text,
                 out IPAddress address
-            ) ||
-            !int.TryParse(
-                PortInput.text,
-                out int port
-            ) ||
-            port < 1025 ||
-            port > 65535
+            )
         )
         {
             if (LogPanel != null)
             {
                 LogPanel.DisplayLog(
-                    "Ingrese una dirección IP y un puerto válidos",
+                    "Ingrese una dirección IP válida",
                     () =>
                     {
                         if (HostGame != null)
@@ -462,7 +456,10 @@ public class UIManager : MonoBehaviour
 
         if (socketServer != null)
         {
-            socketServer.StartServer(address, port);
+            socketServer.StartServer(
+                address,
+                GamePort
+            );
         }
 
         CloseHostGame();
@@ -492,23 +489,15 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        string[] address =
-            JoinIpInput.text.Split(':');
+        string hostAddress =
+            JoinIpInput.text.Trim();
 
-        if (
-            address.Length < 2 ||
-            !int.TryParse(
-                address[1],
-                out int port
-            ) ||
-            port < 1025 ||
-            port > 65535
-        )
+        if (string.IsNullOrEmpty(hostAddress))
         {
             if (LogPanel != null)
             {
                 LogPanel.DisplayLog(
-                    "Ingrese una dirección válida",
+                    "Ingrese una dirección IP válida",
                     () =>
                     {
                         if (JoinGame != null)
@@ -522,10 +511,16 @@ public class UIManager : MonoBehaviour
             return;
         }
 
+        if (hostAddress.Contains(":"))
+        {
+            hostAddress =
+                hostAddress.Split(':')[0];
+        }
+
         try
         {
             IPAddress[] addresses =
-                Dns.GetHostAddresses(address[0]);
+                Dns.GetHostAddresses(hostAddress);
 
             if (addresses.Length == 0)
             {
@@ -567,7 +562,7 @@ public class UIManager : MonoBehaviour
             {
                 socketClient.JoinGame(
                     addresses[0],
-                    port,
+                    GamePort,
                     JoinPasswordInput.text
                 );
             }
@@ -605,24 +600,24 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        string[] address =
-            JoinIpInput.text.Split(':');
+        string hostAddress =
+            JoinIpInput.text.Trim();
 
-        if (
-            address.Length < 2 ||
-            !int.TryParse(
-                address[1],
-                out int port
-            )
-        )
+        if (string.IsNullOrEmpty(hostAddress))
         {
             return;
+        }
+
+        if (hostAddress.Contains(":"))
+        {
+            hostAddress =
+                hostAddress.Split(':')[0];
         }
 
         try
         {
             IPAddress[] addresses =
-                Dns.GetHostAddresses(address[0]);
+                Dns.GetHostAddresses(hostAddress);
 
             if (addresses.Length == 0)
             {
@@ -643,7 +638,7 @@ public class UIManager : MonoBehaviour
             {
                 socketClient.JoinGame(
                     addresses[0],
-                    port,
+                    GamePort,
                     JoinPasswordInput.text
                 );
             }
