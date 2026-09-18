@@ -28,6 +28,8 @@ public class GameManager : MonoBehaviour
     public GameConf GameConf { get; private set; }
     public AudioConf AudioConf { get; private set; }
 
+    public StatsManager StatsManager;
+
     public bool IsStartupReady { get; private set; }
     public float StartupProgress { get; private set; }
 

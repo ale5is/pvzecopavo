@@ -28,7 +28,7 @@ public abstract class Allcoin : MonoBehaviour
 			animator.speed = 0f;
 			animator.Play("normal", 0, 0f);
 			Coinbank.Instance.ShowCoinbank();
-			StatsManager.Instance.AddStatsNum(StatsEnum.ClickMoney);
+            GameManager.Instance.StatsManager.AddStatsNum(StatsEnum.ClickMoney);
 			Vector3 vector = Camera.main.ScreenToWorldPoint(Coinbank.Instance.GetCoinbankTextPos());
 			vector = new Vector3(vector.x, vector.y, 0f);
 			FlyAnimation(vector);
