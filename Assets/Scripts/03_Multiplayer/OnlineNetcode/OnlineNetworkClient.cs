@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net;
@@ -55,7 +55,7 @@ public class OnlineNetworkClient : MonoBehaviour
             try
             {
                 NetworkManager.Singleton.CustomMessagingManager
-                    .UnregisterNamedMessageHandler(MessageName);
+                    ?.UnregisterNamedMessageHandler(MessageName);
             }
             catch
             {
@@ -76,7 +76,8 @@ public class OnlineNetworkClient : MonoBehaviour
     {
         var manager = NetworkManager.Singleton;
 
-        if (manager == null)
+        if (manager == null ||
+            manager.CustomMessagingManager == null)
             return;
 
         try
@@ -118,7 +119,7 @@ public class OnlineNetworkClient : MonoBehaviour
 
         if (transport == null)
         {
-            Debug.LogError("No se encontró UnityTransport.");
+            Debug.LogError("No se encontrÃ³ UnityTransport.");
             return;
         }
 
@@ -172,7 +173,6 @@ public class OnlineNetworkClient : MonoBehaviour
         pendingBattlePlayerListDone = false;
 
         ConfigureTransport(ip, port);
-        RegisterMessageHandler();
         RegisterNetworkCallbacks();
 
         WaitConnect = StartCoroutine(WaitLog());
@@ -181,7 +181,10 @@ public class OnlineNetworkClient : MonoBehaviour
         {
             WaitConnect = null;
             Debug.LogError("No se pudo iniciar el cliente NGO.");
+            return;
         }
+
+        RegisterMessageHandler();
     }
 
     void OnClientConnected(ulong clientId)
@@ -195,6 +198,14 @@ public class OnlineNetworkClient : MonoBehaviour
             return;
         }
 
+        Debug.Log(
+            $"[OnlineNetworkClient] NGO conectado. ClientId: {clientId}");
+
+        RegisterMessageHandler();
+
+        Debug.Log(
+            "[OnlineNetworkClient] Enviando PlayerInfo...");
+
         SendConnectionInfo();
     }
 
@@ -205,6 +216,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (gm == null ||
             gm.LocalPlayerSave == null)
         {
+            Debug.LogWarning(
+                "[OnlineNetworkClient] No se pudo preparar PlayerInfo.");
             return;
         }
 
@@ -216,6 +229,9 @@ public class OnlineNetworkClient : MonoBehaviour
             ReCntCode = ReConnectCode,
             Password = pendingPassword
         };
+
+        Debug.Log(
+            $"[OnlineNetworkClient] PlayerInfo preparado. Name={info.Name} | Version={info.VersionCode} | ReCntCode={info.ReCntCode}");
 
         SendMsg(
             JsonUtility.ToJson(info),
@@ -233,6 +249,9 @@ public class OnlineNetworkClient : MonoBehaviour
         {
             return;
         }
+
+        Debug.Log(
+            $"[OnlineNetworkClient] NGO desconectado. ClientId: {clientId}");
 
         if (!connectionResponseReceived &&
             !IsHandOver)
@@ -279,16 +298,25 @@ public class OnlineNetworkClient : MonoBehaviour
         if (manager == null ||
             !manager.IsListening)
         {
+            Debug.LogWarning(
+                $"[OnlineNetworkClient] SendMsg cancelado: NetworkManager inexistente o no estÃ¡ escuchando. Type1={type1} Type2={type2}");
             return;
         }
 
         content ??= "";
 
+        int stringBytes =
+            Encoding.UTF8.GetByteCount(content);
+
         int size =
-            Encoding.UTF8.GetByteCount(content) + 64;
+            stringBytes + 256;
 
         if (size > MaxPacket)
+        {
+            Debug.LogWarning(
+                $"[OnlineNetworkClient] Mensaje demasiado grande. Bytes={stringBytes}");
             return;
+        }
 
         using var writer =
             new FastBufferWriter(
@@ -299,6 +327,9 @@ public class OnlineNetworkClient : MonoBehaviour
         writer.WriteValueSafe(type2);
         writer.WriteValueSafe(content);
 
+        Debug.Log(
+            $"[OnlineNetworkClient] SendMsg. Type1={type1} | Type2={type2} | IsServer={manager.IsServer} | IsClient={manager.IsClient} | CustomMessagingManager={manager.CustomMessagingManager != null}");
+
         if (manager.IsServer)
         {
             OnlineNetworkServer.Instance?
@@ -308,6 +339,13 @@ public class OnlineNetworkClient : MonoBehaviour
                     type2,
                     content);
 
+            return;
+        }
+
+        if (manager.CustomMessagingManager == null)
+        {
+            Debug.LogWarning(
+                "[OnlineNetworkClient] CustomMessagingManager inexistente.");
             return;
         }
 
@@ -366,7 +404,7 @@ public class OnlineNetworkClient : MonoBehaviour
             if (LVManager.Instance?.InGame == true)
             {
                 UIManager.Instance.LogPanel.DisplayLog(
-                    "Por favor, inténtelo de nuevo.",
+                    "Por favor, intÃ©ntelo de nuevo.",
                     null);
             }
             else
@@ -483,9 +521,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    void ProcessGame(
-        byte type,
-        string s)
+    void ProcessGame(byte type, string s)
     {
         if (type == 0)
         {
@@ -677,9 +713,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    void ProcessSpawn(
-        byte type,
-        string s)
+    void ProcessSpawn(byte type, string s)
     {
         if (type == 0)
         {
@@ -811,9 +845,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    void ProcessWorld(
-        byte type,
-        string s)
+    void ProcessWorld(byte type, string s)
     {
         if (type == 0)
         {
@@ -958,8 +990,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    void CreatePuddle(
-        PuddleSpawn spawn)
+    void CreatePuddle(PuddleSpawn spawn)
     {
         if (spawn == null ||
             MapManager.Instance == null ||
@@ -996,8 +1027,7 @@ public class OnlineNetworkClient : MonoBehaviour
         MapManager.Instance.puddles.Add(puddle);
     }
 
-    void SynGrid(
-        SynGrid data)
+    void SynGrid(SynGrid data)
     {
         if (data == null ||
             MapManager.Instance == null ||
@@ -1019,9 +1049,7 @@ public class OnlineNetworkClient : MonoBehaviour
             .ClientSynState(data);
     }
 
-    void ProcessCommand(
-        byte type,
-        string s)
+    void ProcessCommand(byte type, string s)
     {
         if (type == 0)
         {
@@ -1148,9 +1176,7 @@ public class OnlineNetworkClient : MonoBehaviour
             Debug.Log(s);
     }
 
-    void ReversePvP(
-        ref Vector2 pos,
-        string player)
+    void ReversePvP(ref Vector2 pos, string player)
     {
         if (LV.Instance?.CurrLVType == LVType.PvP &&
             PvPSelector.Instance != null &&
@@ -1160,8 +1186,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    public void SynItem(
-        SynItem syn)
+    public void SynItem(SynItem syn)
     {
         if (syn == null)
             return;
@@ -1314,7 +1339,7 @@ public class OnlineNetworkClient : MonoBehaviour
         float t =
             Time.realtimeSinceStartup;
 
-        while (Time.realtimeSinceStartup - t <= 3f &&
+        while (Time.realtimeSinceStartup - t <= 15f &&
                GameManager.Instance?.isOnline == false &&
                WaitConnect != null &&
                !connectionResponseReceived)
@@ -1364,23 +1389,23 @@ public class OnlineNetworkClient : MonoBehaviour
 
     public void CloseClient()
     {
-        if (NetworkManager.Singleton == null)
-            return;
+        var manager = NetworkManager.Singleton;
 
-        SendMsg(
-            "",
-            0,
-            2);
+        if (manager != null &&
+            manager.IsListening)
+        {
+            SendMsg(
+                "",
+                0,
+                2);
 
-        IsHandOver = true;
+            IsHandOver = true;
+
+            manager.Shutdown();
+        }
+
         needLog = false;
         needLog2 = false;
-
-        var manager =
-            NetworkManager.Singleton;
-
-        if (manager.IsListening)
-            manager.Shutdown();
 
         ConnectOver();
     }
@@ -1490,7 +1515,7 @@ public class OnlineNetworkClient : MonoBehaviour
             else if (needLog)
             {
                 UIManager.Instance.LogPanel.DisplayLog(
-                    "La conexión ha caducado.",
+                    "La conexiÃ³n ha caducado.",
                     () =>
                         UIManager.Instance?.JoinGame?
                             .gameObject
@@ -1499,8 +1524,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    public void SendChatMsg(
-        string msg)
+    public void SendChatMsg(string msg)
     {
         SendMsg(
             msg,
@@ -1523,8 +1547,7 @@ public class OnlineNetworkClient : MonoBehaviour
             1);
     }
 
-    public void ChangeMap(
-        PlayerMap map)
+    public void ChangeMap(PlayerMap map)
     {
         SendMsg(
             JsonUtility.ToJson(map),
@@ -1532,8 +1555,7 @@ public class OnlineNetworkClient : MonoBehaviour
             3);
     }
 
-    public void SelectCard(
-        SelectCard card)
+    public void SelectCard(SelectCard card)
     {
         SendMsg(
             JsonUtility.ToJson(card),
@@ -1541,8 +1563,7 @@ public class OnlineNetworkClient : MonoBehaviour
             4);
     }
 
-    public void SelectPrepare(
-        SelectPrepare prepare)
+    public void SelectPrepare(SelectPrepare prepare)
     {
         SendMsg(
             JsonUtility.ToJson(prepare),
@@ -1550,8 +1571,7 @@ public class OnlineNetworkClient : MonoBehaviour
             5);
     }
 
-    public void ApplyTool(
-        ToolApply apply)
+    public void ApplyTool(ToolApply apply)
     {
         SendMsg(
             JsonUtility.ToJson(apply),
@@ -1559,9 +1579,7 @@ public class OnlineNetworkClient : MonoBehaviour
             1);
     }
 
-    public void UpdateCD(
-        int cardID,
-        bool Ok)
+    public void UpdateCD(int cardID, bool Ok)
     {
         SendMsg(
             JsonUtility.ToJson(
@@ -1574,8 +1592,7 @@ public class OnlineNetworkClient : MonoBehaviour
             8);
     }
 
-    public void ClickedSun(
-        ClickedSun sun)
+    public void ClickedSun(ClickedSun sun)
     {
         SendMsg(
             JsonUtility.ToJson(sun),
@@ -1583,8 +1600,7 @@ public class OnlineNetworkClient : MonoBehaviour
             2);
     }
 
-    public void ApplyPlacePlant(
-        PlantSpawn spawn)
+    public void ApplyPlacePlant(PlantSpawn spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1592,8 +1608,7 @@ public class OnlineNetworkClient : MonoBehaviour
             0);
     }
 
-    public void ApplyPlaceZombie(
-        ZombieSpawnApply spawn)
+    public void ApplyPlaceZombie(ZombieSpawnApply spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1601,8 +1616,7 @@ public class OnlineNetworkClient : MonoBehaviour
             10);
     }
 
-    public void ApplyPlacePreview(
-        PlantPreview spawn)
+    public void ApplyPlacePreview(PlantPreview spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1610,8 +1624,7 @@ public class OnlineNetworkClient : MonoBehaviour
             7);
     }
 
-    public void ApplyShovelPreview(
-        ShovelPreview spawn)
+    public void ApplyShovelPreview(ShovelPreview spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1619,8 +1632,7 @@ public class OnlineNetworkClient : MonoBehaviour
             9);
     }
 
-    public void ApplyZombiePreview(
-        ZombiePreview spawn)
+    public void ApplyZombiePreview(ZombiePreview spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1628,8 +1640,7 @@ public class OnlineNetworkClient : MonoBehaviour
             11);
     }
 
-    public void ApplyJoinTeam(
-        JoinTeamApply spawn)
+    public void ApplyJoinTeam(JoinTeamApply spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1637,8 +1648,7 @@ public class OnlineNetworkClient : MonoBehaviour
             12);
     }
 
-    public void ApplyJoinSpect(
-        JoinSpecApply spawn)
+    public void ApplyJoinSpect(JoinSpecApply spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1646,8 +1656,7 @@ public class OnlineNetworkClient : MonoBehaviour
             13);
     }
 
-    public void SendSynBag(
-        SynItem syn)
+    public void SendSynBag(SynItem syn)
     {
         SendMsg(
             JsonUtility.ToJson(syn),
@@ -1655,8 +1664,7 @@ public class OnlineNetworkClient : MonoBehaviour
             6);
     }
 
-    public void SendSlotMBag(
-        SlotMchBag bag)
+    public void SendSlotMBag(SlotMchBag bag)
     {
         SendMsg(
             JsonUtility.ToJson(bag),

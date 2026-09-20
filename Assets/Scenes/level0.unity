@@ -128434,7 +128434,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.00013132575}
+  m_AnchoredPosition: {x: 0, y: 0.000009180377}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!1 &313557439
@@ -130914,7 +130914,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.00013132575}
+  m_AnchoredPosition: {x: 0, y: 0.000009180377}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &423918493
@@ -134069,9 +134069,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: EOSOnlineUI, Assembly-CSharp
-        m_MethodName: LeaveOnlineGame
+      - m_Target: {fileID: 2117112849}
+        m_TargetAssemblyTypeName: OnlineMultiplayer, Assembly-CSharp
+        m_MethodName: Salir
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -142240,7 +142240,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112846}
+      - m_Target: {fileID: 2117112849}
         m_TargetAssemblyTypeName: OnlineMultiplayer, Assembly-CSharp
         m_MethodName: CrearPartida
         m_Mode: 1
@@ -146915,6 +146915,51 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1 &1183225678
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1183225680}
+  - component: {fileID: 1183225679}
+  m_Layer: 0
+  m_Name: ServerOnlineClient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1183225679
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1183225678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd2fea47460a71542818b0396bcfa12b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  text: {fileID: 0}
+--- !u!4 &1183225680
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1183225678}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1183506835
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -153014,7 +153059,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2117112846}
+      - m_Target: {fileID: 2117112849}
         m_TargetAssemblyTypeName: OnlineMultiplayer, Assembly-CSharp
         m_MethodName: UnirsePartida
         m_Mode: 1
@@ -156426,6 +156471,75 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1 &1604552142
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1604552145}
+  - component: {fileID: 1604552143}
+  - component: {fileID: 1604552144}
+  m_Layer: 0
+  m_Name: ServerOnlineHost
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1604552143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1604552142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 3587690701
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+--- !u!114 &1604552144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1604552142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be3e4a76f44cbdd46b7fd5d3f0c43c08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  battlePlayerList: {fileID: 0}
+  playerList: {fileID: 0}
+  isServerOpen: 0
+--- !u!4 &1604552145
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1604552142}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1606813769
 GameObject:
   m_ObjectHideFlags: 0
@@ -166575,7 +166689,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2117112845}
   - component: {fileID: 2117112848}
-  - component: {fileID: 2117112846}
   - component: {fileID: 2117112847}
   - component: {fileID: 2117112849}
   m_Layer: 0
@@ -166600,23 +166713,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2117112846
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2117112843}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b4367a1d5760a74fb3792c27577a6e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  address: 127.0.0.1
-  port: 7777
-  onlineStatusText: {fileID: 1439396935}
-  onlineClientsText: {fileID: 2112826996}
-  onlineDiagnosticText: {fileID: 1970607307}
 --- !u!114 &2117112847
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -166690,10 +166786,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 2117112843}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dd2fea47460a71542818b0396bcfa12b, type: 3}
+  m_Script: {fileID: 11500000, guid: 4b4367a1d5760a74fb3792c27577a6e1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  text: {fileID: 0}
+  address: 127.0.0.1
+  port: 7777
+  onlineStatusText: {fileID: 1439396935}
+  onlineClientsText: {fileID: 2112826996}
+  onlineDiagnosticText: {fileID: 1970607307}
 --- !u!1 &2118072417
 GameObject:
   m_ObjectHideFlags: 0
@@ -167204,6 +167304,8 @@ SceneRoots:
   m_Roots:
   - {fileID: 1617}
   - {fileID: 2117112845}
+  - {fileID: 1604552145}
+  - {fileID: 1183225680}
   - {fileID: 1776070182}
   - {fileID: 1676}
   - {fileID: 1683}

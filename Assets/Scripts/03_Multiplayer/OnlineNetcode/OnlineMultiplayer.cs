@@ -2,6 +2,7 @@ using TMPro;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
+using System.Net;
 
 public class OnlineMultiplayer : MonoBehaviour
 {
@@ -73,11 +74,18 @@ public class OnlineMultiplayer : MonoBehaviour
             return;
         }
 
-        transport.SetConnectionData("0.0.0.0", port);
+        if (OnlineNetworkServer.Instance == null)
+        {
+            Debug.LogError("[OnlineMultiplayer] OnlineNetworkServer.Instance es NULL.");
+            MostrarEstado("ERROR: OnlineNetworkServer NULL");
+            return;
+        }
 
-        bool resultado = networkManager.StartHost();
+        OnlineNetworkServer.Instance.StartServer(
+            IPAddress.Parse("0.0.0.0"),
+            port);
 
-        if (resultado)
+        if (networkManager.IsHost)
         {
             MostrarEstado("HOST INICIADO");
         }
@@ -115,18 +123,31 @@ public class OnlineMultiplayer : MonoBehaviour
             return;
         }
 
-        transport.SetConnectionData(address, port);
-
-        bool resultado = networkManager.StartClient();
-
-        if (resultado)
+        if (OnlineNetworkClient.Instance == null)
         {
-            MostrarEstado("CLIENTE INICIADO");
+            Debug.LogError("[OnlineMultiplayer] OnlineNetworkClient.Instance es NULL.");
+            MostrarEstado("ERROR: OnlineNetworkClient NULL");
+            return;
         }
-        else
+
+        IPAddress ip;
+
+        if (!IPAddress.TryParse(address, out ip))
         {
-            MostrarEstado("ERROR AL INICIAR CLIENTE");
+            Debug.LogError(
+                "[OnlineMultiplayer] Dirección IP no válida: " +
+                address);
+
+            MostrarEstado("ERROR: IP NO VÁLIDA");
+            return;
         }
+
+        OnlineNetworkClient.Instance.JoinGame(
+            ip,
+            port,
+            "");
+
+        MostrarEstado("CLIENTE INICIADO");
 
         ActualizarDiagnostico();
     }

@@ -4,6 +4,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text;
+using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -11,6 +13,9 @@ using UnityEngine;
 public class OnlineNetworkServer : NetworkBehaviour
 {
     public static OnlineNetworkServer Instance;
+
+    const string MessageName = "PVZ_ONLINE_MESSAGE";
+    const int MaxPacket = 1048576;
 
     [Header("UI")]
     [SerializeField] BattlePlayerList battlePlayerList;
@@ -46,6 +51,8 @@ public class OnlineNetworkServer : NetworkBehaviour
 
         if (IsServer)
         {
+            RegisterMessageHandler();
+
             isServerOpen = true;
 
             InitializeHostPlayer();
@@ -63,12 +70,110 @@ public class OnlineNetworkServer : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        if (IsServer)
+            UnregisterMessageHandler();
+
         StopAllCoroutines();
 
         if (IsServer)
             ClearServerState(true);
 
         base.OnNetworkDespawn();
+    }
+
+    void RegisterMessageHandler()
+    {
+        var manager = NetworkManager.Singleton;
+
+        if (manager == null ||
+            manager.CustomMessagingManager == null)
+        {
+            Debug.LogError(
+                "[OnlineNetworkServer] No se pudo registrar PVZ_ONLINE_MESSAGE: CustomMessagingManager inexistente.");
+
+            return;
+        }
+
+        try
+        {
+            manager.CustomMessagingManager
+                .UnregisterNamedMessageHandler(
+                    MessageName);
+        }
+        catch
+        {
+        }
+
+        manager.CustomMessagingManager.RegisterNamedMessageHandler(
+            MessageName,
+            ReceiveNamedMessage);
+
+        Debug.Log(
+            "[OnlineNetworkServer] Handler registrado: " +
+            MessageName);
+    }
+
+    void UnregisterMessageHandler()
+    {
+        var manager = NetworkManager.Singleton;
+
+        if (manager == null ||
+            manager.CustomMessagingManager == null)
+            return;
+
+        try
+        {
+            manager.CustomMessagingManager
+                .UnregisterNamedMessageHandler(
+                    MessageName);
+        }
+        catch
+        {
+        }
+
+        Debug.Log(
+            "[OnlineNetworkServer] Handler eliminado: " +
+            MessageName);
+    }
+
+    void ReceiveNamedMessage(
+        ulong clientId,
+        FastBufferReader reader)
+    {
+        try
+        {
+            byte type1 = 0;
+            byte type2 = 0;
+            string content = "";
+
+            reader.ReadValueSafe(
+                out type1);
+
+            reader.ReadValueSafe(
+                out type2);
+
+            reader.ReadValueSafe(
+                out content);
+
+            Debug.Log(
+                $"[OnlineNetworkServer] PVZ_ONLINE_MESSAGE recibido. " +
+                $"ClientId={clientId} | " +
+                $"Type1={type1} | " +
+                $"Type2={type2} | " +
+                $"Bytes={reader.Length}");
+
+            ReceiveClientMessage(
+                clientId,
+                type1,
+                type2,
+                content ?? "");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(
+                "[OnlineNetworkServer] Error leyendo PVZ_ONLINE_MESSAGE: " +
+                ex);
+        }
     }
 
     void InitializeHostPlayer()
@@ -184,9 +289,6 @@ public class OnlineNetworkServer : NetworkBehaviour
         InitializeHostPlayer();
 
         UpdatePlayerLists();
-
-        StartCoroutine(SendHeartbeat());
-        StartCoroutine(CheckConnect());
 
         Debug.Log(
             $"Servidor online iniciado. " +
@@ -336,15 +438,26 @@ public class OnlineNetworkServer : NetworkBehaviour
 
             try
             {
-                info = JsonUtility.FromJson<PlayerInfo>(msg);
+                info =
+                    JsonUtility.FromJson<PlayerInfo>(
+                        msg);
             }
             catch
             {
                 info = null;
             }
 
+            Debug.Log(
+                $"[OnlineNetworkServer] PlayerInfo recibido. " +
+                $"ClientId={clientId} | " +
+                $"Name={info?.Name} | " +
+                $"Version={info?.VersionCode}");
+
             if (!ValidatePlayer(info))
             {
+                Debug.LogWarning(
+                    $"[OnlineNetworkServer] PlayerInfo rechazado. ClientId={clientId}");
+
                 DisconnectClient(clientId);
                 return;
             }
@@ -356,6 +469,11 @@ public class OnlineNetworkServer : NetworkBehaviour
             AddPlayerFromClient(
                 clientId,
                 info);
+
+            Debug.Log(
+                $"[OnlineNetworkServer] Cliente registrado. " +
+                $"ClientId={clientId} | " +
+                $"Name={info.Name}");
 
             return;
         }
@@ -383,6 +501,9 @@ public class OnlineNetworkServer : NetworkBehaviour
                     out var player))
             {
                 player.Heartbeat = true;
+
+                Debug.Log(
+                    $"[OnlineNetworkServer] Heartbeat recibido. ClientId={clientId} | Player={player.Name}");
             }
 
             SendMessageToClient(
@@ -537,10 +658,22 @@ public class OnlineNetworkServer : NetworkBehaviour
 
             ReConnectListChange();
 
+            SendJsonToClient(
+                clientId,
+                0,
+                2,
+                new OnlinePlayerInfo
+                {
+                    HostPlayer = HostPlayer,
+                    players = players
+                });
+
             return;
         }
 
-        AddNewPlayer(player);
+        AddNewPlayer(
+            player,
+            clientId);
 
         SendCommandBag(clientId);
 
@@ -1142,6 +1275,59 @@ public class OnlineNetworkServer : NetworkBehaviour
         }
     }
 
+    void SendNamedMessageToClient(
+        ulong clientId,
+        byte type1,
+        byte type2,
+        string content)
+    {
+        var manager =
+            NetworkManager.Singleton;
+
+        if (!IsServer ||
+            manager == null ||
+            !manager.IsListening ||
+            manager.CustomMessagingManager == null)
+        {
+            return;
+        }
+
+        content ??= "";
+
+        int stringBytes =
+            Encoding.UTF8.GetByteCount(content);
+
+        int size =
+            stringBytes + 256;
+
+        if (size > MaxPacket)
+        {
+            Debug.LogError(
+                $"[OnlineNetworkServer] Mensaje demasiado grande. Bytes={stringBytes}");
+            return;
+        }
+
+        using var writer =
+            new FastBufferWriter(
+                size,
+                Allocator.Temp);
+
+        writer.WriteValueSafe(type1);
+        writer.WriteValueSafe(type2);
+        writer.WriteValueSafe(content);
+
+        Debug.Log(
+            $"[OnlineNetworkServer] Enviando PVZ_ONLINE_MESSAGE. " +
+            $"ClientId={clientId} | " +
+            $"Type1={type1} | " +
+            $"Type2={type2}");
+
+        manager.CustomMessagingManager.SendNamedMessage(
+            MessageName,
+            clientId,
+            writer);
+    }
+
     void SendMessage(
         byte type1,
         byte type2,
@@ -1150,10 +1336,26 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (!IsServer)
             return;
 
-        SendMessageClientRpc(
-            type1,
-            type2,
-            content ?? "");
+        var manager =
+            NetworkManager.Singleton;
+
+        if (manager == null)
+            return;
+
+        var clients =
+            manager.ConnectedClientsIds;
+
+        foreach (var clientId in clients)
+        {
+            if (clientId == NetworkManager.ServerClientId)
+                continue;
+
+            SendNamedMessageToClient(
+                clientId,
+                type1,
+                type2,
+                content ?? "");
+        }
     }
 
     void SendMessageToClient(
@@ -1165,24 +1367,16 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (!IsServer)
             return;
 
-        var rpcParams =
-            new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams
-                {
-                    TargetClientIds =
-                        new[]
-                        {
-                            clientId
-                        }
-                }
-            };
+        if (!NetworkManager.Singleton
+                .ConnectedClientsIds
+                .Contains(clientId))
+            return;
 
-        SendMessageClientRpc(
+        SendNamedMessageToClient(
+            clientId,
             type1,
             type2,
-            content ?? "",
-            rpcParams);
+            content ?? "");
     }
 
     void SendMessageExcept(
@@ -1194,29 +1388,27 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (!IsServer)
             return;
 
-        var targets =
-            NetworkManager.Singleton
-                .ConnectedClientsIds
-                .Where(id => id != excludedClientId)
-                .ToArray();
+        var manager =
+            NetworkManager.Singleton;
 
-        if (targets.Length == 0)
+        if (manager == null)
             return;
 
-        var rpcParams =
-            new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams
-                {
-                    TargetClientIds = targets
-                }
-            };
+        foreach (var clientId in
+                 manager.ConnectedClientsIds)
+        {
+            if (clientId ==
+                NetworkManager.ServerClientId ||
+                clientId ==
+                excludedClientId)
+                continue;
 
-        SendMessageClientRpc(
-            type1,
-            type2,
-            content ?? "",
-            rpcParams);
+            SendNamedMessageToClient(
+                clientId,
+                type1,
+                type2,
+                content ?? "");
+        }
     }
 
     void SendJson(
@@ -1254,22 +1446,6 @@ public class OnlineNetworkServer : NetworkBehaviour
             type1,
             type2,
             JsonUtility.ToJson(value));
-    }
-
-    [ClientRpc]
-    void SendMessageClientRpc(
-        byte type1,
-        byte type2,
-        string content,
-        ClientRpcParams rpcParams = default)
-    {
-        if (IsServer)
-            return;
-
-        OnlineNetworkClient.Instance?.ReceiveMessage(
-            type1,
-            type2,
-            content);
     }
 
     void DisconnectPlayer(
@@ -1489,7 +1665,8 @@ public class OnlineNetworkServer : NetworkBehaviour
     }
 
     void AddNewPlayer(
-        PlayerInfo player)
+        PlayerInfo player,
+        ulong clientId)
     {
         if (player == null ||
             players.Any(
@@ -1517,7 +1694,8 @@ public class OnlineNetworkServer : NetworkBehaviour
             1,
             content);
 
-        SendJson(
+        SendJsonToClient(
+            clientId,
             0,
             2,
             new OnlinePlayerInfo
@@ -1525,6 +1703,10 @@ public class OnlineNetworkServer : NetworkBehaviour
                 HostPlayer = HostPlayer,
                 players = players
             });
+
+        Debug.Log(
+            $"[OnlineNetworkServer] OnlinePlayerInfo enviado. " +
+            $"ClientId={clientId} | Players={players.Count}");
     }
 
     void RemoveDone(
