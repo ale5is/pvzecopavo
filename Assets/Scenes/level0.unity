@@ -128434,7 +128434,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.000372697}
+  m_AnchoredPosition: {x: 0, y: 0.00013132575}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!1 &313557439
@@ -130914,7 +130914,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.000372697}
+  m_AnchoredPosition: {x: 0, y: 0.00013132575}
   m_SizeDelta: {x: 0, y: 300}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &423918493
@@ -134371,7 +134371,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 2079240341}
   m_Direction: 2
   m_Value: 0
-  m_Size: 0.9999984
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -154068,7 +154068,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 891658939}
   m_Direction: 2
   m_Value: 0
-  m_Size: 0.9999984
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -166577,6 +166577,7 @@ GameObject:
   - component: {fileID: 2117112848}
   - component: {fileID: 2117112846}
   - component: {fileID: 2117112847}
+  - component: {fileID: 2117112849}
   m_Layer: 0
   m_Name: ServerOnlineManager
   m_TagString: Untagged
@@ -166680,6 +166681,19 @@ MonoBehaviour:
     OldPrefabList: []
   RunInBackground: 1
   LogLevel: 1
+--- !u!114 &2117112849
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2117112843}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd2fea47460a71542818b0396bcfa12b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  text: {fileID: 0}
 --- !u!1 &2118072417
 GameObject:
   m_ObjectHideFlags: 0
