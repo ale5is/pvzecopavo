@@ -158,7 +158,7 @@ public class Sun : MonoBehaviour
             ClickedSun clickedSun = new ClickedSun();
             clickedSun.OnlineSunId = OnlineSunId;
 
-            SocketClient.Instance.ClickedSun(clickedSun);
+            OnlineNetworkClient.Instance.ClickedSun(clickedSun);
 
             return;
         }
@@ -173,7 +173,7 @@ public class Sun : MonoBehaviour
             ClickedSun clickedSun2 = new ClickedSun();
             clickedSun2.OnlineSunId = OnlineSunId;
 
-            SocketServer.Instance.ClickedSun(clickedSun2);
+            OnlineNetworkServer.Instance.ClickedSun(clickedSun2);
         }
 
         SkyManager.Instance.clickedSunNum++;
@@ -277,7 +277,7 @@ public class Sun : MonoBehaviour
                 clickedSun.FlyPos = true;
                 clickedSun.pos = pos;
 
-                SocketServer.Instance.ClickedSun(clickedSun);
+                OnlineNetworkServer.Instance.ClickedSun(clickedSun);
             }
         }
     }

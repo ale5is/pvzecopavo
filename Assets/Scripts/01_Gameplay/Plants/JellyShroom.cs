@@ -24,7 +24,7 @@ public class JellyShroom : PlantBase
 				synItem.OnlineId = OnlineId;
 				synItem.Type = SynItemType.Plant;
 				synItem.SynCode[0] = 1;
-				SocketClient.Instance.SendSynBag(synItem);
+				OnlineNetworkClient.Instance.SendSynBag(synItem);
 			}
 			else
 			{

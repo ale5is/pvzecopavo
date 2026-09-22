@@ -64,7 +64,7 @@ public class ReConnect : MonoBehaviour
 
     public void Reconnect()
     {
-        UIManager.Instance.ReJoinGame();
+        MultiplayerUI.Instance?.ReJoinGame();
     }
 
     public void ReConnectBtn()
@@ -76,7 +76,7 @@ public class ReConnect : MonoBehaviour
     {
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.GiveUpReConnect();
+            OnlineNetworkServer.Instance.GiveUpReConnect();
             return;
         }
 
@@ -84,6 +84,6 @@ public class ReConnect : MonoBehaviour
 
         LVManager.Instance.QuitBattleGame();
 
-        SocketClient.Instance.ReConnectGiveUp();
+        OnlineNetworkClient.Instance.ReConnectGiveUp();
     }
 }

@@ -176,7 +176,7 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 						toolApply.type = ToolType.Glove;
 						toolApply.GridPos = gridPointByMouse.Position;
 						toolApply.OnlineId = currPlant.OnlineId;
-						SocketClient.Instance.ApplyTool(toolApply);
+						OnlineNetworkClient.Instance.ApplyTool(toolApply);
 					}
 					else
 					{
@@ -193,7 +193,7 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 					toolApply2.type = ToolType.Glove;
 					toolApply2.GridPos = vector;
 					toolApply2.OnlineId = currZombie.OnlineId;
-					SocketClient.Instance.ApplyTool(toolApply2);
+					OnlineNetworkClient.Instance.ApplyTool(toolApply2);
 				}
 				else
 				{
@@ -248,11 +248,11 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 			shovelPreview.PlayerName = GameManager.Instance.LocalPlayerSave.playerName;
 			if (GameManager.Instance.isClient)
 			{
-				SocketClient.Instance.ApplyShovelPreview(shovelPreview);
+				OnlineNetworkClient.Instance.ApplyShovelPreview(shovelPreview);
 			}
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.ShovelPreview(shovelPreview, null);
+				OnlineNetworkServer.Instance.ShovelPreview(shovelPreview, null);
 			}
 		}
 	}

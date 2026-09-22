@@ -188,22 +188,22 @@ public class StartButton : MonoBehaviour, IPointerEnterHandler, IEventSystemHand
                 "[StartButton] CheckPrepare() OK"
             );
 
-            if (SocketServer.Instance == null)
+            if (OnlineNetworkServer.Instance == null)
             {
                 Debug.LogError(
-                    "[StartButton] SocketServer.Instance == NULL"
+                    "[StartButton] OnlineNetworkServer.Instance == NULL"
                 );
                 return;
             }
 
             Debug.Log(
-                "[StartButton] LLAMANDO SocketServer.StartRunLv()..."
+                "[StartButton] LLAMANDO OnlineNetworkServer.StartRunLv()..."
             );
 
-            SocketServer.Instance.StartRunLv();
+            OnlineNetworkServer.Instance.StartRunLv();
 
             Debug.Log(
-                "[StartButton] SocketServer.StartRunLv() TERMINADO"
+                "[StartButton] OnlineNetworkServer.StartRunLv() TERMINADO"
             );
         }
         else

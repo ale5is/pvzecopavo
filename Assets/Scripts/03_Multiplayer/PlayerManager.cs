@@ -66,7 +66,7 @@ public class PlayerManager : MonoBehaviour
 					sunNumBag.sunNum = (int)sunNum;
 					sunNumBag.isSun = true;
 					sunNumBag.isBlTeam = false;
-					SocketServer.Instance.UpdateSunNum(sunNumBag);
+					OnlineNetworkServer.Instance.UpdateSunNum(sunNumBag);
 				}
 			}
 		}
@@ -105,7 +105,7 @@ public class PlayerManager : MonoBehaviour
 					sunNumBag.sunNum = (int)moonNum;
 					sunNumBag.isSun = false;
 					sunNumBag.isBlTeam = false;
-					SocketServer.Instance.UpdateSunNum(sunNumBag);
+					OnlineNetworkServer.Instance.UpdateSunNum(sunNumBag);
 				}
 			}
 		}
@@ -144,7 +144,7 @@ public class PlayerManager : MonoBehaviour
 					sunNumBag.sunNum = (int)sunNumTeam;
 					sunNumBag.isSun = true;
 					sunNumBag.isBlTeam = true;
-					SocketServer.Instance.UpdateSunNum(sunNumBag);
+					OnlineNetworkServer.Instance.UpdateSunNum(sunNumBag);
 				}
 			}
 		}
@@ -183,7 +183,7 @@ public class PlayerManager : MonoBehaviour
 					sunNumBag.sunNum = (int)moonNumTeam;
 					sunNumBag.isSun = false;
 					sunNumBag.isBlTeam = true;
-					SocketServer.Instance.UpdateSunNum(sunNumBag);
+					OnlineNetworkServer.Instance.UpdateSunNum(sunNumBag);
 				}
 			}
 		}

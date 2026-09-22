@@ -11,7 +11,7 @@ public class SeedChooser : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     [SerializeField] private LV lv;
     [SerializeField] private LVManager lvManager;
-    [SerializeField] private SocketClient socketClient;
+    [SerializeField] private OnlineNetworkClient socketClient;
     [SerializeField] private BattlePlayerList battlePlayerList;
     [SerializeField] private SpectatorList spectatorList;
     [SerializeField] private SeedBank seedBank;

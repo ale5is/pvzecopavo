@@ -1,83 +1,71 @@
-﻿using System;
+﻿using SocketSave;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using SocketSave;
 using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Networking.Transport.Relay;
+using Unity.Services.Relay;
+using Unity.Services.Relay.Models;
 using UnityEngine;
 
 public class OnlineNetworkClient : MonoBehaviour
 {
     public static OnlineNetworkClient Instance;
 
-    const string MessageName = "PVZ_ONLINE_MESSAGE";
-    const int MaxPacket = 1048576;
+    private const string MessageName = "PVZ_ONLINE_MESSAGE";
+    private const int MaxPacket = 1048576;
+    private const string RelayConnectionType = "udp";
 
-    bool needLog;
-    bool needLog2;
-    bool OnlineCheck;
-    bool IsHandOver;
+    private bool needLog;
+    private bool needLog2;
+    private bool onlineCheck;
+    private bool isHandOver;
 
-    public TextMesh text;
+    private int reconnectCode;
 
-    int ReConnectCode;
+    private bool connectOverCalled;
+    private bool connectionResponseReceived;
 
-    bool connectOverCalled;
-    bool connectionResponseReceived;
+    private Coroutine waitConnect;
 
-    Coroutine WaitConnect;
+    private string pendingPassword = "";
 
-    string pendingPassword;
+    private OnlinePlayerInfo pendingOnlinePlayerInfo;
+    private bool hasPendingOnlinePlayerInfo;
+    private bool pendingPlayerListDone;
+    private bool pendingBattlePlayerListDone;
 
-    OnlinePlayerInfo pendingOnlinePlayerInfo;
-    bool hasPendingOnlinePlayerInfo;
-    bool pendingPlayerListDone;
-    bool pendingBattlePlayerListDone;
+    private bool relayConnecting;
 
-    void Awake()
+    private void Awake()
     {
         Instance = this;
         Application.runInBackground = true;
     }
 
-    void Update()
+    private void Update()
     {
         ProcessPendingOnlinePlayerInfo();
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
-        if (NetworkManager.Singleton != null)
-        {
-            try
-            {
-                NetworkManager.Singleton.CustomMessagingManager
-                    ?.UnregisterNamedMessageHandler(MessageName);
-            }
-            catch
-            {
-            }
-
-            NetworkManager.Singleton.OnClientConnectedCallback -=
-                OnClientConnected;
-
-            NetworkManager.Singleton.OnClientDisconnectCallback -=
-                OnClientDisconnect;
-        }
+        UnregisterNetworkCallbacks();
+        UnregisterMessageHandler();
 
         if (Instance == this)
             Instance = null;
     }
 
-    void RegisterMessageHandler()
+    private void RegisterMessageHandler()
     {
         var manager = NetworkManager.Singleton;
 
-        if (manager == null ||
-            manager.CustomMessagingManager == null)
+        if (manager?.CustomMessagingManager == null)
             return;
 
         try
@@ -94,7 +82,24 @@ public class OnlineNetworkClient : MonoBehaviour
             ReceiveMessage);
     }
 
-    void RegisterNetworkCallbacks()
+    private void UnregisterMessageHandler()
+    {
+        var manager = NetworkManager.Singleton;
+
+        if (manager?.CustomMessagingManager == null)
+            return;
+
+        try
+        {
+            manager.CustomMessagingManager
+                .UnregisterNamedMessageHandler(MessageName);
+        }
+        catch
+        {
+        }
+    }
+
+    private void RegisterNetworkCallbacks()
     {
         var manager = NetworkManager.Singleton;
 
@@ -108,25 +113,60 @@ public class OnlineNetworkClient : MonoBehaviour
         manager.OnClientDisconnectCallback += OnClientDisconnect;
     }
 
-    void ConfigureTransport(IPAddress ip, int port)
+    private void UnregisterNetworkCallbacks()
     {
         var manager = NetworkManager.Singleton;
 
         if (manager == null)
             return;
 
-        var transport = manager.GetComponent<UnityTransport>();
+        manager.OnClientConnectedCallback -= OnClientConnected;
+        manager.OnClientDisconnectCallback -= OnClientDisconnect;
+    }
+
+    private bool ConfigureTransport(
+        IPAddress ip,
+        int port)
+    {
+        var manager = NetworkManager.Singleton;
+
+        if (manager == null)
+            return false;
+
+        var transport =
+            manager.GetComponent<UnityTransport>();
 
         if (transport == null)
         {
-            Debug.LogError("No se encontró UnityTransport.");
-            return;
+            Debug.LogError(
+                "[OnlineNetworkClient] No se encontró UnityTransport.");
+
+            return false;
+        }
+
+        if (ip == null)
+        {
+            Debug.LogError(
+                "[OnlineNetworkClient] IP del servidor inválida.");
+
+            return false;
+        }
+
+        if (port < 1 ||
+            port > ushort.MaxValue)
+        {
+            Debug.LogError(
+                $"[OnlineNetworkClient] Puerto inválido: {port}");
+
+            return false;
         }
 
         transport.SetConnectionData(
             ip.ToString(),
             (ushort)port,
             "0.0.0.0");
+
+        return true;
     }
 
     public void JoinGame(
@@ -137,8 +177,9 @@ public class OnlineNetworkClient : MonoBehaviour
         var gm = GameManager.Instance;
 
         if (gm == null ||
-            WaitConnect != null ||
-            gm.isOnline)
+            gm.isOnline ||
+            waitConnect != null ||
+            relayConnecting)
         {
             return;
         }
@@ -147,47 +188,208 @@ public class OnlineNetworkClient : MonoBehaviour
 
         if (manager == null)
         {
-            Debug.LogError("No existe NetworkManager.");
+            Debug.LogError(
+                "[OnlineNetworkClient] No existe NetworkManager.");
+
             return;
         }
-
-        if (manager.IsListening)
-            manager.Shutdown();
 
         if (gm.LocalPlayerSave == null)
             return;
 
-        pendingPassword = passWord ?? "";
+        if (manager.IsListening)
+            manager.Shutdown();
 
-        needLog = true;
-        needLog2 = false;
-        IsHandOver = false;
+        if (!ConfigureTransport(
+                ip,
+                port))
+        {
+            return;
+        }
 
-        connectOverCalled = false;
-        connectionResponseReceived = false;
-        OnlineCheck = false;
+        pendingPassword =
+            (passWord ?? "").Trim();
 
-        pendingOnlinePlayerInfo = null;
-        hasPendingOnlinePlayerInfo = false;
-        pendingPlayerListDone = false;
-        pendingBattlePlayerListDone = false;
+        PrepareConnection();
 
-        ConfigureTransport(ip, port);
         RegisterNetworkCallbacks();
 
-        WaitConnect = StartCoroutine(WaitLog());
+        waitConnect =
+            StartCoroutine(
+                WaitLog());
 
         if (!manager.StartClient())
         {
-            WaitConnect = null;
-            Debug.LogError("No se pudo iniciar el cliente NGO.");
+            waitConnect = null;
+
+            Debug.LogError(
+                "[OnlineNetworkClient] No se pudo iniciar el cliente NGO.");
+
             return;
         }
 
         RegisterMessageHandler();
+
+        Debug.Log(
+            $"[OnlineNetworkClient] Conectando a {ip}:{port}");
     }
 
-    void OnClientConnected(ulong clientId)
+    public void JoinRelay(
+        string joinCode,
+        string passWord)
+    {
+        _ = JoinRelayGame(
+            joinCode,
+            passWord);
+    }
+
+    public async System.Threading.Tasks.Task<bool> JoinRelayGame(
+        string joinCode,
+        string passWord)
+    {
+        var gm = GameManager.Instance;
+
+        if (gm == null ||
+            gm.isOnline ||
+            waitConnect != null ||
+            relayConnecting)
+        {
+            return false;
+        }
+
+        var manager = NetworkManager.Singleton;
+
+        if (manager == null)
+        {
+            Debug.LogError(
+                "[OnlineNetworkClient] No existe NetworkManager.");
+
+            return false;
+        }
+
+        if (gm.LocalPlayerSave == null)
+            return false;
+
+        joinCode =
+            (joinCode ?? "")
+                .Trim()
+                .ToUpperInvariant();
+
+        if (string.IsNullOrEmpty(joinCode))
+        {
+            Debug.LogError(
+                "[OnlineNetworkClient] Join Code vacío.");
+
+            return false;
+        }
+
+        var services =
+            UnityServicesInitializer.Instance;
+
+        if (services == null)
+        {
+            Debug.LogError(
+                "[OnlineNetworkClient] No existe UnityServicesInitializer.");
+
+            return false;
+        }
+
+        relayConnecting = true;
+
+        try
+        {
+            if (manager.IsListening)
+                manager.Shutdown();
+
+            if (!await services.InitializeServices())
+            {
+                Debug.LogError(
+                    "[OnlineNetworkClient] No se pudieron inicializar Unity Services.");
+
+                return false;
+            }
+
+            JoinAllocation allocation =
+                await RelayService.Instance
+                    .JoinAllocationAsync(
+                        joinCode);
+
+            var transport =
+                manager.GetComponent<UnityTransport>();
+
+            if (transport == null)
+            {
+                Debug.LogError(
+                    "[OnlineNetworkClient] No se encontró UnityTransport.");
+
+                return false;
+            }
+
+            transport.SetRelayServerData(
+                new RelayServerData(
+                    allocation,
+                    RelayConnectionType));
+
+            pendingPassword =
+                (passWord ?? "").Trim();
+
+            PrepareConnection();
+
+            RegisterNetworkCallbacks();
+
+            waitConnect =
+                StartCoroutine(
+                    WaitLog());
+
+            if (!manager.StartClient())
+            {
+                waitConnect = null;
+
+                Debug.LogError(
+                    "[OnlineNetworkClient] No se pudo iniciar el cliente Relay.");
+
+                return false;
+            }
+
+            RegisterMessageHandler();
+
+            Debug.Log(
+                $"[OnlineNetworkClient] Conectando mediante Relay. JoinCode={joinCode}");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(
+                "[OnlineNetworkClient] Error uniéndose a Relay: " +
+                ex);
+
+            if (manager.IsListening)
+                manager.Shutdown();
+
+            return false;
+        }
+        finally
+        {
+            relayConnecting = false;
+        }
+    }
+
+    private void PrepareConnection()
+    {
+        needLog = true;
+        needLog2 = false;
+        isHandOver = false;
+
+        connectOverCalled = false;
+        connectionResponseReceived = false;
+        onlineCheck = false;
+
+        ClearPendingPlayerInfo();
+    }
+
+    private void OnClientConnected(
+        ulong clientId)
     {
         var manager = NetworkManager.Singleton;
 
@@ -202,22 +404,18 @@ public class OnlineNetworkClient : MonoBehaviour
             $"[OnlineNetworkClient] NGO conectado. ClientId: {clientId}");
 
         RegisterMessageHandler();
-
-        Debug.Log(
-            "[OnlineNetworkClient] Enviando PlayerInfo...");
-
         SendConnectionInfo();
     }
 
-    void SendConnectionInfo()
+    private void SendConnectionInfo()
     {
         var gm = GameManager.Instance;
 
-        if (gm == null ||
-            gm.LocalPlayerSave == null)
+        if (gm?.LocalPlayerSave == null)
         {
             Debug.LogWarning(
                 "[OnlineNetworkClient] No se pudo preparar PlayerInfo.");
+
             return;
         }
 
@@ -226,12 +424,9 @@ public class OnlineNetworkClient : MonoBehaviour
             Name = gm.LocalPlayerSave.playerName,
             VersionCode = gm.VersionCode,
             CmdEnable = gm.LocalPlayerSave.CmdEnable,
-            ReCntCode = ReConnectCode,
+            ReCntCode = reconnectCode,
             Password = pendingPassword
         };
-
-        Debug.Log(
-            $"[OnlineNetworkClient] PlayerInfo preparado. Name={info.Name} | Version={info.VersionCode} | ReCntCode={info.ReCntCode}");
 
         SendMsg(
             JsonUtility.ToJson(info),
@@ -239,7 +434,8 @@ public class OnlineNetworkClient : MonoBehaviour
             1);
     }
 
-    void OnClientDisconnect(ulong clientId)
+    private void OnClientDisconnect(
+        ulong clientId)
     {
         var manager = NetworkManager.Singleton;
 
@@ -253,13 +449,9 @@ public class OnlineNetworkClient : MonoBehaviour
         Debug.Log(
             $"[OnlineNetworkClient] NGO desconectado. ClientId: {clientId}");
 
-        if (!connectionResponseReceived &&
-            !IsHandOver)
-        {
-            connectionResponseReceived = true;
-        }
+        connectionResponseReceived = true;
 
-        if (!IsHandOver)
+        if (!isHandOver)
             ConnectOver();
     }
 
@@ -267,14 +459,28 @@ public class OnlineNetworkClient : MonoBehaviour
         ulong senderClientId,
         FastBufferReader reader)
     {
-        reader.ReadValueSafe(out byte type1);
-        reader.ReadValueSafe(out byte type2);
-        reader.ReadValueSafe(out string content);
+        try
+        {
+            reader.ReadValueSafe(
+                out byte type1);
 
-        ProcessMessage(
-            type1,
-            type2,
-            content ?? "");
+            reader.ReadValueSafe(
+                out byte type2);
+
+            reader.ReadValueSafe(
+                out string content);
+
+            ProcessMessage(
+                type1,
+                type2,
+                content ?? "");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(
+                "[OnlineNetworkClient] Error leyendo mensaje: " +
+                ex);
+        }
     }
 
     public void ReceiveMessage(
@@ -288,7 +494,7 @@ public class OnlineNetworkClient : MonoBehaviour
             content ?? "");
     }
 
-    void SendMsg(
+    private void SendMsg(
         string content,
         byte type1,
         byte type2)
@@ -298,25 +504,17 @@ public class OnlineNetworkClient : MonoBehaviour
         if (manager == null ||
             !manager.IsListening)
         {
-            Debug.LogWarning(
-                $"[OnlineNetworkClient] SendMsg cancelado: NetworkManager inexistente o no está escuchando. Type1={type1} Type2={type2}");
             return;
         }
 
         content ??= "";
 
-        int stringBytes =
-            Encoding.UTF8.GetByteCount(content);
-
         int size =
-            stringBytes + 256;
+            Encoding.UTF8.GetByteCount(content) +
+            256;
 
         if (size > MaxPacket)
-        {
-            Debug.LogWarning(
-                $"[OnlineNetworkClient] Mensaje demasiado grande. Bytes={stringBytes}");
             return;
-        }
 
         using var writer =
             new FastBufferWriter(
@@ -326,9 +524,6 @@ public class OnlineNetworkClient : MonoBehaviour
         writer.WriteValueSafe(type1);
         writer.WriteValueSafe(type2);
         writer.WriteValueSafe(content);
-
-        Debug.Log(
-            $"[OnlineNetworkClient] SendMsg. Type1={type1} | Type2={type2} | IsServer={manager.IsServer} | IsClient={manager.IsClient} | CustomMessagingManager={manager.CustomMessagingManager != null}");
 
         if (manager.IsServer)
         {
@@ -343,11 +538,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
 
         if (manager.CustomMessagingManager == null)
-        {
-            Debug.LogWarning(
-                "[OnlineNetworkClient] CustomMessagingManager inexistente.");
             return;
-        }
 
         manager.CustomMessagingManager.SendNamedMessage(
             MessageName,
@@ -355,47 +546,83 @@ public class OnlineNetworkClient : MonoBehaviour
             writer);
     }
 
-    void ProcessMessage(
+    private void ProcessMessage(
         byte type1,
         byte type2,
-        string s)
+        string content)
     {
         if (type1 == 0)
-            ProcessConnection(type2, s);
-        else if (type1 == 1)
-            ProcessGame(type2, s);
-        else if (type1 == 2)
-            ProcessSpawn(type2, s);
-        else if (type1 == 3)
-            ProcessWorld(type2, s);
-        else if (type1 == 4)
-            ProcessCommand(type2, s);
+        {
+            ProcessConnection(
+                type2,
+                content);
+
+            return;
+        }
+
+        if (type1 == 1)
+        {
+            ProcessGame(
+                type2,
+                content);
+
+            return;
+        }
+
+        if (type1 == 2)
+        {
+            ProcessSpawn(
+                type2,
+                content);
+
+            return;
+        }
+
+        if (type1 == 3)
+        {
+            ProcessWorld(
+                type2,
+                content);
+
+            return;
+        }
+
+        if (type1 == 4)
+        {
+            ProcessCommand(
+                type2,
+                content);
+        }
     }
 
-    void ProcessConnection(
+    private void ProcessConnection(
         byte type,
-        string s)
+        string content)
     {
         connectionResponseReceived = true;
 
         if (type == byte.MaxValue)
         {
-            OnlineCheck = true;
+            onlineCheck = true;
             return;
         }
 
         if (type == 1)
         {
-            IsHandOver = true;
+            isHandOver = true;
             needLog = false;
 
             var info =
-                JsonUtility.FromJson<ConnectInfo>(s);
+                JsonUtility.FromJson<ConnectInfo>(
+                    content);
 
             if (info == null)
                 return;
 
-            if (UIManager.Instance?.LogPanel == null)
+            var logPanel =
+                UIManager.Instance?.LogPanel;
+
+            if (logPanel == null)
             {
                 CloseClient();
                 return;
@@ -403,23 +630,18 @@ public class OnlineNetworkClient : MonoBehaviour
 
             if (LVManager.Instance?.InGame == true)
             {
-                UIManager.Instance.LogPanel.DisplayLog(
+                logPanel.DisplayLog(
                     "Por favor, inténtelo de nuevo.",
                     null);
             }
             else
             {
-                UIManager.Instance.LogPanel.DisplayLog(
+                logPanel.DisplayLog(
                     info.msg ?? "",
                     () =>
                     {
-                        if (GameManager.Instance?.isOnline == false &&
-                            UIManager.Instance?.JoinGame != null)
-                        {
-                            UIManager.Instance.JoinGame
-                                .gameObject
-                                .SetActive(true);
-                        }
+                        if (GameManager.Instance?.isOnline == false)
+                            MultiplayerUI.Instance?.OpenJoinCanvas();
                     });
             }
 
@@ -430,7 +652,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 2)
         {
             var info =
-                JsonUtility.FromJson<OnlinePlayerInfo>(s);
+                JsonUtility.FromJson<OnlinePlayerInfo>(
+                    content);
 
             if (info == null ||
                 GameManager.Instance == null)
@@ -452,7 +675,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 3)
         {
             var info =
-                JsonUtility.FromJson<ReConnectInfo>(s);
+                JsonUtility.FromJson<ReConnectInfo>(
+                    content);
 
             if (info == null ||
                 GameManager.Instance == null)
@@ -479,7 +703,7 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    void ProcessPendingOnlinePlayerInfo()
+    private void ProcessPendingOnlinePlayerInfo()
     {
         if (!hasPendingOnlinePlayerInfo ||
             pendingOnlinePlayerInfo == null)
@@ -516,30 +740,55 @@ public class OnlineNetworkClient : MonoBehaviour
         if (pendingPlayerListDone &&
             pendingBattlePlayerListDone)
         {
-            pendingOnlinePlayerInfo = null;
-            hasPendingOnlinePlayerInfo = false;
+            ClearPendingPlayerInfo();
         }
     }
 
-    void ProcessGame(byte type, string s)
+    private void ClearPendingPlayerInfo()
+    {
+        pendingOnlinePlayerInfo = null;
+        hasPendingOnlinePlayerInfo = false;
+        pendingPlayerListDone = false;
+        pendingBattlePlayerListDone = false;
+    }
+
+    private void ProcessGame(
+        byte type,
+        string content)
     {
         if (type == 0)
         {
             var load =
-                JsonUtility.FromJson<LoadLVBag>(s);
+                JsonUtility.FromJson<LoadLVBag>(
+                    content);
 
             if (load == null ||
                 LVManager.Instance == null)
                 return;
 
-            ReConnectCode = load.ReCntCode;
+            reconnectCode =
+                load.ReCntCode;
 
             if (load.LoadType == 0)
-                LVManager.Instance.StartGame(load, -1);
-            else if (load.LoadType == 1)
+            {
+                LVManager.Instance.StartGame(
+                    load,
+                    -1);
+
+                return;
+            }
+
+            if (load.LoadType == 1)
+            {
                 LVManager.Instance.ReStartGame();
-            else if (load.LoadType == 2)
+                return;
+            }
+
+            if (load.LoadType == 2)
+            {
                 LVManager.Instance.QuitBattleGame();
+                return;
+            }
 
             return;
         }
@@ -554,43 +803,26 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 2)
         {
             LVManager.Instance?.ClientShowBigWave(
-                JsonUtility.FromJson<WaveComing>(s));
+                JsonUtility.FromJson<WaveComing>(
+                    content));
+
             return;
         }
 
         if (type == 3)
         {
             PlayerManager.Instance?.ClientUpdateSunNum(
-                JsonUtility.FromJson<SunNumBag>(s));
+                JsonUtility.FromJson<SunNumBag>(
+                    content));
+
             return;
         }
 
         if (type == 4)
         {
-            SynItem(
-                JsonUtility.FromJson<SynItem>(s));
-            return;
-        }
-
-        if (type == 5)
-        {
-            var map =
-                JsonUtility.FromJson<PlayerMap>(s);
-
-            if (map != null)
-            {
-                BattlePlayerList.Instance?.UpdateMapSprite(
-                    map.PlayerName,
-                    map.Pos);
-            }
-
-            return;
-        }
-
-        if (type == 6)
-        {
             var card =
-                JsonUtility.FromJson<SelectCard>(s);
+                JsonUtility.FromJson<SelectCard>(
+                    content);
 
             var save =
                 GameManager.Instance?.LocalPlayerSave;
@@ -619,10 +851,11 @@ public class OnlineNetworkClient : MonoBehaviour
             return;
         }
 
-        if (type == 7)
+        if (type == 5)
         {
             var prepare =
-                JsonUtility.FromJson<SelectPrepare>(s);
+                JsonUtility.FromJson<SelectPrepare>(
+                    content);
 
             if (prepare != null)
             {
@@ -634,22 +867,52 @@ public class OnlineNetworkClient : MonoBehaviour
             return;
         }
 
+        if (type == 6)
+        {
+            SynItem(
+                JsonUtility.FromJson<SynItem>(
+                    content));
+
+            return;
+        }
+
+        if (type == 7)
+        {
+            var map =
+                JsonUtility.FromJson<PlayerMap>(
+                    content);
+
+            if (map != null)
+            {
+                BattlePlayerList.Instance?.UpdateMapSprite(
+                    map.PlayerName,
+                    map.Pos);
+            }
+
+            return;
+        }
+
         if (type == 8)
         {
             var over =
-                JsonUtility.FromJson<GameOver>(s);
+                JsonUtility.FromJson<GameOver>(
+                    content);
 
-            if (over != null &&
-                LV.Instance != null &&
-                LVManager.Instance != null)
+            if (over == null ||
+                LV.Instance == null ||
+                LVManager.Instance == null)
+                return;
+
+            if (LV.Instance.CurrLVType == LVType.PvP)
             {
-                if (LV.Instance.CurrLVType == LVType.PvP)
-                    LVManager.Instance.PvPGameOver(
-                        over.pos,
-                        over.isRedFail);
-                else
-                    LVManager.Instance.ZombieGameOver(
-                        over.pos);
+                LVManager.Instance.PvPGameOver(
+                    over.pos,
+                    over.isRedFail);
+            }
+            else
+            {
+                LVManager.Instance.ZombieGameOver(
+                    over.pos);
             }
 
             return;
@@ -658,21 +921,26 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 9)
         {
             PvPSelector.Instance?.ClientSynTeam(
-                JsonUtility.FromJson<PvPTeamList>(s));
+                JsonUtility.FromJson<PvPTeamList>(
+                    content));
+
             return;
         }
 
         if (type == 10)
         {
             PvPSelector.Instance?.ClientSynMode(
-                JsonUtility.FromJson<PvPModeSyn>(s));
+                JsonUtility.FromJson<PvPModeSyn>(
+                    content));
+
             return;
         }
 
         if (type == 11)
         {
             var list =
-                JsonUtility.FromJson<SpectList>(s);
+                JsonUtility.FromJson<SpectList>(
+                    content);
 
             if (list != null)
             {
@@ -687,7 +955,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 12)
         {
             var add =
-                JsonUtility.FromJson<AddCardBag>(s);
+                JsonUtility.FromJson<AddCardBag>(
+                    content);
 
             if (add != null)
             {
@@ -702,23 +971,29 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 13)
         {
             FlagMeter.Instance?.ClientSyn(
-                JsonUtility.FromJson<FlagMeterSyn>(s));
+                JsonUtility.FromJson<FlagMeterSyn>(
+                    content));
+
             return;
         }
 
         if (type == 14)
         {
             Timetable.Instance?.ClientSyn(
-                JsonUtility.FromJson<TimetableSyn>(s));
+                JsonUtility.FromJson<TimetableSyn>(
+                    content));
         }
     }
 
-    void ProcessSpawn(byte type, string s)
+    private void ProcessSpawn(
+        byte type,
+        string content)
     {
         if (type == 0)
         {
             var plant =
-                JsonUtility.FromJson<PlantSpawn>(s);
+                JsonUtility.FromJson<PlantSpawn>(
+                    content);
 
             if (plant == null ||
                 PlantManager.Instance == null ||
@@ -745,7 +1020,8 @@ public class OnlineNetworkClient : MonoBehaviour
                 ref plant.GridPos,
                 plant.PlacePlayer);
 
-            obj.OnlineId = plant.OnlineId;
+            obj.OnlineId =
+                plant.OnlineId;
 
             var grid =
                 MapManager.Instance.GetGridByWorldPos(
@@ -767,28 +1043,35 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 1)
         {
             SkyManager.Instance?.ClientSpawnSun(
-                JsonUtility.FromJson<SunSpawn>(s));
+                JsonUtility.FromJson<SunSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 2)
         {
             SkyManager.Instance?.OnlineCollectSun(
-                JsonUtility.FromJson<ClickedSun>(s));
+                JsonUtility.FromJson<ClickedSun>(
+                    content));
+
             return;
         }
 
         if (type == 3)
         {
             BattlePlayerList.Instance?.PreviewPlant(
-                JsonUtility.FromJson<PlantPreview>(s));
+                JsonUtility.FromJson<PlantPreview>(
+                    content));
+
             return;
         }
 
         if (type == 4)
         {
             var cd =
-                JsonUtility.FromJson<UpdateCardCD>(s);
+                JsonUtility.FromJson<UpdateCardCD>(
+                    content);
 
             if (cd == null)
                 return;
@@ -800,8 +1083,10 @@ public class OnlineNetworkClient : MonoBehaviour
                 cd.name == save.playerName)
             {
                 if (cd.OK)
+                {
                     SeedBank.Instance?.PlantFailClearCD(
                         cd.CardId);
+                }
             }
             else
             {
@@ -817,7 +1102,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 5)
         {
             var shovel =
-                JsonUtility.FromJson<ShovelPreview>(s);
+                JsonUtility.FromJson<ShovelPreview>(
+                    content);
 
             if (shovel != null)
             {
@@ -833,41 +1119,49 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 6)
         {
             var tool =
-                JsonUtility.FromJson<ToolApply>(s);
+                JsonUtility.FromJson<ToolApply>(
+                    content);
 
             if (tool != null)
             {
-                BattlePlayerList.Instance?.PlayShovelAnimation(
-                    tool.GridPos,
-                    tool.Sound,
-                    tool.User);
+                BattlePlayerList.Instance?
+                    .PlayShovelAnimation(
+                        tool.GridPos,
+                        tool.Sound,
+                        tool.User);
             }
         }
     }
 
-    void ProcessWorld(byte type, string s)
+    private void ProcessWorld(
+        byte type,
+        string content)
     {
         if (type == 0)
         {
             ZombieManager.Instance?.UpdateZombie(
-                JsonUtility.FromJson<ZombieSpawn>(s));
+                JsonUtility.FromJson<ZombieSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 1)
         {
             var grave =
-                JsonUtility.FromJson<GraveStoneSpawn>(s);
+                JsonUtility.FromJson<GraveStoneSpawn>(
+                    content);
 
-            var ggrid =
+            var grid =
                 grave != null
                     ? MapManager.Instance?
-                        .GetGridByWorldPos(grave.MapPos)
+                        .GetGridByWorldPos(
+                            grave.MapPos)
                     : null;
 
-            if (ggrid != null)
+            if (grid != null)
             {
-                ggrid.ClientSynGrave(
+                grid.ClientSynGrave(
                     grave.Type,
                     grave.isHave);
             }
@@ -878,25 +1172,29 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 2)
         {
             CreatePuddle(
-                JsonUtility.FromJson<PuddleSpawn>(s));
+                JsonUtility.FromJson<PuddleSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 3)
         {
             var light =
-                JsonUtility.FromJson<LightingSpawn>(s);
+                JsonUtility.FromJson<LightingSpawn>(
+                    content);
 
-            var lgrid =
+            var grid =
                 light != null
                     ? MapManager.Instance?
-                        .GetGridByWorldPos(light.Pos)
+                        .GetGridByWorldPos(
+                            light.Pos)
                     : null;
 
-            if (lgrid != null)
+            if (grid != null)
             {
                 SkyManager.Instance?.ClientLightningThis(
-                    lgrid);
+                    grid);
             }
 
             return;
@@ -905,7 +1203,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 4)
         {
             var map =
-                JsonUtility.FromJson<SynMap>(s);
+                JsonUtility.FromJson<SynMap>(
+                    content);
 
             if (map != null)
             {
@@ -920,43 +1219,50 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 5)
         {
             BattlePlayerList.Instance?.PreviewZombie(
-                JsonUtility.FromJson<ZombiePreview>(s));
+                JsonUtility.FromJson<ZombiePreview>(
+                    content));
+
             return;
         }
 
         if (type == 6)
         {
             MapManager.Instance?.ClientCreatePortal(
-                JsonUtility.FromJson<PortalSpawn>(s));
+                JsonUtility.FromJson<PortalSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 7)
         {
             SynGrid(
-                JsonUtility.FromJson<SynGrid>(s));
+                JsonUtility.FromJson<SynGrid>(
+                    content));
+
             return;
         }
 
         if (type == 8)
         {
             var booty =
-                JsonUtility.FromJson<SynBooty>(s);
+                JsonUtility.FromJson<SynBooty>(
+                    content);
 
-            if (booty != null &&
-                LVManager.Instance?.InGame == true)
+            if (booty == null ||
+                LVManager.Instance?.InGame != true)
+                return;
+
+            if (booty.isSpawn)
             {
-                if (booty.isSpawn)
-                {
-                    LVManager.Instance.SpawnBooty(
-                        booty.pos,
-                        booty);
-                }
-                else
-                {
-                    LVManager.Instance.OnlyBooty?
-                        .CollectBooty();
-                }
+                LVManager.Instance.SpawnBooty(
+                    booty.pos,
+                    booty);
+            }
+            else
+            {
+                LVManager.Instance.OnlyBooty?
+                    .CollectBooty();
             }
 
             return;
@@ -965,47 +1271,57 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 9)
         {
             LvItemManager.Instance?.ClientCreateVase(
-                JsonUtility.FromJson<VaseSpawn>(s));
+                JsonUtility.FromJson<VaseSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 10)
         {
             SeedBank.Instance?.ClientSpawnCard(
-                JsonUtility.FromJson<CardSpawn>(s));
+                JsonUtility.FromJson<CardSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 11)
         {
             LvItemManager.Instance?.SpawnMelt(
-                JsonUtility.FromJson<MeltSpawn>(s));
+                JsonUtility.FromJson<MeltSpawn>(
+                    content));
+
             return;
         }
 
         if (type == 12)
         {
             LvItemManager.Instance?.SpawnFallHail(
-                JsonUtility.FromJson<FallHailSpawn>(s));
+                JsonUtility.FromJson<FallHailSpawn>(
+                    content));
         }
     }
 
-    void CreatePuddle(PuddleSpawn spawn)
+    private void CreatePuddle(
+        PuddleSpawn spawn)
     {
         if (spawn == null ||
             MapManager.Instance == null ||
             GameManager.Instance?.GameConf?.Puddle == null)
+        {
             return;
+        }
 
-        var grids =
-            new List<Grid>();
+        var grids = new List<Grid>();
 
         foreach (var pos in
                  spawn.MapPos ??
                  new List<Vector2>())
         {
             var grid =
-                MapManager.Instance.GetGridByWorldPos(pos);
+                MapManager.Instance.GetGridByWorldPos(
+                    pos);
 
             if (grid != null)
                 grids.Add(grid);
@@ -1024,55 +1340,69 @@ public class OnlineNetworkClient : MonoBehaviour
             spawn.InitPos,
             spawn.OnlineId);
 
-        MapManager.Instance.puddles.Add(puddle);
+        MapManager.Instance.puddles.Add(
+            puddle);
     }
 
-    void SynGrid(SynGrid data)
+    private void SynGrid(
+        SynGrid data)
     {
         if (data == null ||
             MapManager.Instance == null ||
             LV.Instance == null)
+        {
             return;
+        }
+
+        var gm = GameManager.Instance;
 
         if (LV.Instance.CurrLVType == LVType.PvP &&
             PvPSelector.Instance != null &&
-            GameManager.Instance != null &&
+            gm != null &&
             !PvPSelector.Instance.IsSameTeam(
-                GameManager.Instance.HostName))
+                gm.HostName))
         {
             data.GridPos =
-                MyTool.ReverseX(data.GridPos);
+                MyTool.ReverseX(
+                    data.GridPos);
         }
 
         MapManager.Instance
-            .GetGridByWorldPos(data.GridPos)?
+            .GetGridByWorldPos(
+                data.GridPos)?
             .ClientSynState(data);
     }
 
-    void ProcessCommand(byte type, string s)
+    private void ProcessCommand(
+        byte type,
+        string content)
     {
         if (type == 0)
         {
-            ChatInput.Instance?.AddMessage(s);
+            ChatInput.Instance?.AddMessage(
+                content);
+
             return;
         }
 
         if (type == 1)
         {
             ChatInput.Instance?.AddMessage(
-                s,
+                content,
                 new Color32(
                     255,
                     255,
                     0,
                     255));
+
             return;
         }
 
         if (type == 2)
         {
             var chat =
-                JsonUtility.FromJson<PrivateChatMsg>(s);
+                JsonUtility.FromJson<PrivateChatMsg>(
+                    content);
 
             if (chat != null)
             {
@@ -1094,13 +1424,15 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 3)
         {
             var cmd =
-                JsonUtility.FromJson<CommandBag>(s);
+                JsonUtility.FromJson<CommandBag>(
+                    content);
 
             if (cmd == null)
                 return;
 
             if (PlantManager.Instance != null)
-                PlantManager.Instance.PlantInvincible = cmd.Pinv;
+                PlantManager.Instance.PlantInvincible =
+                    cmd.Pinv;
 
             if (ZombieManager.Instance != null)
             {
@@ -1112,13 +1444,16 @@ public class OnlineNetworkClient : MonoBehaviour
             }
 
             if (SkyManager.Instance != null)
-                SkyManager.Instance.DayLightCycle = cmd.DLiCy;
+                SkyManager.Instance.DayLightCycle =
+                    cmd.DLiCy;
 
             if (PlayerManager.Instance != null)
-                PlayerManager.Instance.SunInfinite = cmd.SnInf;
+                PlayerManager.Instance.SunInfinite =
+                    cmd.SnInf;
 
             if (SeedBank.Instance != null)
-                SeedBank.Instance.isNoCD = cmd.CdCle;
+                SeedBank.Instance.isNoCD =
+                    cmd.CdCle;
 
             if (LvItemManager.Instance != null)
                 LvItemManager.Instance.VaseAlwaysLight =
@@ -1130,14 +1465,17 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 4)
         {
             SkyManager.Instance?.ClientSynWeather(
-                JsonUtility.FromJson<WeatherChange>(s));
+                JsonUtility.FromJson<WeatherChange>(
+                    content));
+
             return;
         }
 
         if (type == 5)
         {
             var time =
-                JsonUtility.FromJson<TimeCmd>(s);
+                JsonUtility.FromJson<TimeCmd>(
+                    content);
 
             if (time == null ||
                 SkyManager.Instance == null)
@@ -1161,7 +1499,8 @@ public class OnlineNetworkClient : MonoBehaviour
         if (type == 6)
         {
             var achievement =
-                JsonUtility.FromJson<GetAcvment>(s);
+                JsonUtility.FromJson<GetAcvment>(
+                    content);
 
             if (achievement != null)
             {
@@ -1173,10 +1512,12 @@ public class OnlineNetworkClient : MonoBehaviour
         }
 
         if (type == 99)
-            Debug.Log(s);
+            Debug.Log(content);
     }
 
-    void ReversePvP(ref Vector2 pos, string player)
+    private void ReversePvP(
+        ref Vector2 pos,
+        string player)
     {
         if (LV.Instance?.CurrLVType == LVType.PvP &&
             PvPSelector.Instance != null &&
@@ -1186,7 +1527,8 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    public void SynItem(SynItem syn)
+    public void SynItem(
+        SynItem syn)
     {
         if (syn == null)
             return;
@@ -1201,11 +1543,11 @@ public class OnlineNetworkClient : MonoBehaviour
             {
                 foreach (var plant in plants)
                 {
-                    if (plant?.OnlineId == syn.OnlineId)
-                    {
-                        plant.OnlineSynPlant(syn);
-                        break;
-                    }
+                    if (plant?.OnlineId != syn.OnlineId)
+                        continue;
+
+                    plant.OnlineSynPlant(syn);
+                    break;
                 }
             }
         }
@@ -1213,25 +1555,28 @@ public class OnlineNetworkClient : MonoBehaviour
         if (syn.Type == SynItemType.AllItem ||
             syn.Type == SynItemType.Zombie)
         {
-            if (ZombieManager.Instance != null)
+            var manager =
+                ZombieManager.Instance;
+
+            if (manager != null)
             {
                 var zombies =
                     new List<ZombieBase>(
-                        ZombieManager.Instance.GetAllZombies());
+                        manager.GetAllZombies());
 
                 var hyp =
-                    ZombieManager.Instance.GetAllHypZombies();
+                    manager.GetAllHypZombies();
 
                 if (hyp != null)
                     zombies.AddRange(hyp);
 
                 foreach (var zombie in zombies)
                 {
-                    if (zombie?.OnlineId == syn.OnlineId)
-                    {
-                        zombie.OnlineSynZombie(syn);
-                        break;
-                    }
+                    if (zombie?.OnlineId != syn.OnlineId)
+                        continue;
+
+                    zombie.OnlineSynZombie(syn);
+                    break;
                 }
             }
         }
@@ -1246,11 +1591,11 @@ public class OnlineNetworkClient : MonoBehaviour
             {
                 foreach (var puddle in puddles)
                 {
-                    if (puddle?.OnlineId == syn.OnlineId)
-                    {
-                        puddle.StartDisappear();
-                        break;
-                    }
+                    if (puddle?.OnlineId != syn.OnlineId)
+                        continue;
+
+                    puddle.StartDisappear();
+                    break;
                 }
             }
         }
@@ -1265,11 +1610,11 @@ public class OnlineNetworkClient : MonoBehaviour
             {
                 foreach (var portal in portals)
                 {
-                    if (portal?.OnlineId == syn.OnlineId)
-                    {
-                        portal.ClientReset(syn);
-                        break;
-                    }
+                    if (portal?.OnlineId != syn.OnlineId)
+                        continue;
+
+                    portal.ClientReset(syn);
+                    break;
                 }
             }
         }
@@ -1287,62 +1632,64 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    IEnumerator SendHeartbeat()
+    private IEnumerator SendHeartbeat()
     {
-        float t =
+        float timer =
             Time.realtimeSinceStartup;
 
-        while (GameManager.Instance?.isOnline == true)
+        while (
+            GameManager.Instance?.isOnline == true)
         {
             yield return null;
 
-            if (Time.realtimeSinceStartup - t > .5f)
-            {
-                SendMsg(
-                    "",
-                    0,
-                    byte.MaxValue);
+            if (Time.realtimeSinceStartup - timer <= .5f)
+                continue;
 
-                t =
-                    Time.realtimeSinceStartup;
-            }
+            SendMsg(
+                "",
+                0,
+                byte.MaxValue);
+
+            timer =
+                Time.realtimeSinceStartup;
         }
     }
 
-    IEnumerator CheckConnect()
+    private IEnumerator CheckConnect()
     {
-        float t =
+        float timer =
             Time.realtimeSinceStartup;
 
-        while (GameManager.Instance?.isOnline == true)
+        while (
+            GameManager.Instance?.isOnline == true)
         {
             yield return null;
 
-            if (Time.realtimeSinceStartup - t > 3f)
+            if (Time.realtimeSinceStartup - timer <= 3f)
+                continue;
+
+            if (!onlineCheck)
             {
-                if (!OnlineCheck)
-                {
-                    CloseClient();
-                    yield break;
-                }
-
-                OnlineCheck = false;
-
-                t =
-                    Time.realtimeSinceStartup;
+                CloseClient();
+                yield break;
             }
+
+            onlineCheck = false;
+            timer =
+                Time.realtimeSinceStartup;
         }
     }
 
-    IEnumerator WaitLog()
+    private IEnumerator WaitLog()
     {
-        float t =
+        float timer =
             Time.realtimeSinceStartup;
 
-        while (Time.realtimeSinceStartup - t <= 15f &&
-               GameManager.Instance?.isOnline == false &&
-               WaitConnect != null &&
-               !connectionResponseReceived)
+        while (
+            Time.realtimeSinceStartup - timer <= 15f &&
+            GameManager.Instance?.isOnline == false &&
+            waitConnect != null &&
+            !connectionResponseReceived)
         {
             yield return null;
         }
@@ -1350,46 +1697,51 @@ public class OnlineNetworkClient : MonoBehaviour
         if (GameManager.Instance?.isOnline == true ||
             connectionResponseReceived)
         {
-            WaitConnect = null;
+            waitConnect = null;
             yield break;
         }
 
-        WaitConnect = null;
+        waitConnect = null;
 
         CloseClient();
 
         UIManager.Instance?.LogPanel?.Confirm();
     }
 
-    void ConnectSuccess()
+    private void ConnectSuccess()
     {
-        if (GameManager.Instance == null ||
-            GameManager.Instance.isOnline)
-            return;
+        var gm =
+            GameManager.Instance;
 
-        if (WaitConnect != null)
+        if (gm == null ||
+            gm.isOnline)
         {
-            StopCoroutine(WaitConnect);
-            WaitConnect = null;
+            return;
+        }
+
+        if (waitConnect != null)
+        {
+            StopCoroutine(waitConnect);
+            waitConnect = null;
         }
 
         needLog2 = true;
 
         Application.runInBackground = true;
 
-        GameManager.Instance.isOnline = true;
-
-        OnlineCheck = true;
+        gm.isOnline = true;
+        onlineCheck = true;
 
         StartCoroutine(CheckConnect());
         StartCoroutine(SendHeartbeat());
 
-        UIManager.Instance?.ConnectSuccess();
+        MultiplayerUI.Instance?.ConnectSuccess();
     }
 
     public void CloseClient()
     {
-        var manager = NetworkManager.Singleton;
+        var manager =
+            NetworkManager.Singleton;
 
         if (manager != null &&
             manager.IsListening)
@@ -1399,7 +1751,7 @@ public class OnlineNetworkClient : MonoBehaviour
                 0,
                 2);
 
-            IsHandOver = true;
+            isHandOver = true;
 
             manager.Shutdown();
         }
@@ -1416,7 +1768,7 @@ public class OnlineNetworkClient : MonoBehaviour
         ConnectOverDone();
     }
 
-    void ConnectOver()
+    private void ConnectOver()
     {
         if (connectOverCalled)
             return;
@@ -1433,26 +1785,17 @@ public class OnlineNetworkClient : MonoBehaviour
 
             if (!gm.isOnline)
             {
-                if (WaitConnect != null)
-                {
-                    StopCoroutine(WaitConnect);
-                    WaitConnect = null;
-                }
-
+                StopWaitConnect();
                 return;
             }
 
             gm.isOnline = false;
 
-            if (WaitConnect != null)
-            {
-                StopCoroutine(WaitConnect);
-                WaitConnect = null;
-            }
+            StopWaitConnect();
 
             if (LVManager.Instance?.InGame == true)
             {
-                if (IsHandOver)
+                if (isHandOver)
                 {
                     LVManager.Instance.QuitBattleGame();
                     ConnectOverDone();
@@ -1478,16 +1821,21 @@ public class OnlineNetworkClient : MonoBehaviour
         }
     }
 
-    void ConnectOverDone()
+    private void StopWaitConnect()
     {
-        ReConnectCode = 0;
+        if (waitConnect == null)
+            return;
+
+        StopCoroutine(waitConnect);
+        waitConnect = null;
+    }
+
+    private void ConnectOverDone()
+    {
+        reconnectCode = 0;
         connectionResponseReceived = false;
 
-        pendingOnlinePlayerInfo = null;
-        hasPendingOnlinePlayerInfo = false;
-
-        pendingPlayerListDone = false;
-        pendingBattlePlayerListDone = false;
+        ClearPendingPlayerInfo();
 
         SpectatorList.Instance?.ClientSynList(
             new List<string>());
@@ -1504,32 +1852,28 @@ public class OnlineNetworkClient : MonoBehaviour
 
         StopAllCoroutines();
 
-        if (UIManager.Instance?.LogPanel != null)
+        if (UIManager.Instance?.LogPanel == null)
+            return;
+
+        if (needLog && needLog2)
         {
-            if (needLog && needLog2)
-            {
-                UIManager.Instance.LogPanel.DisplayLog(
-                    "Desconectado del servidor",
-                    null);
-            }
-            else if (needLog)
-            {
-                UIManager.Instance.LogPanel.DisplayLog(
-                    "La conexión ha caducado.",
-                    () =>
-                        UIManager.Instance?.JoinGame?
-                            .gameObject
-                            .SetActive(true));
-            }
+            UIManager.Instance.LogPanel.DisplayLog(
+                "Desconectado del servidor",
+                null);
+        }
+        else if (needLog)
+        {
+            UIManager.Instance.LogPanel.DisplayLog(
+                "La conexión ha caducado.",
+                () =>
+                    MultiplayerUI.Instance?.OpenJoinCanvas());
         }
     }
 
-    public void SendChatMsg(string msg)
+    public void SendChatMsg(
+        string msg)
     {
-        SendMsg(
-            msg,
-            2,
-            0);
+        SendMsg(msg, 2, 0);
     }
 
     public void SendPrivateChatMsg(
@@ -1547,7 +1891,8 @@ public class OnlineNetworkClient : MonoBehaviour
             1);
     }
 
-    public void ChangeMap(PlayerMap map)
+    public void ChangeMap(
+        PlayerMap map)
     {
         SendMsg(
             JsonUtility.ToJson(map),
@@ -1555,7 +1900,8 @@ public class OnlineNetworkClient : MonoBehaviour
             3);
     }
 
-    public void SelectCard(SelectCard card)
+    public void SelectCard(
+        SelectCard card)
     {
         SendMsg(
             JsonUtility.ToJson(card),
@@ -1563,7 +1909,8 @@ public class OnlineNetworkClient : MonoBehaviour
             4);
     }
 
-    public void SelectPrepare(SelectPrepare prepare)
+    public void SelectPrepare(
+        SelectPrepare prepare)
     {
         SendMsg(
             JsonUtility.ToJson(prepare),
@@ -1571,7 +1918,8 @@ public class OnlineNetworkClient : MonoBehaviour
             5);
     }
 
-    public void ApplyTool(ToolApply apply)
+    public void ApplyTool(
+        ToolApply apply)
     {
         SendMsg(
             JsonUtility.ToJson(apply),
@@ -1579,7 +1927,9 @@ public class OnlineNetworkClient : MonoBehaviour
             1);
     }
 
-    public void UpdateCD(int cardID, bool Ok)
+    public void UpdateCD(
+        int cardID,
+        bool Ok)
     {
         SendMsg(
             JsonUtility.ToJson(
@@ -1592,7 +1942,8 @@ public class OnlineNetworkClient : MonoBehaviour
             8);
     }
 
-    public void ClickedSun(ClickedSun sun)
+    public void ClickedSun(
+        ClickedSun sun)
     {
         SendMsg(
             JsonUtility.ToJson(sun),
@@ -1600,7 +1951,8 @@ public class OnlineNetworkClient : MonoBehaviour
             2);
     }
 
-    public void ApplyPlacePlant(PlantSpawn spawn)
+    public void ApplyPlacePlant(
+        PlantSpawn spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1608,7 +1960,8 @@ public class OnlineNetworkClient : MonoBehaviour
             0);
     }
 
-    public void ApplyPlaceZombie(ZombieSpawnApply spawn)
+    public void ApplyPlaceZombie(
+        ZombieSpawnApply spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1616,7 +1969,8 @@ public class OnlineNetworkClient : MonoBehaviour
             10);
     }
 
-    public void ApplyPlacePreview(PlantPreview spawn)
+    public void ApplyPlacePreview(
+        PlantPreview spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1624,7 +1978,8 @@ public class OnlineNetworkClient : MonoBehaviour
             7);
     }
 
-    public void ApplyShovelPreview(ShovelPreview spawn)
+    public void ApplyShovelPreview(
+        ShovelPreview spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1632,7 +1987,8 @@ public class OnlineNetworkClient : MonoBehaviour
             9);
     }
 
-    public void ApplyZombiePreview(ZombiePreview spawn)
+    public void ApplyZombiePreview(
+        ZombiePreview spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1640,7 +1996,8 @@ public class OnlineNetworkClient : MonoBehaviour
             11);
     }
 
-    public void ApplyJoinTeam(JoinTeamApply spawn)
+    public void ApplyJoinTeam(
+        JoinTeamApply spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1648,7 +2005,8 @@ public class OnlineNetworkClient : MonoBehaviour
             12);
     }
 
-    public void ApplyJoinSpect(JoinSpecApply spawn)
+    public void ApplyJoinSpect(
+        JoinSpecApply spawn)
     {
         SendMsg(
             JsonUtility.ToJson(spawn),
@@ -1656,7 +2014,8 @@ public class OnlineNetworkClient : MonoBehaviour
             13);
     }
 
-    public void SendSynBag(SynItem syn)
+    public void SendSynBag(
+        SynItem syn)
     {
         SendMsg(
             JsonUtility.ToJson(syn),
@@ -1664,7 +2023,8 @@ public class OnlineNetworkClient : MonoBehaviour
             6);
     }
 
-    public void SendSlotMBag(SlotMchBag bag)
+    public void SendSlotMBag(
+        SlotMchBag bag)
     {
         SendMsg(
             JsonUtility.ToJson(bag),

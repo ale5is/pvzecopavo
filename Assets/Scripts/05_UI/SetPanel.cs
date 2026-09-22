@@ -350,7 +350,7 @@ public class SetPanel : MonoBehaviour
         if (!GameManager.Instance.isClient)
             return;
 
-        SocketClient.Instance.CloseClient();
+        OnlineNetworkClient.Instance.CloseClient();
         CloseSetPanel();
     }
 

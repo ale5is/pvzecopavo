@@ -12,7 +12,7 @@ public class Timetable : MonoBehaviour
     [SerializeField] private SkyManager skyManager;
     [SerializeField] private LV lv;
     [SerializeField] private GameManager gameManager;
-    [SerializeField] private SocketServer socketServer;
+    [SerializeField] private OnlineNetworkServer socketServer;
     [SerializeField] private NormalSprite normalSprite;
     [SerializeField] private CameraControl cameraControl;
 

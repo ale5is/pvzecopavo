@@ -4,40 +4,58 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Networking.Transport.Relay;
+using Unity.Services.Relay;
+using Unity.Services.Relay.Models;
 using UnityEngine;
 
 public class OnlineNetworkServer : NetworkBehaviour
 {
     public static OnlineNetworkServer Instance;
 
-    const string MessageName = "PVZ_ONLINE_MESSAGE";
-    const int MaxPacket = 1048576;
+    private const string MessageName = "PVZ_ONLINE_MESSAGE";
+    private const int MaxPacket = 1048576;
+    private const int DiscoveryPort = 47777;
+    private const string DiscoveryRequest = "PVZ_DISCOVERY_REQUEST";
+    private const string DiscoveryResponse = "PVZ_DISCOVERY_RESPONSE";
+    private const string RelayConnectionType = "udp";
 
     [Header("UI")]
-    [SerializeField] BattlePlayerList battlePlayerList;
-    [SerializeField] PlayerList playerList;
+    [SerializeField] private BattlePlayerList battlePlayerList;
+    [SerializeField] private PlayerList playerList;
 
     public bool isServerOpen;
 
-    readonly List<PlayerInfo> players = new();
-    readonly Dictionary<ulong, PlayerInfo> clientPlayers = new();
+    private readonly List<PlayerInfo> players = new();
+    private readonly Dictionary<ulong, PlayerInfo> clientPlayers = new();
+    private readonly List<PlayerInfo> reConnectPlayer = new();
+    private readonly List<PlayerInfo> handQuitPlayer = new();
 
-    PlayerInfo HostPlayer;
+    private PlayerInfo hostPlayer;
+    private string hostPassword = "";
 
-    int ReConnectCode;
-    int itemId;
+    private UdpClient discoverySocket;
+    private Thread discoveryThread;
+    private volatile bool discoveryRunning;
 
-    readonly List<PlayerInfo> ReConnectPlayer = new();
-    readonly List<PlayerInfo> HandQuitPlayer = new();
+    private int discoveryGamePort = 7777;
+    private string discoveryHostName = "Host";
+    private string discoveryVersion = "";
+    private bool discoveryPasswordRequired;
+
+    private int reConnectCode;
+    private int itemId;
 
     public int noHostPlayerNum => players.Count;
     public int ItemId => ++itemId;
 
-    void Awake()
+    private void Awake()
     {
         Instance = this;
 
@@ -49,30 +67,30 @@ public class OnlineNetworkServer : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        if (IsServer)
-        {
-            RegisterMessageHandler();
+        if (!IsServer)
+            return;
 
-            isServerOpen = true;
+        RegisterMessageHandler();
+        RegisterNetworkCallbacks();
 
-            InitializeHostPlayer();
+        isServerOpen = true;
 
-            StartCoroutine(SendHeartbeat());
-            StartCoroutine(CheckConnect());
+        InitializeHostPlayer();
 
-            UpdatePlayerLists();
+        StartCoroutine(SendHeartbeat());
+        StartCoroutine(CheckConnect());
 
-            Debug.Log(
-                $"Online Server iniciado. Host: {HostPlayer?.Name} | " +
-                $"Versión: v{GameManager.Instance?.VersionCode}");
-        }
+        UpdatePlayerLists();
     }
 
     public override void OnNetworkDespawn()
     {
+        UnregisterNetworkCallbacks();
+
         if (IsServer)
             UnregisterMessageHandler();
 
+        StopDiscovery();
         StopAllCoroutines();
 
         if (IsServer)
@@ -81,24 +99,38 @@ public class OnlineNetworkServer : NetworkBehaviour
         base.OnNetworkDespawn();
     }
 
-    void RegisterMessageHandler()
+    private void RegisterNetworkCallbacks()
     {
         var manager = NetworkManager.Singleton;
 
-        if (manager == null ||
-            manager.CustomMessagingManager == null)
-        {
-            Debug.LogError(
-                "[OnlineNetworkServer] No se pudo registrar PVZ_ONLINE_MESSAGE: CustomMessagingManager inexistente.");
-
+        if (manager == null)
             return;
-        }
+
+        manager.OnClientDisconnectCallback -= HandleClientDisconnected;
+        manager.OnClientDisconnectCallback += HandleClientDisconnected;
+    }
+
+    private void UnregisterNetworkCallbacks()
+    {
+        var manager = NetworkManager.Singleton;
+
+        if (manager == null)
+            return;
+
+        manager.OnClientDisconnectCallback -= HandleClientDisconnected;
+    }
+
+    private void RegisterMessageHandler()
+    {
+        var manager = NetworkManager.Singleton;
+
+        if (manager?.CustomMessagingManager == null)
+            return;
 
         try
         {
             manager.CustomMessagingManager
-                .UnregisterNamedMessageHandler(
-                    MessageName);
+                .UnregisterNamedMessageHandler(MessageName);
         }
         catch
         {
@@ -107,60 +139,34 @@ public class OnlineNetworkServer : NetworkBehaviour
         manager.CustomMessagingManager.RegisterNamedMessageHandler(
             MessageName,
             ReceiveNamedMessage);
-
-        Debug.Log(
-            "[OnlineNetworkServer] Handler registrado: " +
-            MessageName);
     }
 
-    void UnregisterMessageHandler()
+    private void UnregisterMessageHandler()
     {
         var manager = NetworkManager.Singleton;
 
-        if (manager == null ||
-            manager.CustomMessagingManager == null)
+        if (manager?.CustomMessagingManager == null)
             return;
 
         try
         {
             manager.CustomMessagingManager
-                .UnregisterNamedMessageHandler(
-                    MessageName);
+                .UnregisterNamedMessageHandler(MessageName);
         }
         catch
         {
         }
-
-        Debug.Log(
-            "[OnlineNetworkServer] Handler eliminado: " +
-            MessageName);
     }
 
-    void ReceiveNamedMessage(
+    private void ReceiveNamedMessage(
         ulong clientId,
         FastBufferReader reader)
     {
         try
         {
-            byte type1 = 0;
-            byte type2 = 0;
-            string content = "";
-
-            reader.ReadValueSafe(
-                out type1);
-
-            reader.ReadValueSafe(
-                out type2);
-
-            reader.ReadValueSafe(
-                out content);
-
-            Debug.Log(
-                $"[OnlineNetworkServer] PVZ_ONLINE_MESSAGE recibido. " +
-                $"ClientId={clientId} | " +
-                $"Type1={type1} | " +
-                $"Type2={type2} | " +
-                $"Bytes={reader.Length}");
+            reader.ReadValueSafe(out byte type1);
+            reader.ReadValueSafe(out byte type2);
+            reader.ReadValueSafe(out string content);
 
             ReceiveClientMessage(
                 clientId,
@@ -171,12 +177,12 @@ public class OnlineNetworkServer : NetworkBehaviour
         catch (Exception ex)
         {
             Debug.LogError(
-                "[OnlineNetworkServer] Error leyendo PVZ_ONLINE_MESSAGE: " +
+                "[OnlineNetworkServer] Error leyendo mensaje: " +
                 ex);
         }
     }
 
-    void InitializeHostPlayer()
+    private void InitializeHostPlayer()
     {
         var gm = GameManager.Instance;
 
@@ -187,17 +193,18 @@ public class OnlineNetworkServer : NetworkBehaviour
             gm.LocalPlayerSave?.playerName ??
             "Host";
 
-        HostPlayer = new PlayerInfo
+        hostPlayer = new PlayerInfo
         {
             Name = name,
-            VersionCode = gm.VersionCode
+            VersionCode = gm.VersionCode,
+            Password = hostPassword
         };
 
         gm.HostName = name;
         gm.isOnline = true;
     }
 
-    void ClearPlayerUI()
+    private void ClearPlayerUI()
     {
         battlePlayerList?.UpdatePlayerList(
             null,
@@ -208,7 +215,8 @@ public class OnlineNetworkServer : NetworkBehaviour
             new List<PlayerInfo>());
     }
 
-    void ClearServerState(bool clearUI)
+    private void ClearServerState(
+        bool clearUI)
     {
         isServerOpen = false;
 
@@ -217,109 +225,356 @@ public class OnlineNetworkServer : NetworkBehaviour
 
         players.Clear();
         clientPlayers.Clear();
-        ReConnectPlayer.Clear();
-        HandQuitPlayer.Clear();
+        reConnectPlayer.Clear();
+        handQuitPlayer.Clear();
 
-        HostPlayer = null;
+        hostPlayer = null;
+        hostPassword = "";
 
-        ReConnectCode = 0;
+        discoveryGamePort = 7777;
+        discoveryHostName = "Host";
+        discoveryVersion = "";
+        discoveryPasswordRequired = false;
+
+        reConnectCode = 0;
         itemId = 0;
 
         if (clearUI)
             ClearPlayerUI();
     }
 
-    public void StartServer(IPAddress ip, int port)
+    public void StartServer(
+        IPAddress ip,
+        int port,
+        string password = "")
+    {
+        _ = StartLocalServer(
+            ip,
+            port,
+            password);
+    }
+
+    public async System.Threading.Tasks.Task<bool> StartLocalServer(
+        IPAddress ip,
+        int port,
+        string password = "")
     {
         var gm = GameManager.Instance;
 
-        if (gm == null)
+        if (gm == null ||
+            gm.isOnline ||
+            port < 1 ||
+            port > ushort.MaxValue)
         {
-            Debug.LogError(
-                "No se pudo iniciar el servidor: GameManager.Instance es null.");
-            return;
+            return false;
         }
 
-        if (gm.isOnline)
-            return;
+        var manager = NetworkManager.Singleton;
 
-        var networkManager = NetworkManager.Singleton;
-
-        if (networkManager == null)
-        {
-            Debug.LogError(
-                "No existe NetworkManager.");
-            return;
-        }
+        if (manager == null)
+            return false;
 
         var transport =
-            networkManager.GetComponent<UnityTransport>();
+            manager.GetComponent<UnityTransport>();
 
         if (transport == null)
-        {
-            Debug.LogError(
-                "No existe UnityTransport en NetworkManager.");
-            return;
-        }
+            return false;
 
         StopAllCoroutines();
+        StopDiscovery();
         ClearServerState(true);
 
+        hostPassword =
+            (password ?? "").Trim();
+
+        discoveryGamePort = port;
+
+        discoveryHostName =
+            gm.LocalPlayerSave?.playerName ??
+            "Host";
+
+        discoveryVersion =
+            gm.VersionCode ??
+            "";
+
+        discoveryPasswordRequired =
+            !string.IsNullOrEmpty(
+                hostPassword);
+
         string address =
-            ip != null
-                ? ip.ToString()
-                : "0.0.0.0";
+            ip?.ToString() ??
+            "0.0.0.0";
 
         transport.SetConnectionData(
             address,
             (ushort)port,
             "0.0.0.0");
 
-        if (!networkManager.StartHost())
+        if (!manager.StartHost())
         {
-            Debug.LogError(
-                "No se pudo iniciar NetworkManager como Host.");
-
             ClearServerState(true);
-            return;
+            return false;
         }
 
         isServerOpen = true;
 
         InitializeHostPlayer();
-
+        StartDiscovery();
         UpdatePlayerLists();
 
-        Debug.Log(
-            $"Servidor online iniciado. " +
-            $"Host: {HostPlayer?.Name} | " +
-            $"Address: {address} | " +
-            $"Port: {port}");
+        return true;
+    }
+
+    public async System.Threading.Tasks.Task<string> StartRelayServer(
+        int maxConnections,
+        string password = "")
+    {
+        var gm = GameManager.Instance;
+
+        if (gm == null ||
+            gm.isOnline)
+        {
+            return "";
+        }
+
+        var manager =
+            NetworkManager.Singleton;
+
+        if (manager == null)
+            return "";
+
+        var transport =
+            manager.GetComponent<UnityTransport>();
+
+        if (transport == null)
+            return "";
+
+        var services =
+            UnityServicesInitializer.Instance;
+
+        if (services == null)
+            return "";
+
+        try
+        {
+            if (!await services.InitializeServices())
+                return "";
+
+            if (manager.IsListening)
+                manager.Shutdown();
+
+            StopAllCoroutines();
+            StopDiscovery();
+            ClearServerState(true);
+
+            hostPassword =
+                (password ?? "").Trim();
+
+            Allocation allocation =
+                await RelayService.Instance
+                    .CreateAllocationAsync(
+                        Mathf.Clamp(
+                            maxConnections,
+                            1,
+                            100));
+
+            transport.SetRelayServerData(
+                new RelayServerData(
+                    allocation,
+                    RelayConnectionType));
+
+            string joinCode =
+                await RelayService.Instance
+                    .GetJoinCodeAsync(
+                        allocation.AllocationId);
+
+            if (!manager.StartHost())
+            {
+                ClearServerState(true);
+                return "";
+            }
+
+            isServerOpen = true;
+
+            InitializeHostPlayer();
+            UpdatePlayerLists();
+
+            Debug.Log(
+                "[OnlineNetworkServer] Relay creado. " +
+                "JoinCode=" +
+                joinCode);
+
+            return joinCode;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(
+                "[OnlineNetworkServer] Error creando Relay: " +
+                ex);
+
+            if (manager.IsListening)
+                manager.Shutdown();
+
+            ClearServerState(true);
+
+            return "";
+        }
+    }
+
+    private void StartDiscovery()
+    {
+        StopDiscovery();
+
+        discoveryRunning = true;
+
+        discoveryThread =
+            new Thread(DiscoveryLoop)
+            {
+                IsBackground = true
+            };
+
+        discoveryThread.Start();
+    }
+
+    private void DiscoveryLoop()
+    {
+        try
+        {
+            using UdpClient socket =
+                new(DiscoveryPort);
+
+            socket.EnableBroadcast = true;
+            socket.Client.ReceiveTimeout = 500;
+            discoverySocket = socket;
+
+            while (discoveryRunning)
+            {
+                try
+                {
+                    IPEndPoint endpoint =
+                        new(
+                            IPAddress.Any,
+                            0);
+
+                    byte[] data =
+                        socket.Receive(
+                            ref endpoint);
+
+                    string message =
+                        Encoding.UTF8.GetString(data);
+
+                    if (message != DiscoveryRequest)
+                        continue;
+
+                    string json =
+                        "{\"name\":\"" +
+                        EscapeJson(discoveryHostName) +
+                        "\",\"version\":\"" +
+                        EscapeJson(discoveryVersion) +
+                        "\",\"port\":" +
+                        discoveryGamePort +
+                        ",\"passwordRequired\":" +
+                        (discoveryPasswordRequired
+                            ? "true"
+                            : "false") +
+                        "}";
+
+                    byte[] response =
+                        Encoding.UTF8.GetBytes(
+                            DiscoveryResponse +
+                            "|" +
+                            json);
+
+                    socket.Send(
+                        response,
+                        response.Length,
+                        endpoint);
+                }
+                catch (SocketException)
+                {
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (discoveryRunning)
+            {
+                Debug.LogWarning(
+                    "[OnlineNetworkServer] Error en descubrimiento: " +
+                    ex.Message);
+            }
+        }
+        finally
+        {
+            discoverySocket = null;
+            discoveryRunning = false;
+        }
+    }
+
+    private static string EscapeJson(
+        string value)
+    {
+        return (value ?? "")
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"");
+    }
+
+    private void StopDiscovery()
+    {
+        discoveryRunning = false;
+
+        try
+        {
+            discoverySocket?.Close();
+        }
+        catch
+        {
+        }
+
+        discoverySocket = null;
+
+        if (discoveryThread != null &&
+            discoveryThread.IsAlive)
+        {
+            try
+            {
+                discoveryThread.Join(150);
+            }
+            catch
+            {
+            }
+        }
+
+        discoveryThread = null;
     }
 
     public void CloseServer()
     {
+        StopDiscovery();
         StopAllCoroutines();
 
-        var networkManager = NetworkManager.Singleton;
+        var manager =
+            NetworkManager.Singleton;
 
-        if (networkManager != null &&
-            networkManager.IsListening)
+        if (manager != null &&
+            manager.IsListening)
         {
-            networkManager.Shutdown();
+            manager.Shutdown();
         }
 
         ClearServerState(true);
-
-        Debug.Log(
-            "Servidor online cerrado y estado limpiado.");
     }
 
-    void OnApplicationQuit()
+    private void OnApplicationQuit()
     {
         try
         {
             StopAllCoroutines();
+            StopDiscovery();
             ClearServerState(false);
         }
         catch
@@ -327,14 +582,16 @@ public class OnlineNetworkServer : NetworkBehaviour
         }
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
         if (Instance != this)
             return;
 
         try
         {
+            UnregisterNetworkCallbacks();
             StopAllCoroutines();
+            StopDiscovery();
             ClearServerState(false);
         }
         catch
@@ -351,14 +608,12 @@ public class OnlineNetworkServer : NetworkBehaviour
         string content,
         ServerRpcParams rpcParams = default)
     {
-        if (!IsServer || !isServerOpen)
+        if (!IsServer ||
+            !isServerOpen)
             return;
 
-        ulong clientId =
-            rpcParams.Receive.SenderClientId;
-
         HandleClientMessage(
-            clientId,
+            rpcParams.Receive.SenderClientId,
             type1,
             type2,
             content ?? "");
@@ -370,7 +625,8 @@ public class OnlineNetworkServer : NetworkBehaviour
         byte type2,
         string content)
     {
-        if (!IsServer || !isServerOpen)
+        if (!IsServer ||
+            !isServerOpen)
             return;
 
         HandleClientMessage(
@@ -380,7 +636,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             content ?? "");
     }
 
-    void HandleClientMessage(
+    private void HandleClientMessage(
         ulong clientId,
         byte type1,
         byte type2,
@@ -396,13 +652,15 @@ public class OnlineNetworkServer : NetworkBehaviour
             return;
         }
 
+        if (!clientPlayers.TryGetValue(
+                clientId,
+                out var player))
+        {
+            return;
+        }
+
         if (type1 == 1)
         {
-            if (!clientPlayers.TryGetValue(
-                    clientId,
-                    out var player))
-                return;
-
             ProcessGameMessage(
                 type2,
                 content,
@@ -414,11 +672,6 @@ public class OnlineNetworkServer : NetworkBehaviour
 
         if (type1 == 2)
         {
-            if (!clientPlayers.TryGetValue(
-                    clientId,
-                    out var player))
-                return;
-
             HandleChatMessage(
                 type2,
                 content,
@@ -427,7 +680,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         }
     }
 
-    void HandleConnectionMessage(
+    private void HandleConnectionMessage(
         ulong clientId,
         byte type,
         string msg)
@@ -447,17 +700,10 @@ public class OnlineNetworkServer : NetworkBehaviour
                 info = null;
             }
 
-            Debug.Log(
-                $"[OnlineNetworkServer] PlayerInfo recibido. " +
-                $"ClientId={clientId} | " +
-                $"Name={info?.Name} | " +
-                $"Version={info?.VersionCode}");
-
-            if (!ValidatePlayer(info))
+            if (!ValidatePlayer(
+                    info,
+                    clientId))
             {
-                Debug.LogWarning(
-                    $"[OnlineNetworkServer] PlayerInfo rechazado. ClientId={clientId}");
-
                 DisconnectClient(clientId);
                 return;
             }
@@ -470,23 +716,11 @@ public class OnlineNetworkServer : NetworkBehaviour
                 clientId,
                 info);
 
-            Debug.Log(
-                $"[OnlineNetworkServer] Cliente registrado. " +
-                $"ClientId={clientId} | " +
-                $"Name={info.Name}");
-
             return;
         }
 
         if (type == 2)
         {
-            if (clientPlayers.TryGetValue(
-                    clientId,
-                    out var player))
-            {
-                HandQuitPlayer.Add(player);
-            }
-
             RemovePlayerByClient(
                 clientId,
                 true);
@@ -501,39 +735,36 @@ public class OnlineNetworkServer : NetworkBehaviour
                     out var player))
             {
                 player.Heartbeat = true;
-
-                Debug.Log(
-                    $"[OnlineNetworkServer] Heartbeat recibido. ClientId={clientId} | Player={player.Name}");
             }
 
             SendMessageToClient(
                 clientId,
                 0,
-                byte.MaxValue,
-                "");
-
-            return;
+                byte.MaxValue);
         }
     }
 
-    bool ValidatePlayer(PlayerInfo info)
+    private bool ValidatePlayer(
+        PlayerInfo info,
+        ulong clientId)
     {
         if (info == null)
         {
             SendFailConnectMsg(
                 "Información del jugador no válida.",
-                0);
+                clientId);
 
             return false;
         }
 
-        var gm = GameManager.Instance;
+        var gm =
+            GameManager.Instance;
 
         if (gm == null)
         {
             SendFailConnectMsg(
                 "GameManager no está disponible.",
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
@@ -541,42 +772,43 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (info.VersionCode != gm.VersionCode)
         {
             SendFailConnectMsg(
-                "Diferente a la versión del juego del servidor. Versión del juego del servidor :v" +
+                "Diferente a la versión del juego del servidor. " +
+                "Versión del juego del servidor :v" +
                 gm.VersionCode,
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
 
         if (CanReConnect(info))
         {
-            if (info.ReCntCode != ReConnectCode)
+            if (info.ReCntCode != reConnectCode)
             {
+                SendFailConnectMsg(
+                    "Código de reconexión incorrecto.",
+                    clientId);
+
                 return false;
             }
 
             return true;
         }
 
-        var ui = UIManager.Instance;
+        string clientPassword =
+            (info.Password ?? "").Trim();
 
-        if (ui?.HostPasswordInput == null)
-        {
-            SendFailConnectMsg(
-                "La interfaz del servidor no está disponible.",
-                FindClientId(info.Name));
+        string serverPassword =
+            (hostPassword ?? "").Trim();
 
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(
-                ui.HostPasswordInput.text) &&
-            info.Password !=
-            ui.HostPasswordInput.text)
+        if (!string.IsNullOrEmpty(serverPassword) &&
+            !string.Equals(
+                clientPassword,
+                serverPassword,
+                StringComparison.Ordinal))
         {
             SendFailConnectMsg(
                 "Contraseña incorrecta; no se pudo unir.",
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
@@ -585,16 +817,17 @@ public class OnlineNetworkServer : NetworkBehaviour
         {
             SendFailConnectMsg(
                 "Server lleno; error al unirse.",
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
 
-        if (HostPlayer?.Name == info.Name)
+        if (hostPlayer?.Name == info.Name)
         {
             SendFailConnectMsg(
-                "El nombre entra en conflicto con el de un jugador en línea; no se pudo unir a la partida.",
-                FindClientId(info.Name));
+                "El nombre entra en conflicto con el de un jugador en línea; " +
+                "no se pudo unir a la partida.",
+                clientId);
 
             return false;
         }
@@ -603,7 +836,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         {
             SendFailConnectMsg(
                 "La partida ya ha comenzado; no se pudo unir.",
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
@@ -612,7 +845,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         {
             SendFailConnectMsg(
                 "No se pudo cargar la información del jugador.",
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
@@ -624,7 +857,7 @@ public class OnlineNetworkServer : NetworkBehaviour
                 info.CmdEnable
                     ? "Has habilitado los comandos, pero el servidor no; no puedes unirte"
                     : "No has habilitado los comandos, pero el servidor sí; no puedes unirte",
-                FindClientId(info.Name));
+                clientId);
 
             return false;
         }
@@ -633,8 +866,9 @@ public class OnlineNetworkServer : NetworkBehaviour
                 p => p?.Name == info.Name))
         {
             SendFailConnectMsg(
-                "El nombre entra en conflicto con el de un jugador en línea; no se pudo unir a la partida.",
-                FindClientId(info.Name));
+                "El nombre entra en conflicto con el de un jugador en línea; " +
+                "no se pudo unir a la partida.",
+                clientId);
 
             return false;
         }
@@ -642,7 +876,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         return true;
     }
 
-    void AddPlayerFromClient(
+    private void AddPlayerFromClient(
         ulong clientId,
         PlayerInfo player)
     {
@@ -653,7 +887,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         {
             players.Add(player);
 
-            ReConnectPlayer.RemoveAll(
+            reConnectPlayer.RemoveAll(
                 p => p?.Name == player.Name);
 
             ReConnectListChange();
@@ -664,7 +898,7 @@ public class OnlineNetworkServer : NetworkBehaviour
                 2,
                 new OnlinePlayerInfo
                 {
-                    HostPlayer = HostPlayer,
+                    HostPlayer = hostPlayer,
                     players = players
                 });
 
@@ -690,208 +924,208 @@ public class OnlineNetworkServer : NetworkBehaviour
             PvPSelector.Instance.ServerSynTeam();
         }
 
-        SpectatorList.Instance?.ServerSynSpectList();
+        SpectatorList.Instance?
+            .ServerSynSpectList();
     }
 
-    void DisconnectClient(ulong clientId)
+    private void DisconnectClient(
+        ulong clientId)
     {
-        var networkManager =
+        var manager =
             NetworkManager.Singleton;
 
-        if (networkManager == null)
-            return;
-
-        if (networkManager.ConnectedClientsIds.Contains(
-                clientId))
+        if (manager?.ConnectedClientsIds.Contains(
+                clientId) == true)
         {
-            networkManager.DisconnectClient(
-                clientId);
+            manager.DisconnectClient(clientId);
         }
     }
 
-    ulong FindClientId(string playerName)
-    {
-        foreach (var pair in clientPlayers)
-        {
-            if (pair.Value?.Name == playerName)
-                return pair.Key;
-        }
-
-        return ulong.MaxValue;
-    }
-
-    void ProcessGameMessage(
+    private void ProcessGameMessage(
         byte type,
         string msg,
         PlayerInfo player,
         ulong clientId)
     {
-        switch (type)
+        if (type == 0)
         {
-            case 0:
-                PlacePlant(
-                    JsonUtility.FromJson<PlantSpawn>(msg),
-                    player,
+            PlacePlant(
+                JsonUtility.FromJson<PlantSpawn>(msg),
+                player,
+                clientId);
+
+            return;
+        }
+
+        if (type == 1)
+        {
+            ApplyTool(
+                JsonUtility.FromJson<ToolApply>(msg),
+                player,
+                clientId);
+
+            return;
+        }
+
+        if (type == 2)
+        {
+            SkyManager.Instance?.OnlineCollectSun(
+                JsonUtility.FromJson<ClickedSun>(msg));
+
+            return;
+        }
+
+        if (type == 3)
+        {
+            ChangeMap(
+                JsonUtility.FromJson<PlayerMap>(msg),
+                player);
+
+            return;
+        }
+
+        if (type == 4)
+        {
+            SelectCard(
+                JsonUtility.FromJson<SelectCard>(msg),
+                player);
+
+            return;
+        }
+
+        if (type == 5)
+        {
+            SelectPrepare(
+                JsonUtility.FromJson<SelectPrepare>(msg),
+                player);
+
+            return;
+        }
+
+        if (type == 6)
+        {
+            var item =
+                JsonUtility.FromJson<SynItem>(msg);
+
+            if (item != null)
+                SynItem(item);
+
+            return;
+        }
+
+        if (type == 7)
+        {
+            var preview =
+                JsonUtility.FromJson<PlantPreview>(msg);
+
+            if (preview != null)
+            {
+                BattlePlayerList.Instance?.PreviewPlant(preview);
+                PlacePreview(preview, clientId);
+            }
+
+            return;
+        }
+
+        if (type == 8)
+        {
+            UpdateCD(
+                JsonUtility.FromJson<UpdateCardCD>(msg),
+                player,
+                clientId);
+
+            return;
+        }
+
+        if (type == 9)
+        {
+            var preview =
+                JsonUtility.FromJson<ShovelPreview>(msg);
+
+            if (preview != null)
+            {
+                BattlePlayerList.Instance?
+                    .PreviewShovel(
+                        preview.PlayerName,
+                        preview.GridPos,
+                        preview.isShow);
+
+                ShovelPreview(
+                    preview,
                     clientId);
-                break;
+            }
 
-            case 1:
-                ApplyTool(
-                    JsonUtility.FromJson<ToolApply>(msg),
-                    player,
-                    clientId);
-                break;
+            return;
+        }
 
-            case 2:
-                if (SkyManager.Instance != null)
-                {
-                    SkyManager.Instance.OnlineCollectSun(
-                        JsonUtility.FromJson<ClickedSun>(msg));
-                }
-                break;
+        if (type == 10)
+        {
+            PlaceZombie(
+                JsonUtility.FromJson<ZombieSpawnApply>(msg),
+                player,
+                clientId);
 
-            case 3:
-                ChangeMap(
-                    JsonUtility.FromJson<PlayerMap>(msg),
-                    player);
-                break;
+            return;
+        }
 
-            case 4:
-                SelectCard(
-                    JsonUtility.FromJson<SelectCard>(msg),
-                    player);
-                break;
+        if (type == 11)
+        {
+            var preview =
+                JsonUtility.FromJson<ZombiePreview>(msg);
 
-            case 5:
-                SelectPrepare(
-                    JsonUtility.FromJson<SelectPrepare>(msg),
-                    player);
-                break;
+            if (preview != null)
+            {
+                BattlePlayerList.Instance?.PreviewZombie(preview);
+                ZombiePreview(preview, clientId);
+            }
 
-            case 6:
-                {
-                    var item =
-                        JsonUtility.FromJson<SynItem>(msg);
+            return;
+        }
 
-                    if (item != null)
-                        SynItem(item);
+        if (type == 12)
+        {
+            var team =
+                JsonUtility.FromJson<JoinTeamApply>(msg);
 
-                    break;
-                }
+            if (team != null &&
+                PvPSelector.Instance != null)
+            {
+                if (team.isRed)
+                    PvPSelector.Instance.JoinRed(player.Name);
+                else
+                    PvPSelector.Instance.JoinBlue(player.Name);
+            }
 
-            case 7:
-                {
-                    var pp =
-                        JsonUtility.FromJson<PlantPreview>(msg);
+            return;
+        }
 
-                    if (pp != null)
-                    {
-                        BattlePlayerList.Instance?.PreviewPlant(pp);
-                        PlacePreview(pp, clientId);
-                    }
+        if (type == 13)
+        {
+            var spectator =
+                JsonUtility.FromJson<JoinSpecApply>(msg);
 
-                    break;
-                }
+            if (spectator != null &&
+                SpectatorList.Instance != null)
+            {
+                SpectatorList.Instance.ClientJoinSpect(
+                    player.Name,
+                    spectator.isJoin);
+            }
 
-            case 8:
-                UpdateCD(
-                    JsonUtility.FromJson<UpdateCardCD>(msg),
-                    player,
-                    clientId);
-                break;
+            return;
+        }
 
-            case 9:
-                {
-                    var sp =
-                        JsonUtility.FromJson<ShovelPreview>(msg);
+        if (type == 14)
+        {
+            var bag =
+                JsonUtility.FromJson<SlotMchBag>(msg);
 
-                    if (sp != null)
-                    {
-                        BattlePlayerList.Instance?.PreviewShovel(
-                            sp.PlayerName,
-                            sp.GridPos,
-                            sp.isShow);
-
-                        ShovelPreview(
-                            sp,
-                            clientId);
-                    }
-
-                    break;
-                }
-
-            case 10:
-                PlaceZombie(
-                    JsonUtility.FromJson<ZombieSpawnApply>(msg),
-                    player,
-                    clientId);
-                break;
-
-            case 11:
-                {
-                    var zp =
-                        JsonUtility.FromJson<ZombiePreview>(msg);
-
-                    if (zp != null)
-                    {
-                        BattlePlayerList.Instance?.PreviewZombie(zp);
-                        ZombiePreview(zp, clientId);
-                    }
-
-                    break;
-                }
-
-            case 12:
-                {
-                    var team =
-                        JsonUtility.FromJson<JoinTeamApply>(msg);
-
-                    if (team != null &&
-                        player != null &&
-                        PvPSelector.Instance != null)
-                    {
-                        if (team.isRed)
-                            PvPSelector.Instance.JoinRed(
-                                player.Name);
-                        else
-                            PvPSelector.Instance.JoinBlue(
-                                player.Name);
-                    }
-
-                    break;
-                }
-
-            case 13:
-                {
-                    var spect =
-                        JsonUtility.FromJson<JoinSpecApply>(msg);
-
-                    if (spect != null &&
-                        player != null &&
-                        SpectatorList.Instance != null)
-                    {
-                        SpectatorList.Instance.ClientJoinSpect(
-                            player.Name,
-                            spect.isJoin);
-                    }
-
-                    break;
-                }
-
-            case 14:
-                {
-                    var bag =
-                        JsonUtility.FromJson<SlotMchBag>(msg);
-
-                    if (bag != null)
-                        SlotMachine.Instance?.ClientSyn(bag);
-
-                    break;
-                }
+            if (bag != null)
+                SlotMachine.Instance?.ClientSyn(bag);
         }
     }
 
-    void PlacePlant(
+    private void PlacePlant(
         PlantSpawn spawn,
         PlayerInfo player,
         ulong clientId)
@@ -903,11 +1137,12 @@ public class OnlineNetworkServer : NetworkBehaviour
             SeedBank.Instance == null)
             return;
 
-        var cd = new UpdateCardCD
-        {
-            CardId = spawn.CardId,
-            name = player.Name
-        };
+        var cd =
+            new UpdateCardCD
+            {
+                CardId = spawn.CardId,
+                name = player.Name
+            };
 
         ReversePvP(
             ref spawn.GridPos,
@@ -932,7 +1167,6 @@ public class OnlineNetworkServer : NetworkBehaviour
                 player.Name))
         {
             int needSun = -1;
-
             cd.OK = false;
 
             if (spawn.SPcode == 2)
@@ -956,10 +1190,7 @@ public class OnlineNetworkServer : NetworkBehaviour
                 spawn.SPcode,
                 player.Name);
 
-            SendJson(
-                2,
-                4,
-                cd);
+            SendJson(2, 4, cd);
 
             BattlePlayerList.Instance?
                 .UpdateCardCD(
@@ -989,7 +1220,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             false);
     }
 
-    void PlaceZombie(
+    private void PlaceZombie(
         ZombieSpawnApply spawn,
         PlayerInfo player,
         ulong clientId)
@@ -1001,11 +1232,12 @@ public class OnlineNetworkServer : NetworkBehaviour
             SeedBank.Instance == null)
             return;
 
-        var cd = new UpdateCardCD
-        {
-            CardId = spawn.CardId,
-            name = player.Name
-        };
+        var cd =
+            new UpdateCardCD
+            {
+                CardId = spawn.CardId,
+                name = player.Name
+            };
 
         ReversePvP(
             ref spawn.GridPos,
@@ -1039,10 +1271,7 @@ public class OnlineNetworkServer : NetworkBehaviour
                 player.Name,
                 spawn.isRat);
 
-            SendJson(
-                2,
-                4,
-                cd);
+            SendJson(2, 4, cd);
 
             BattlePlayerList.Instance?
                 .UpdateCardCD(
@@ -1072,7 +1301,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             spawn.isRat);
     }
 
-    void ReversePvP(
+    private void ReversePvP(
         ref Vector2 pos,
         string player)
     {
@@ -1084,7 +1313,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         }
     }
 
-    void ApplyTool(
+    private void ApplyTool(
         ToolApply apply,
         PlayerInfo player,
         ulong clientId)
@@ -1117,12 +1346,11 @@ public class OnlineNetworkServer : NetworkBehaviour
                         player.Name);
             }
 
-            SendJson(
-                2,
-                6,
-                apply);
+            SendJson(2, 6, apply);
+            return;
         }
-        else if (apply.type == ToolType.Glove)
+
+        if (apply.type == ToolType.Glove)
         {
             Glove.Instance?.SynClient(
                 apply.OnlineId,
@@ -1130,7 +1358,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         }
     }
 
-    void ChangeMap(
+    private void ChangeMap(
         PlayerMap map,
         PlayerInfo player)
     {
@@ -1148,7 +1376,7 @@ public class OnlineNetworkServer : NetworkBehaviour
                 map.Pos);
     }
 
-    void SelectCard(
+    private void SelectCard(
         SelectCard card,
         PlayerInfo player)
     {
@@ -1160,27 +1388,27 @@ public class OnlineNetworkServer : NetworkBehaviour
 
         SelectCard(card);
 
-        if (BattlePlayerList.Instance != null)
+        if (BattlePlayerList.Instance == null)
+            return;
+
+        if (card.isBack)
         {
-            if (card.isBack)
-            {
-                BattlePlayerList.Instance.CancelCard(
-                    card.PlayerName,
-                    card.cardId);
-            }
-            else
-            {
-                BattlePlayerList.Instance.SelectCard(
-                    card.PlayerName,
-                    card.plantType,
-                    card.zombieType,
-                    card.noAnim,
-                    card.cardId);
-            }
+            BattlePlayerList.Instance.CancelCard(
+                card.PlayerName,
+                card.cardId);
+        }
+        else
+        {
+            BattlePlayerList.Instance.SelectCard(
+                card.PlayerName,
+                card.plantType,
+                card.zombieType,
+                card.noAnim,
+                card.cardId);
         }
     }
 
-    void SelectPrepare(
+    private void SelectPrepare(
         SelectPrepare prepare,
         PlayerInfo player)
     {
@@ -1198,7 +1426,7 @@ public class OnlineNetworkServer : NetworkBehaviour
                 prepare.isPrepare);
     }
 
-    void UpdateCD(
+    private void UpdateCD(
         UpdateCardCD cd,
         PlayerInfo player,
         ulong clientId)
@@ -1222,7 +1450,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             cd);
     }
 
-    void HandleChatMessage(
+    private void HandleChatMessage(
         byte type,
         string msg,
         PlayerInfo player,
@@ -1241,41 +1469,41 @@ public class OnlineNetworkServer : NetworkBehaviour
             return;
         }
 
-        if (type == 1)
+        if (type != 1)
+            return;
+
+        var chat =
+            JsonUtility.FromJson<PrivateChatMsg>(msg);
+
+        if (chat == null ||
+            player == null)
+            return;
+
+        if (GameManager.Instance?.LocalPlayerSave != null &&
+            chat.PlayerName ==
+            GameManager.Instance.LocalPlayerSave.playerName)
         {
-            var chat =
-                JsonUtility.FromJson<PrivateChatMsg>(msg);
-
-            if (chat == null ||
-                player == null)
-                return;
-
-            if (GameManager.Instance?.LocalPlayerSave != null &&
-                chat.PlayerName ==
-                GameManager.Instance.LocalPlayerSave.playerName)
-            {
-                ChatInput.Instance?.AddMessage(
-                    "Jugador" +
-                    player.Name +
-                    "Susurro:" +
-                    chat.content,
-                    new Color32(
-                        123,
-                        123,
-                        123,
-                        255));
-            }
-            else
-            {
-                SendPrivateChatMsg(
-                    chat.PlayerName,
-                    chat.content,
-                    player.Name);
-            }
+            ChatInput.Instance?.AddMessage(
+                "Jugador" +
+                player.Name +
+                "Susurro:" +
+                chat.content,
+                new Color32(
+                    123,
+                    123,
+                    123,
+                    255));
+        }
+        else
+        {
+            SendPrivateChatMsg(
+                chat.PlayerName,
+                chat.content,
+                player.Name);
         }
     }
 
-    void SendNamedMessageToClient(
+    private void SendNamedMessageToClient(
         ulong clientId,
         byte type1,
         byte type2,
@@ -1294,33 +1522,34 @@ public class OnlineNetworkServer : NetworkBehaviour
 
         content ??= "";
 
-        int stringBytes =
+        int contentBytes =
             Encoding.UTF8.GetByteCount(content);
 
-        int size =
-            stringBytes + 256;
-
-        if (size > MaxPacket)
+        if (contentBytes > MaxPacket)
         {
             Debug.LogError(
-                $"[OnlineNetworkServer] Mensaje demasiado grande. Bytes={stringBytes}");
+                $"[OnlineNetworkServer] Mensaje demasiado grande. Bytes={contentBytes}");
+
             return;
         }
+
+        int size =
+            contentBytes +
+            1024;
 
         using var writer =
             new FastBufferWriter(
                 size,
                 Allocator.Temp);
 
-        writer.WriteValueSafe(type1);
-        writer.WriteValueSafe(type2);
-        writer.WriteValueSafe(content);
+        writer.WriteValueSafe(
+            type1);
 
-        Debug.Log(
-            $"[OnlineNetworkServer] Enviando PVZ_ONLINE_MESSAGE. " +
-            $"ClientId={clientId} | " +
-            $"Type1={type1} | " +
-            $"Type2={type2}");
+        writer.WriteValueSafe(
+            type2);
+
+        writer.WriteValueSafe(
+            content);
 
         manager.CustomMessagingManager.SendNamedMessage(
             MessageName,
@@ -1328,59 +1557,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             writer);
     }
 
-    void SendMessage(
-        byte type1,
-        byte type2,
-        string content = "")
-    {
-        if (!IsServer)
-            return;
-
-        var manager =
-            NetworkManager.Singleton;
-
-        if (manager == null)
-            return;
-
-        var clients =
-            manager.ConnectedClientsIds;
-
-        foreach (var clientId in clients)
-        {
-            if (clientId == NetworkManager.ServerClientId)
-                continue;
-
-            SendNamedMessageToClient(
-                clientId,
-                type1,
-                type2,
-                content ?? "");
-        }
-    }
-
-    void SendMessageToClient(
-        ulong clientId,
-        byte type1,
-        byte type2,
-        string content = "")
-    {
-        if (!IsServer)
-            return;
-
-        if (!NetworkManager.Singleton
-                .ConnectedClientsIds
-                .Contains(clientId))
-            return;
-
-        SendNamedMessageToClient(
-            clientId,
-            type1,
-            type2,
-            content ?? "");
-    }
-
-    void SendMessageExcept(
-        ulong excludedClientId,
+    private void SendMessage(
         byte type1,
         byte type2,
         string content = "")
@@ -1398,20 +1575,71 @@ public class OnlineNetworkServer : NetworkBehaviour
                  manager.ConnectedClientsIds)
         {
             if (clientId ==
-                NetworkManager.ServerClientId ||
-                clientId ==
-                excludedClientId)
+                NetworkManager.ServerClientId)
                 continue;
 
             SendNamedMessageToClient(
                 clientId,
                 type1,
                 type2,
-                content ?? "");
+                content);
         }
     }
 
-    void SendJson(
+    private void SendMessageToClient(
+        ulong clientId,
+        byte type1,
+        byte type2,
+        string content = "")
+    {
+        if (!IsServer)
+            return;
+
+        var manager =
+            NetworkManager.Singleton;
+
+        if (manager?.ConnectedClientsIds.Contains(
+                clientId) != true)
+            return;
+
+        SendNamedMessageToClient(
+            clientId,
+            type1,
+            type2,
+            content);
+    }
+
+    private void SendMessageExcept(
+        ulong excludedClientId,
+        byte type1,
+        byte type2,
+        string content = "")
+    {
+        if (!IsServer)
+            return;
+
+        var manager =
+            NetworkManager.Singleton;
+
+        if (manager == null)
+            return;
+
+        foreach (var clientId in
+                 manager.ConnectedClientsIds)
+        {
+            if (clientId == NetworkManager.ServerClientId ||
+                clientId == excludedClientId)
+                continue;
+
+            SendNamedMessageToClient(
+                clientId,
+                type1,
+                type2,
+                content);
+        }
+    }
+
+    private void SendJson(
         byte type1,
         byte type2,
         object value)
@@ -1422,7 +1650,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             JsonUtility.ToJson(value));
     }
 
-    void SendJsonToClient(
+    private void SendJsonToClient(
         ulong clientId,
         byte type1,
         byte type2,
@@ -1435,7 +1663,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             JsonUtility.ToJson(value));
     }
 
-    void SendJsonExcept(
+    private void SendJsonExcept(
         ulong excludedClientId,
         byte type1,
         byte type2,
@@ -1448,37 +1676,30 @@ public class OnlineNetworkServer : NetworkBehaviour
             JsonUtility.ToJson(value));
     }
 
-    void DisconnectPlayer(
-        ulong clientId)
-    {
-        if (!clientPlayers.TryGetValue(
-                clientId,
-                out var player))
-            return;
-
-        RemovePlayer(
-            player,
-            clientId);
-    }
-
-    void RemovePlayerByClient(
+    private void RemovePlayerByClient(
         ulong clientId,
         bool intentional)
     {
         if (!clientPlayers.TryGetValue(
                 clientId,
                 out var player))
+        {
             return;
+        }
 
-        if (intentional)
-            HandQuitPlayer.Add(player);
+        if (intentional &&
+            !handQuitPlayer.Any(
+                p => p?.Name == player.Name))
+        {
+            handQuitPlayer.Add(player);
+        }
 
         RemovePlayer(
             player,
             clientId);
     }
 
-    void RemovePlayer(
+    private void RemovePlayer(
         PlayerInfo player,
         ulong clientId)
     {
@@ -1488,50 +1709,54 @@ public class OnlineNetworkServer : NetworkBehaviour
         clientPlayers.Remove(clientId);
 
         int index =
-            players.IndexOf(player);
-
-        if (index < 0)
-        {
-            index =
-                players.FindIndex(
-                    p => p?.Name == player.Name);
-        }
+            players.FindIndex(
+                p => p?.Name == player.Name);
 
         if (index < 0)
             return;
 
-        player = players[index];
+        player =
+            players[index];
 
         players.RemoveAt(index);
 
+        Debug.Log(
+            "[OnlineNetworkServer] Jugador desconectado: " +
+            player.Name);
+
         if (LVManager.Instance?.InGame == true)
         {
-            if (HandQuitPlayer.Remove(player))
+            if (handQuitPlayer.Remove(
+                    player))
             {
                 RemoveDone(player);
                 return;
             }
 
-            if (!ReConnectPlayer.Contains(player))
-                ReConnectPlayer.Add(player);
+            if (!reConnectPlayer.Any(
+                    p => p?.Name == player.Name))
+            {
+                reConnectPlayer.Add(player);
+            }
 
             ReConnect.Instance?.OpenInit(false);
-
             ReConnectListChange();
+
+            return;
         }
-        else
-        {
-            RemoveDone(player);
-        }
+
+        RemoveDone(player);
     }
 
-    void RemovePlayerOnDisconnect(
+    private void RemovePlayerOnDisconnect(
         ulong clientId)
     {
         if (!clientPlayers.TryGetValue(
                 clientId,
                 out var player))
+        {
             return;
+        }
 
         RemovePlayer(
             player,
@@ -1544,10 +1769,16 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (!IsServer)
             return;
 
-        RemovePlayerOnDisconnect(clientId);
+        Debug.Log(
+            "[OnlineNetworkServer] NGO desconectó al cliente: " +
+            clientId);
+
+        RemovePlayerOnDisconnect(
+            clientId);
     }
 
-    public void SynItem(SynItem syn)
+    public void SynItem(
+        SynItem syn)
     {
         if (syn == null)
             return;
@@ -1556,8 +1787,7 @@ public class OnlineNetworkServer : NetworkBehaviour
             syn.Type == SynItemType.Plant)
         {
             PlantManager.Instance?
-                .OnlineGetPlant(
-                    syn.OnlineId)?
+                .OnlineGetPlant(syn.OnlineId)?
                 .OnlineSynPlant(syn);
         }
 
@@ -1565,26 +1795,25 @@ public class OnlineNetworkServer : NetworkBehaviour
             syn.Type == SynItemType.Zombie)
         {
             ZombieManager.Instance?
-                .OnlineGetZombie(
-                    syn.OnlineId)?
+                .OnlineGetZombie(syn.OnlineId)?
                 .OnlineSynZombie(syn);
         }
 
         if (syn.Type == SynItemType.AllItem ||
             syn.Type == SynItemType.Puddle)
         {
-            var list =
+            var puddles =
                 MapManager.Instance?.puddles;
 
-            if (list != null)
+            if (puddles != null)
             {
-                foreach (var item in list)
+                foreach (var item in puddles)
                 {
-                    if (item?.OnlineId == syn.OnlineId)
-                    {
-                        item.StartDisappear();
-                        break;
-                    }
+                    if (item?.OnlineId != syn.OnlineId)
+                        continue;
+
+                    item.StartDisappear();
+                    break;
                 }
             }
         }
@@ -1592,18 +1821,18 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (syn.Type == SynItemType.AllItem ||
             syn.Type == SynItemType.Portal)
         {
-            var list =
+            var portals =
                 MapManager.Instance?.portalCs;
 
-            if (list != null)
+            if (portals != null)
             {
-                foreach (var item in list)
+                foreach (var item in portals)
                 {
-                    if (item?.OnlineId == syn.OnlineId)
-                    {
-                        item.ClientReset(syn);
-                        break;
-                    }
+                    if (item?.OnlineId != syn.OnlineId)
+                        continue;
+
+                    item.ClientReset(syn);
+                    break;
                 }
             }
         }
@@ -1623,16 +1852,16 @@ public class OnlineNetworkServer : NetworkBehaviour
 
     public List<string> GetAllPlayerNameList()
     {
-        var names = new List<string>();
+        var names =
+            new List<string>();
 
-        if (HostPlayer != null)
-            names.Add(HostPlayer.Name);
+        if (hostPlayer != null)
+            names.Add(hostPlayer.Name);
 
-        foreach (var player in players)
-        {
-            if (player != null)
-                names.Add(player.Name);
-        }
+        names.AddRange(
+            players
+                .Where(p => p != null)
+                .Select(p => p.Name));
 
         return names;
     }
@@ -1644,27 +1873,29 @@ public class OnlineNetworkServer : NetworkBehaviour
 
     public PlayerInfo GetHostPlayer()
     {
-        return HostPlayer;
+        return hostPlayer;
     }
 
-    void UpdatePlayerLists()
+    private void UpdatePlayerLists()
     {
-        battlePlayerList ??=
-            BattlePlayerList.Instance;
+        battlePlayerList ??= BattlePlayerList.Instance;
+        playerList ??= PlayerList.Instance;
 
-        playerList ??=
-            PlayerList.Instance;
+        var currentPlayers =
+            players
+                .Where(p => p != null)
+                .ToList();
 
         battlePlayerList?.UpdatePlayerList(
-            HostPlayer,
-            players);
+            hostPlayer,
+            currentPlayers);
 
         playerList?.UpdatePlayerList(
-            HostPlayer,
-            players);
+            hostPlayer,
+            currentPlayers);
     }
 
-    void AddNewPlayer(
+    private void AddNewPlayer(
         PlayerInfo player,
         ulong clientId)
     {
@@ -1700,16 +1931,12 @@ public class OnlineNetworkServer : NetworkBehaviour
             2,
             new OnlinePlayerInfo
             {
-                HostPlayer = HostPlayer,
+                HostPlayer = hostPlayer,
                 players = players
             });
-
-        Debug.Log(
-            $"[OnlineNetworkServer] OnlinePlayerInfo enviado. " +
-            $"ClientId={clientId} | Players={players.Count}");
     }
 
-    void RemoveDone(
+    private void RemoveDone(
         PlayerInfo player)
     {
         if (player == null)
@@ -1735,20 +1962,21 @@ public class OnlineNetworkServer : NetworkBehaviour
         UpdatePlayerLists();
 
         PvPSelector.Instance?
-            .ClearQuitPlayer(
-                player.Name);
+            .ClearQuitPlayer(player.Name);
 
         SpectatorList.Instance?
-            .ClearPlayer(
-                player.Name);
+            .ClearPlayer(player.Name);
 
         SendJson(
             0,
             2,
             new OnlinePlayerInfo
             {
-                HostPlayer = HostPlayer,
-                players = players
+                HostPlayer = hostPlayer,
+                players =
+                    players
+                        .Where(p => p != null)
+                        .ToList()
             });
     }
 
@@ -1828,7 +2056,11 @@ public class OnlineNetworkServer : NetworkBehaviour
         if (player == null)
             return;
 
-        HandQuitPlayer.Add(player);
+        if (!handQuitPlayer.Any(
+                p => p?.Name == player.Name))
+        {
+            handQuitPlayer.Add(player);
+        }
 
         var clientId =
             GetClientIdByPlayer(name);
@@ -1846,13 +2078,13 @@ public class OnlineNetworkServer : NetworkBehaviour
     public void LoadLv(
         LoadLVBag loadLV)
     {
-        ReConnectCode =
+        reConnectCode =
             UnityEngine.Random.Range(
                 100000,
                 999999);
 
         loadLV.ReCntCode =
-            ReConnectCode;
+            reConnectCode;
 
         SendJson(
             1,
@@ -1879,81 +2111,55 @@ public class OnlineNetworkServer : NetworkBehaviour
 
     public void StartRunLv()
     {
-        SendMessage(
-            1,
-            1);
+        SendMessage(1, 1);
     }
 
     public void BigWaveComing(
         WaveComing wave)
     {
-        SendJson(
-            1,
-            2,
-            wave);
+        SendJson(1, 2, wave);
     }
 
     public void UpdateSunNum(
         SunNumBag sun)
     {
-        SendJson(
-            1,
-            3,
-            sun);
+        SendJson(1, 3, sun);
     }
 
     public void SendSynBag(
         SynItem syn)
     {
-        SendJson(
-            1,
-            4,
-            syn);
+        SendJson(1, 6, syn);
     }
 
     public void ChangeMap(
         PlayerMap map)
     {
-        SendJson(
-            1,
-            5,
-            map);
+        SendJson(1, 7, map);
     }
 
     public void SelectCard(
         SelectCard card)
     {
-        SendJson(
-            1,
-            6,
-            card);
+        SendJson(1, 4, card);
     }
 
     public void SelectPrepare(
         SelectPrepare prepare)
     {
-        SendJson(
-            1,
-            7,
-            prepare);
+        SendJson(1, 5, prepare);
     }
 
     public void GameOver(
         GameOver over)
     {
-        SendJson(
-            1,
-            8,
-            over);
+        SendJson(1, 8, over);
     }
 
     public void SynTeamList(
         PvPTeamList list)
     {
-        SendJson(
-            1,
-            9,
-            list);
+        SendJson(1, 9, list);
     }
 
     public void SynPvPMode(
@@ -1961,82 +2167,62 @@ public class OnlineNetworkServer : NetworkBehaviour
         ulong clientId = ulong.MaxValue)
     {
         if (clientId == ulong.MaxValue)
-        {
-            SendJson(
-                1,
-                10,
-                syn);
-        }
+            SendJson(1, 10, syn);
         else
-        {
             SendJsonToClient(
                 clientId,
                 1,
                 10,
                 syn);
-        }
     }
 
     public void SynSpectList(
         SpectList list)
     {
-        SendJson(
-            1,
-            11,
-            list);
+        SendJson(1, 11, list);
     }
 
     public void SynFlagMeter(
         FlagMeterSyn syn)
     {
-        SendJson(
-            1,
-            13,
-            syn);
+        SendJson(1, 13, syn);
     }
 
     public void SynTimeTable(
         TimetableSyn syn)
     {
-        SendJson(
-            1,
-            14,
-            syn);
+        SendJson(1, 14, syn);
     }
 
     public void SpawnSun(
         SunSpawn spawn)
     {
-        SendJson(
-            2,
-            1,
-            spawn);
+        SendJson(2, 1, spawn);
     }
 
     public void ClickedSun(
         ClickedSun sun)
     {
-        SendJson(
-            2,
-            2,
-            sun);
+        SendJson(2, 2, sun);
     }
 
     public void SpawnPlant(
         PlantSpawn spawn)
     {
-        SendJson(
-            2,
-            0,
-            spawn);
+        SendJson(2, 0, spawn);
     }
 
     public void PlacePreview(
         PlantPreview preview,
-        ulong clientId)
+        ulong? clientId)
     {
+        ulong excludedClientId =
+            clientId ??
+            NetworkManager.Singleton?.LocalClientId ??
+            ulong.MaxValue;
+
         SendJsonExcept(
-            clientId,
+            excludedClientId,
             2,
             3,
             preview);
@@ -2044,10 +2230,15 @@ public class OnlineNetworkServer : NetworkBehaviour
 
     public void ZombiePreview(
         ZombiePreview preview,
-        ulong clientId)
+        ulong? clientId)
     {
+        ulong excludedClientId =
+            clientId ??
+            NetworkManager.Singleton?.LocalClientId ??
+            ulong.MaxValue;
+
         SendJsonExcept(
-            clientId,
+            excludedClientId,
             3,
             5,
             preview);
@@ -2055,10 +2246,15 @@ public class OnlineNetworkServer : NetworkBehaviour
 
     public void ShovelPreview(
         ShovelPreview preview,
-        ulong clientId)
+        ulong? clientId)
     {
+        ulong excludedClientId =
+            clientId ??
+            NetworkManager.Singleton?.LocalClientId ??
+            ulong.MaxValue;
+
         SendJsonExcept(
-            clientId,
+            excludedClientId,
             2,
             5,
             preview);
@@ -2067,136 +2263,91 @@ public class OnlineNetworkServer : NetworkBehaviour
     public void SpawnZombie(
         ZombieSpawn spawn)
     {
-        SendJson(
-            3,
-            0,
-            spawn);
+        SendJson(3, 0, spawn);
     }
 
     public void SpawnGraveStone(
         GraveStoneSpawn spawn)
     {
-        SendJson(
-            3,
-            1,
-            spawn);
+        SendJson(3, 1, spawn);
     }
 
     public void SpawnPuddle(
         PuddleSpawn spawn)
     {
-        SendJson(
-            3,
-            2,
-            spawn);
+        SendJson(3, 2, spawn);
     }
 
     public void SpawnPortal(
         PortalSpawn spawn)
     {
-        SendJson(
-            3,
-            6,
-            spawn);
+        SendJson(3, 6, spawn);
     }
 
     public void SpawnVase(
         VaseSpawn spawn)
     {
-        SendJson(
-            3,
-            9,
-            spawn);
+        SendJson(3, 9, spawn);
     }
 
     public void SpawnDropCard(
         CardSpawn spawn)
     {
-        SendJson(
-            3,
-            10,
-            spawn);
+        SendJson(3, 10, spawn);
     }
 
     public void SpawnMelt(
         MeltSpawn spawn)
     {
-        SendJson(
-            3,
-            11,
-            spawn);
+        SendJson(3, 11, spawn);
     }
 
     public void SpawnFallHail(
         FallHailSpawn spawn)
     {
-        SendJson(
-            3,
-            12,
-            spawn);
+        SendJson(3, 12, spawn);
     }
 
     public void SpawnLightning(
         LightingSpawn spawn)
     {
-        SendJson(
-            3,
-            3,
-            spawn);
+        SendJson(3, 3, spawn);
     }
 
     public void SendShovelAnim(
         ToolApply apply)
     {
-        SendJson(
-            2,
-            6,
-            apply);
+        SendJson(2, 6, apply);
     }
 
     public void SendGridState(
         SynGrid grid)
     {
-        SendJson(
-            3,
-            7,
-            grid);
+        SendJson(3, 7, grid);
     }
 
     public void SendWeatherCmd(
         WeatherChange cmd)
     {
-        SendJson(
-            4,
-            4,
-            cmd);
+        SendJson(4, 4, cmd);
     }
 
     public void SendTimeCmd(
         TimeCmd cmd)
     {
-        SendJson(
-            4,
-            5,
-            cmd);
+        SendJson(4, 5, cmd);
     }
 
     public void SendMapSyn(
         SynMap map)
     {
-        SendJson(
-            3,
-            4,
-            map);
+        SendJson(3, 4, map);
     }
 
     public void SendSynBooty(
         SynBooty booty)
     {
-        SendJson(
-            3,
-            8,
-            booty);
+        SendJson(3, 8, booty);
     }
 
     public void SendAcvmentGet(
@@ -2230,52 +2381,33 @@ public class OnlineNetworkServer : NetworkBehaviour
             LvItemManager.Instance == null)
             return;
 
-        var bag = new CommandBag
-        {
-            Pinv =
-                PlantManager.Instance.PlantInvincible,
-
-            Zinv =
-                ZombieManager.Instance.ZombieInvincible,
-
-            DLiCy =
-                SkyManager.Instance.DayLightCycle,
-
-            SnInf =
-                PlayerManager.Instance.SunInfinite,
-
-            CdCle =
-                SeedBank.Instance.isNoCD,
-
-            ZomStop =
-                ZombieManager.Instance.ZombieDontMove,
-
-            VaseXray =
-                LvItemManager.Instance.VaseAlwaysLight
-        };
+        var bag =
+            new CommandBag
+            {
+                Pinv = PlantManager.Instance.PlantInvincible,
+                Zinv = ZombieManager.Instance.ZombieInvincible,
+                DLiCy = SkyManager.Instance.DayLightCycle,
+                SnInf = PlayerManager.Instance.SunInfinite,
+                CdCle = SeedBank.Instance.isNoCD,
+                ZomStop = ZombieManager.Instance.ZombieDontMove,
+                VaseXray = LvItemManager.Instance.VaseAlwaysLight
+            };
 
         if (clientId == ulong.MaxValue)
-        {
-            SendJson(
-                4,
-                3,
-                bag);
-        }
+            SendJson(4, 3, bag);
         else
-        {
             SendJsonToClient(
                 clientId,
                 4,
                 3,
                 bag);
-        }
     }
 
-    void SendWaitReConnect(
+    private void SendWaitReConnect(
         bool wait)
     {
         var names =
-            ReConnectPlayer
+            reConnectPlayer
                 .Where(p => p != null)
                 .Select(p => p.Name)
                 .ToList();
@@ -2290,12 +2422,12 @@ public class OnlineNetworkServer : NetworkBehaviour
             });
     }
 
-    void ReConnectListChange()
+    private void ReConnectListChange()
     {
-        if (ReConnectPlayer.Count > 0)
+        if (reConnectPlayer.Count > 0)
         {
             var names =
-                ReConnectPlayer
+                reConnectPlayer
                     .Where(p => p != null)
                     .Select(p => p.Name)
                     .ToList();
@@ -2314,25 +2446,25 @@ public class OnlineNetworkServer : NetworkBehaviour
         }
     }
 
-    bool CanReConnect(
+    private bool CanReConnect(
         PlayerInfo info)
     {
         return info != null &&
-               ReConnectPlayer.Any(
+               reConnectPlayer.Any(
                    p => p?.Name == info.Name);
     }
 
     public void GiveUpReConnect()
     {
-        foreach (var player in ReConnectPlayer)
+        foreach (var player in reConnectPlayer)
             RemoveDone(player);
 
-        ReConnectPlayer.Clear();
+        reConnectPlayer.Clear();
 
         ReConnectListChange();
     }
 
-    ulong GetClientIdByPlayer(
+    private ulong GetClientIdByPlayer(
         string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -2347,7 +2479,7 @@ public class OnlineNetworkServer : NetworkBehaviour
         return ulong.MaxValue;
     }
 
-    IEnumerator SendHeartbeat()
+    private IEnumerator SendHeartbeat()
     {
         float timer =
             Time.realtimeSinceStartup;
@@ -2358,19 +2490,19 @@ public class OnlineNetworkServer : NetworkBehaviour
         {
             yield return null;
 
-            if (Time.realtimeSinceStartup - timer > .5f)
-            {
-                SendMessage(
-                    0,
-                    byte.MaxValue);
+            if (Time.realtimeSinceStartup - timer <= .5f)
+                continue;
 
-                timer =
-                    Time.realtimeSinceStartup;
-            }
+            SendMessage(
+                0,
+                byte.MaxValue);
+
+            timer =
+                Time.realtimeSinceStartup;
         }
     }
 
-    IEnumerator CheckConnect()
+    private IEnumerator CheckConnect()
     {
         float timer =
             Time.realtimeSinceStartup;
@@ -2389,35 +2521,30 @@ public class OnlineNetworkServer : NetworkBehaviour
 
             foreach (var pair in clientPlayers)
             {
-                var player = pair.Value;
-
-                if (player == null)
+                if (pair.Value == null)
                 {
                     disconnected.Add(pair.Key);
                     continue;
                 }
 
-                if (!player.Heartbeat)
+                if (!pair.Value.Heartbeat)
                 {
                     disconnected.Add(pair.Key);
 
                     Debug.LogError(
-                        player.Name +
+                        pair.Value.Name +
                         "Desconexión por tiempo de espera");
                 }
                 else
                 {
-                    player.Heartbeat = false;
+                    pair.Value.Heartbeat = false;
                 }
             }
 
             foreach (var clientId in disconnected)
             {
-                RemovePlayerOnDisconnect(
-                    clientId);
-
-                DisconnectClient(
-                    clientId);
+                RemovePlayerOnDisconnect(clientId);
+                DisconnectClient(clientId);
             }
 
             timer =

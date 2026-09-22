@@ -101,9 +101,9 @@ public class LVManager : MonoBehaviour
 
             LvSpawnisOver = true;
 
-            if (SocketServer.Instance != null)
+            if (OnlineNetworkServer.Instance != null)
             {
-                SocketServer.Instance.BigWaveComing(
+                OnlineNetworkServer.Instance.BigWaveComing(
                     new WaveComing
                     {
                         WaveType = 3
@@ -618,9 +618,9 @@ public class LVManager : MonoBehaviour
                     cardNums
                 );
 
-            if (SocketServer.Instance != null)
+            if (OnlineNetworkServer.Instance != null)
             {
-                SocketServer.Instance.LoadLv(bag);
+                OnlineNetworkServer.Instance.LoadLv(bag);
             }
         }
 
@@ -1143,7 +1143,7 @@ public class LVManager : MonoBehaviour
     {
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.LoadLv(
+            OnlineNetworkServer.Instance.LoadLv(
                 new LoadLVBag
                 {
                     LoadType = 2
@@ -1181,7 +1181,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.LoadLv(
+            OnlineNetworkServer.Instance.LoadLv(
                 new LoadLVBag
                 {
                     LoadType = 1
@@ -1365,7 +1365,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.GameOver(
+            OnlineNetworkServer.Instance.GameOver(
                 new GameOver
                 {
                     pos = overPos
@@ -1438,7 +1438,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.GameOver(
+            OnlineNetworkServer.Instance.GameOver(
                 new GameOver
                 {
                     pos = overPos,
@@ -1645,7 +1645,7 @@ public class LVManager : MonoBehaviour
             i++
         )
         {
-            SocketServer.Instance.SendAddCard(
+            OnlineNetworkServer.Instance.SendAddCard(
                 new AddCardBag
                 {
                     CardTypes = splitCards[i]
@@ -1757,7 +1757,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.BigWaveComing(
+            OnlineNetworkServer.Instance.BigWaveComing(
                 new WaveComing
                 {
                     WaveType = 6
@@ -1995,7 +1995,7 @@ public class LVManager : MonoBehaviour
                 wave.WaitTime = 4f;
             }
 
-            SocketServer.Instance.BigWaveComing(
+            OnlineNetworkServer.Instance.BigWaveComing(
                 wave
             );
         }
@@ -2672,7 +2672,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.SendSynBooty(
+            OnlineNetworkServer.Instance.SendSynBooty(
                 new SynBooty
                 {
                     isSpawn = true,
@@ -2699,7 +2699,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.BigWaveComing(
+            OnlineNetworkServer.Instance.BigWaveComing(
                 new WaveComing
                 {
                     WaveType = 4
@@ -2795,7 +2795,7 @@ public class LVManager : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.BigWaveComing(
+            OnlineNetworkServer.Instance.BigWaveComing(
                 new WaveComing
                 {
                     WaveType = 5

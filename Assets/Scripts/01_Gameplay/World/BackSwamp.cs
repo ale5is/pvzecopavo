@@ -405,7 +405,7 @@ public class BackSwamp : MapBase
 					SynMap synMap = new SynMap();
 					synMap.SynCode[0] = SunNum;
 					synMap.mapPos = base.transform.position;
-					SocketServer.Instance.SendMapSyn(synMap);
+					OnlineNetworkServer.Instance.SendMapSyn(synMap);
 				}
 			});
 			time = 10 + SunNum * 3;
@@ -449,7 +449,7 @@ public class BackSwamp : MapBase
 				SynMap synMap = new SynMap();
 				synMap.SynCode[0] = SunNum;
 				synMap.mapPos = base.transform.position;
-				SocketServer.Instance.SendMapSyn(synMap);
+				OnlineNetworkServer.Instance.SendMapSyn(synMap);
 			}
 		}
 		if (SunNum < 0)

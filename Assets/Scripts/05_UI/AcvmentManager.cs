@@ -110,9 +110,9 @@ public class AcvmentManager : MonoBehaviour
         }
 
         if (GameManager.Instance.isServer &&
-            SocketServer.Instance != null)
+            OnlineNetworkServer.Instance != null)
         {
-            SocketServer.Instance.SendAcvmentGet(
+            OnlineNetworkServer.Instance.SendAcvmentGet(
                 achiv,
                 playerName
             );

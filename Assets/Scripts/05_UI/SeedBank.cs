@@ -488,9 +488,9 @@ public class SeedBank : MonoBehaviour
         if (GameManager.Instance.isServer)
         {
             plantCard.OnlineId =
-                SocketServer.Instance.ItemId;
+                OnlineNetworkServer.Instance.ItemId;
 
-            SocketServer.Instance.SpawnDropCard(
+            OnlineNetworkServer.Instance.SpawnDropCard(
                 new CardSpawn
                 {
                     OnlineId = plantCard.OnlineId,
@@ -564,9 +564,9 @@ public class SeedBank : MonoBehaviour
         if (GameManager.Instance.isServer)
         {
             plantCard.OnlineId =
-                SocketServer.Instance.ItemId;
+                OnlineNetworkServer.Instance.ItemId;
 
-            SocketServer.Instance.SpawnDropCard(
+            OnlineNetworkServer.Instance.SpawnDropCard(
                 new CardSpawn
                 {
                     OnlineId = plantCard.OnlineId,
@@ -637,9 +637,9 @@ public class SeedBank : MonoBehaviour
         if (GameManager.Instance.isServer)
         {
             component.OnlineId =
-                SocketServer.Instance.ItemId;
+                OnlineNetworkServer.Instance.ItemId;
 
-            SocketServer.Instance.SpawnDropCard(
+            OnlineNetworkServer.Instance.SpawnDropCard(
                 new CardSpawn
                 {
                     OnlineId = component.OnlineId,
@@ -943,7 +943,7 @@ public class SeedBank : MonoBehaviour
     {
         if (GameManager.Instance.isClient)
         {
-            SocketClient.Instance.SelectCard(
+            OnlineNetworkClient.Instance.SelectCard(
                 new SelectCard
                 {
                     plantType = CardPlantType,
@@ -956,7 +956,7 @@ public class SeedBank : MonoBehaviour
 
         if (GameManager.Instance.isServer)
         {
-            SocketServer.Instance.SelectCard(
+            OnlineNetworkServer.Instance.SelectCard(
                 new SelectCard
                 {
                     PlayerName =
@@ -1360,7 +1360,7 @@ public class SeedBank : MonoBehaviour
 
                 if (GameManager.Instance.isServer)
                 {
-                    SocketServer.Instance.SendHostCD(
+                    OnlineNetworkServer.Instance.SendHostCD(
                         slotList[i].CardId,
                         true
                     );
@@ -1368,7 +1368,7 @@ public class SeedBank : MonoBehaviour
 
                 if (GameManager.Instance.isClient)
                 {
-                    SocketClient.Instance.UpdateCD(
+                    OnlineNetworkClient.Instance.UpdateCD(
                         slotList[i].CardId,
                         Ok: true
                     );
@@ -1813,7 +1813,7 @@ public class SeedBank : MonoBehaviour
                 new PlantSpawn
                 {
                     OnlineId =
-                        SocketServer.Instance.ItemId,
+                        OnlineNetworkServer.Instance.ItemId,
 
                     plantType =
                         plant.GetPlantType(),
@@ -1842,7 +1842,7 @@ public class SeedBank : MonoBehaviour
                     );
             }
 
-            SocketServer.Instance.SpawnPlant(
+            OnlineNetworkServer.Instance.SpawnPlant(
                 plantSpawn
             );
         }

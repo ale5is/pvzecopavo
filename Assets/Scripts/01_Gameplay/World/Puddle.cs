@@ -77,7 +77,7 @@ public class Puddle : MonoBehaviour
 			SynItem synItem = new SynItem();
 			synItem.OnlineId = OnlineId;
 			synItem.Type = SynItemType.Puddle;
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 		StopCoroutine(HurtCoroutine);
 		StartCoroutine(Disappear());

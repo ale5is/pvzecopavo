@@ -293,7 +293,7 @@ public class PvPSelector : MonoBehaviour
 			{
 				PvPModeSyn pvPModeSyn = new PvPModeSyn();
 				pvPModeSyn.Mode = CurrMode;
-				SocketServer.Instance.SynPvPMode(pvPModeSyn);
+				OnlineNetworkServer.Instance.SynPvPMode(pvPModeSyn);
 			}
 		}
 	}
@@ -313,7 +313,7 @@ public class PvPSelector : MonoBehaviour
 			PvPTeamList pvPTeamList = new PvPTeamList();
 			pvPTeamList.red = RedTeamNames;
 			pvPTeamList.blue = BlueTeamNames;
-			SocketServer.Instance.SynTeamList(pvPTeamList);
+			OnlineNetworkServer.Instance.SynTeamList(pvPTeamList);
 		}
 	}
 
@@ -323,7 +323,7 @@ public class PvPSelector : MonoBehaviour
 		{
 			JoinTeamApply joinTeamApply = new JoinTeamApply();
 			joinTeamApply.isRed = true;
-			SocketClient.Instance.ApplyJoinTeam(joinTeamApply);
+			OnlineNetworkClient.Instance.ApplyJoinTeam(joinTeamApply);
 		}
 		if (GameManager.Instance.isServer)
 		{
@@ -348,7 +348,7 @@ public class PvPSelector : MonoBehaviour
 		{
 			JoinTeamApply joinTeamApply = new JoinTeamApply();
 			joinTeamApply.isRed = false;
-			SocketClient.Instance.ApplyJoinTeam(joinTeamApply);
+			OnlineNetworkClient.Instance.ApplyJoinTeam(joinTeamApply);
 		}
 		if (GameManager.Instance.isServer)
 		{
@@ -424,7 +424,7 @@ public class PvPSelector : MonoBehaviour
 	{
 		if (GameManager.Instance.isServer)
 		{
-			if (BlueTeamNames.Count + RedTeamNames.Count + SpectatorList.Instance.SpectatorNum != SocketServer.Instance.noHostPlayerNum + 1)
+			if (BlueTeamNames.Count + RedTeamNames.Count + SpectatorList.Instance.SpectatorNum != OnlineNetworkServer.Instance.noHostPlayerNum + 1)
 			{
 				AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.Buzzer, base.transform.position, isAll: true);
 			}

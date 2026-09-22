@@ -109,7 +109,7 @@ public class SpectatorList : MonoBehaviour
 
         if (GameManager.Instance.isClient)
         {
-            if (SocketClient.Instance == null)
+            if (OnlineNetworkClient.Instance == null)
             {
                 return;
             }
@@ -117,15 +117,15 @@ public class SpectatorList : MonoBehaviour
             JoinSpecApply joinSpecApply = new JoinSpecApply();
             joinSpecApply.isJoin = !SpectsList.Contains(playerName);
 
-            SocketClient.Instance.ApplyJoinSpect(joinSpecApply);
+            OnlineNetworkClient.Instance.ApplyJoinSpect(joinSpecApply);
         }
         else if (SpectsList.Contains(playerName))
         {
             SpectsList.Remove(playerName);
             UpdateNameUI();
         }
-        else if (SocketServer.Instance != null &&
-                 SpectsList.Count < SocketServer.Instance.noHostPlayerNum)
+        else if (OnlineNetworkServer.Instance != null &&
+                 SpectsList.Count < OnlineNetworkServer.Instance.noHostPlayerNum)
         {
             if (PvPSelector.Instance != null)
             {
@@ -146,10 +146,10 @@ public class SpectatorList : MonoBehaviour
         }
 
         if (GameManager.Instance.isServer &&
-            SocketServer.Instance != null)
+            OnlineNetworkServer.Instance != null)
         {
             List<string> allPlayerNameList =
-                SocketServer.Instance.GetAllPlayerNameList();
+                OnlineNetworkServer.Instance.GetAllPlayerNameList();
 
             for (int i = 0; i < SpectsList.Count; i++)
             {
@@ -217,11 +217,11 @@ public class SpectatorList : MonoBehaviour
         }
 
         if (GameManager.Instance.isServer &&
-            SocketServer.Instance != null)
+            OnlineNetworkServer.Instance != null)
         {
             SpectList spectList = new SpectList();
             spectList.names = SpectsList;
-            SocketServer.Instance.SynSpectList(spectList);
+            OnlineNetworkServer.Instance.SynSpectList(spectList);
         }
     }
 
@@ -241,8 +241,8 @@ public class SpectatorList : MonoBehaviour
             }
 
             if (!SpectsList.Contains(player) &&
-                SocketServer.Instance != null &&
-                SpectsList.Count < SocketServer.Instance.noHostPlayerNum)
+                OnlineNetworkServer.Instance != null &&
+                SpectsList.Count < OnlineNetworkServer.Instance.noHostPlayerNum)
             {
                 SpectsList.Add(player);
                 UpdateNameUI();
@@ -265,19 +265,19 @@ public class SpectatorList : MonoBehaviour
         if (SpectsList.Remove(player))
         {
             if (GameManager.Instance.isServer &&
-                SocketServer.Instance != null)
+                OnlineNetworkServer.Instance != null)
             {
                 SpectList spectList = new SpectList();
                 spectList.names = SpectsList;
-                SocketServer.Instance.SynSpectList(spectList);
+                OnlineNetworkServer.Instance.SynSpectList(spectList);
             }
 
             UpdateNameUI();
         }
 
         if (GameManager.Instance.isServer &&
-            SocketServer.Instance != null &&
-            SocketServer.Instance.noHostPlayerNum + 1 <= SpectsList.Count &&
+            OnlineNetworkServer.Instance != null &&
+            OnlineNetworkServer.Instance.noHostPlayerNum + 1 <= SpectsList.Count &&
             SpectsList.Remove(GameManager.Instance.LocalPlayerSave.playerName))
         {
             UpdateNameUI();

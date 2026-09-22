@@ -79,7 +79,7 @@ public class Vase : MonoBehaviour
 				synItem.OnlineId = OnlineId;
 				synItem.Type = SynItemType.Vase;
 				synItem.SynCode[0] = 1;
-				SocketClient.Instance.SendSynBag(synItem);
+				OnlineNetworkClient.Instance.SendSynBag(synItem);
 			}
 			else
 			{
@@ -97,7 +97,7 @@ public class Vase : MonoBehaviour
 			synItem.OnlineId = OnlineId;
 			synItem.Type = SynItemType.Vase;
 			synItem.SynCode[0] = 1;
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 		if (!breaking)
 		{
@@ -129,7 +129,7 @@ public class Vase : MonoBehaviour
 			synItem.Type = SynItemType.Vase;
 			synItem.SynCode[0] = 2;
 			synItem.SynCode[1] = type;
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 	}
 
@@ -207,7 +207,7 @@ public class Vase : MonoBehaviour
 				synItem.OnlineId = OnlineId;
 				synItem.Type = SynItemType.Vase;
 				synItem.SynCode[0] = 3;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 		CurrGrid.Vases.Remove(this);

@@ -203,7 +203,7 @@ public class Snow : MonoBehaviour
 			synGrid.GridPos = grid.Position;
 			synGrid.SynCode[0] = 1;
 			synGrid.SynCode[1] = lvl;
-			SocketServer.Instance.SendGridState(synGrid);
+			OnlineNetworkServer.Instance.SendGridState(synGrid);
 		}
 	}
 

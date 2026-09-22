@@ -144,11 +144,11 @@ private void Update()
 		AddMessage(text);
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendChatMsg(text);
+			OnlineNetworkServer.Instance.SendChatMsg(text);
 		}
 		if (GameManager.Instance.isClient)
 		{
-			SocketClient.Instance.SendChatMsg(text);
+			OnlineNetworkClient.Instance.SendChatMsg(text);
 		}
 	}
 
@@ -404,7 +404,7 @@ private void Update()
 			CreatePanel.Instance.RefreshNormalPage();
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendCommandBag();
+				OnlineNetworkServer.Instance.SendCommandBag();
 			}
 			if (PlayerManager.Instance.SunInfinite)
 			{
@@ -542,7 +542,7 @@ private void Update()
 			CreatePanel.Instance.RefreshNormalPage();
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendCommandBag();
+				OnlineNetworkServer.Instance.SendCommandBag();
 			}
 			if (SeedBank.Instance.isNoCD)
 			{
@@ -668,11 +668,11 @@ private void Update()
 		{
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendPrivateChatMsg(str[1], str[2], GameManager.Instance.LocalPlayerSave.playerName);
+				OnlineNetworkServer.Instance.SendPrivateChatMsg(str[1], str[2], GameManager.Instance.LocalPlayerSave.playerName);
 			}
 			if (GameManager.Instance.isClient)
 			{
-				SocketClient.Instance.SendPrivateChatMsg(str[1], str[2]);
+				OnlineNetworkClient.Instance.SendPrivateChatMsg(str[1], str[2]);
 			}
 			string content = "你悄悄对玩家" + str[1] + "说:" + str[2];
 			AddMessage(content, new Color32(123, 123, 123, byte.MaxValue));
@@ -691,7 +691,7 @@ private void Update()
 		}
 		else if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.KickPlayer(str[1]);
+			OnlineNetworkServer.Instance.KickPlayer(str[1]);
 		}
 	}
 
@@ -816,7 +816,7 @@ private void Update()
 			CreatePanel.Instance.RefreshNormalPage();
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendCommandBag();
+				OnlineNetworkServer.Instance.SendCommandBag();
 			}
 			if (PlantManager.Instance.PlantInvincible)
 			{
@@ -833,7 +833,7 @@ private void Update()
 			CreatePanel.Instance.RefreshNormalPage();
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendCommandBag();
+				OnlineNetworkServer.Instance.SendCommandBag();
 			}
 			if (ZombieManager.Instance.ZombieInvincible)
 			{
@@ -875,7 +875,7 @@ private void Update()
 			CreatePanel.Instance.RefreshDayCycle();
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendCommandBag();
+				OnlineNetworkServer.Instance.SendCommandBag();
 			}
 			if (SkyManager.Instance.DayLightCycle)
 			{

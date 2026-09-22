@@ -38,13 +38,14 @@ public class GameManager : MonoBehaviour
 
     public bool isServer =>
         isOnline &&
-        SocketServer.Instance != null &&
-        SocketServer.Instance.isServerOpen;
+        Unity.Netcode.NetworkManager.Singleton != null &&
+        Unity.Netcode.NetworkManager.Singleton.IsServer;
 
     public bool isClient =>
         isOnline &&
-        SocketServer.Instance != null &&
-        !SocketServer.Instance.isServerOpen;
+        Unity.Netcode.NetworkManager.Singleton != null &&
+        Unity.Netcode.NetworkManager.Singleton.IsClient &&
+        !Unity.Netcode.NetworkManager.Singleton.IsServer;
 
     public MapStoneBase SelectedStone =>
         SelectMap.Instance != null

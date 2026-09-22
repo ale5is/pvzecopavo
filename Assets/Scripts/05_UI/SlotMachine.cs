@@ -471,7 +471,7 @@ public class SlotMachine : MonoBehaviour
 			slotMchBag.card.plantType = plant;
 			slotMchBag.card.zombieType = zombie;
 			slotMchBag.card.otherType = itemType;
-			SocketClient.Instance.SendSlotMBag(slotMchBag);
+			OnlineNetworkClient.Instance.SendSlotMBag(slotMchBag);
 		}
 	}
 

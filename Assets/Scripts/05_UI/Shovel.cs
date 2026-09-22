@@ -117,7 +117,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 					toolApply.type = ToolType.Shovel;
 					toolApply.GridPos = gridPointByMouse.Position;
 					toolApply.Sound = 2;
-					SocketClient.Instance.ApplyTool(toolApply);
+					OnlineNetworkClient.Instance.ApplyTool(toolApply);
 				}
 				else if (ClearPlant(gridPointByMouse, vector, GameManager.Instance.LocalPlayerSave.playerName))
 				{
@@ -129,7 +129,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 					toolApply2.type = ToolType.Shovel;
 					toolApply2.GridPos = gridPointByMouse.Position;
 					toolApply2.Sound = 2;
-					SocketServer.Instance.SendShovelAnim(toolApply2);
+					OnlineNetworkServer.Instance.SendShovelAnim(toolApply2);
 				}
 				StatsManager.Instance.AddStatsNum(StatsEnum.ShovelOffNum);
 				IsShovel = false;
@@ -142,7 +142,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 					toolApply3.type = ToolType.Shovel;
 					toolApply3.GridPos = gridPointByMouse.Position;
 					toolApply3.Sound = 1;
-					SocketClient.Instance.ApplyTool(toolApply3);
+					OnlineNetworkClient.Instance.ApplyTool(toolApply3);
 				}
 				else if (ClearPlant(gridPointByMouse, vector, GameManager.Instance.LocalPlayerSave.playerName))
 				{
@@ -154,7 +154,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 					toolApply4.type = ToolType.Shovel;
 					toolApply4.GridPos = gridPointByMouse.Position;
 					toolApply4.Sound = 1;
-					SocketServer.Instance.SendShovelAnim(toolApply4);
+					OnlineNetworkServer.Instance.SendShovelAnim(toolApply4);
 				}
 				StatsManager.Instance.AddStatsNum(StatsEnum.ShovelOffNum);
 				IsShovel = false;
@@ -188,11 +188,11 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 			shovelPreview.PlayerName = GameManager.Instance.LocalPlayerSave.playerName;
 			if (GameManager.Instance.isClient)
 			{
-				SocketClient.Instance.ApplyShovelPreview(shovelPreview);
+				OnlineNetworkClient.Instance.ApplyShovelPreview(shovelPreview);
 			}
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.ShovelPreview(shovelPreview, null);
+				OnlineNetworkServer.Instance.ShovelPreview(shovelPreview, null);
 			}
 		}
 	}

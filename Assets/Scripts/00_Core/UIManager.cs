@@ -1,14 +1,9 @@
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
-
-    private const int GamePort = 45678;
 
     // =========================================================
     // REFERENCIAS DIRECTAS - INSPECTOR
@@ -18,8 +13,6 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     [SerializeField] private LVManager lvManager;
     [SerializeField] private AudioManager audioManager;
-    [SerializeField] private SocketServer socketServer;
-    [SerializeField] private SocketClient socketClient;
     [SerializeField] private SeedChooser seedChooser;
     [SerializeField] private ZombieChooser zombieChooser;
     [SerializeField] private Shovel shovel;
@@ -40,20 +33,6 @@ public class UIManager : MonoBehaviour
 
     [Header("Battle")]
     [SerializeField] public GameObject LastStandBtn;
-
-    [Header("Host")]
-    [SerializeField] public GameObject HostGame;
-    [SerializeField] public InputField IpInput;
-    [SerializeField] public InputField PortInput;
-
-    [Header("Host Password")]
-    [SerializeField] public GameObject HostPassword;
-    [SerializeField] public InputField HostPasswordInput;
-
-    [Header("Join")]
-    [SerializeField] public GameObject JoinGame;
-    [SerializeField] public InputField JoinIpInput;
-    [SerializeField] public InputField JoinPasswordInput;
 
     [Header("Chat")]
     [SerializeField] public ChatInput chatInput;
@@ -154,7 +133,6 @@ public class UIManager : MonoBehaviour
             OutChatBox.SetActive(true);
         }
 
-        SetHostAddress();
     }
 
     private void Update()
@@ -201,63 +179,6 @@ public class UIManager : MonoBehaviour
             {
                 chatInput.SlashOpen();
             }
-        }
-    }
-
-    // =========================================================
-    // IP
-    // =========================================================
-
-    private string GetLocalIPAddress()
-    {
-        NetworkInterface[] interfaces =
-            NetworkInterface.GetAllNetworkInterfaces();
-
-        for (int i = 0; i < interfaces.Length; i++)
-        {
-            NetworkInterface network = interfaces[i];
-
-            if (
-                network.OperationalStatus != OperationalStatus.Up ||
-                network.NetworkInterfaceType == NetworkInterfaceType.Loopback
-            )
-            {
-                continue;
-            }
-
-            IPInterfaceProperties properties =
-                network.GetIPProperties();
-
-            for (int j = 0; j < properties.UnicastAddresses.Count; j++)
-            {
-                IPAddress address =
-                    properties.UnicastAddresses[j].Address;
-
-                if (
-                    address.AddressFamily == AddressFamily.InterNetwork &&
-                    !IPAddress.IsLoopback(address) &&
-                    !address.ToString().StartsWith("169.254.")
-                )
-                {
-                    return address.ToString();
-                }
-            }
-        }
-
-        return "127.0.0.1";
-    }
-
-    private void SetHostAddress()
-    {
-        if (IpInput != null)
-        {
-            IpInput.text = GetLocalIPAddress();
-        }
-
-        if (PortInput != null)
-        {
-            PortInput.text = GamePort.ToString();
-            PortInput.interactable = false;
         }
     }
 
@@ -418,280 +339,17 @@ public class UIManager : MonoBehaviour
     }
 
     // =========================================================
-    // HOST
+    // MULTIPLAYER COMPATIBILIDAD
     // =========================================================
 
-    public void ConfirmOpenServer()
+    public void ConnectSuccess()
     {
-        PlayButtonAudio();
-
-        if (IpInput == null)
-        {
-            return;
-        }
-
-        if (
-            !IPAddress.TryParse(
-                IpInput.text,
-                out IPAddress address
-            )
-        )
-        {
-            if (LogPanel != null)
-            {
-                LogPanel.DisplayLog(
-                    "Ingrese una dirección IP válida",
-                    () =>
-                    {
-                        if (HostGame != null)
-                        {
-                            HostGame.SetActive(true);
-                        }
-                    }
-                );
-            }
-
-            return;
-        }
-
-        if (socketServer != null)
-        {
-            socketServer.StartServer(
-                address,
-                GamePort
-            );
-        }
-
-        CloseHostGame();
-    }
-
-    // =========================================================
-    // JOIN
-    // =========================================================
-
-    public void ConfirmJoinGame()
-    {
-        if (
-            gameManager == null ||
-            gameManager.isOnline
-        )
-        {
-            return;
-        }
-
-        PlayButtonAudio();
-
-        if (
-            JoinIpInput == null ||
-            JoinPasswordInput == null
-        )
-        {
-            return;
-        }
-
-        string hostAddress =
-            JoinIpInput.text.Trim();
-
-        if (string.IsNullOrEmpty(hostAddress))
-        {
-            if (LogPanel != null)
-            {
-                LogPanel.DisplayLog(
-                    "Ingrese una dirección IP válida",
-                    () =>
-                    {
-                        if (JoinGame != null)
-                        {
-                            JoinGame.SetActive(true);
-                        }
-                    }
-                );
-            }
-
-            return;
-        }
-
-        if (hostAddress.Contains(":"))
-        {
-            hostAddress =
-                hostAddress.Split(':')[0];
-        }
-
-        try
-        {
-            IPAddress[] addresses =
-                Dns.GetHostAddresses(hostAddress);
-
-            if (addresses.Length == 0)
-            {
-                if (LogPanel != null)
-                {
-                    LogPanel.DisplayLog(
-                        "No se pudo encontrar la dirección",
-                        () =>
-                        {
-                            if (JoinGame != null)
-                            {
-                                JoinGame.SetActive(true);
-                            }
-                        }
-                    );
-                }
-
-                return;
-            }
-
-            if (LogPanel != null)
-            {
-                LogPanel.DisplayLog(
-                    "Conectando...",
-                    () =>
-                    {
-                        if (JoinGame != null)
-                        {
-                            JoinGame.SetActive(true);
-                        }
-                    }
-                );
-
-                LogPanel.ButtonText.text = "Cancelar";
-                LogPanel.CancelConfirm();
-            }
-
-            if (socketClient != null)
-            {
-                socketClient.JoinGame(
-                    addresses[0],
-                    GamePort,
-                    JoinPasswordInput.text
-                );
-            }
-        }
-        catch
-        {
-            if (LogPanel != null)
-            {
-                LogPanel.DisplayLog(
-                    "No se pudo encontrar la dirección",
-                    () =>
-                    {
-                        if (JoinGame != null)
-                        {
-                            JoinGame.SetActive(true);
-                        }
-                    }
-                );
-            }
-        }
+        MultiplayerUI.Instance?.ConnectSuccess();
     }
 
     public void ReJoinGame()
     {
-        if (
-            gameManager == null ||
-            gameManager.isOnline
-        )
-        {
-            return;
-        }
-
-        if (JoinIpInput == null)
-        {
-            return;
-        }
-
-        string hostAddress =
-            JoinIpInput.text.Trim();
-
-        if (string.IsNullOrEmpty(hostAddress))
-        {
-            return;
-        }
-
-        if (hostAddress.Contains(":"))
-        {
-            hostAddress =
-                hostAddress.Split(':')[0];
-        }
-
-        try
-        {
-            IPAddress[] addresses =
-                Dns.GetHostAddresses(hostAddress);
-
-            if (addresses.Length == 0)
-            {
-                return;
-            }
-
-            if (LogPanel != null)
-            {
-                LogPanel.DisplayLog(
-                    "Conectando...",
-                    null
-                );
-
-                LogPanel.CancelConfirm();
-            }
-
-            if (socketClient != null)
-            {
-                socketClient.JoinGame(
-                    addresses[0],
-                    GamePort,
-                    JoinPasswordInput.text
-                );
-            }
-        }
-        catch
-        {
-        }
-    }
-
-    public void ConnectSuccess()
-    {
-        if (LogPanel != null)
-        {
-            LogPanel.gameObject.SetActive(false);
-        }
-
-        CloseJoinGame();
-    }
-
-    // =========================================================
-    // CERRAR HOST / JOIN
-    // =========================================================
-
-    public void CloseHostGame()
-    {
-        PlayButtonAudio();
-
-        SetHostAddress();
-
-        if (HostGame != null)
-        {
-            HostGame.SetActive(false);
-        }
-    }
-
-    public void CloseJoinGame()
-    {
-        PlayButtonAudio();
-
-        if (JoinGame != null)
-        {
-            JoinGame.SetActive(false);
-        }
-    }
-
-    public void ConfirmPassword()
-    {
-        PlayButtonAudio();
-
-        if (HostPassword != null)
-        {
-            HostPassword.SetActive(false);
-        }
+        MultiplayerUI.Instance?.ReJoinGame();
     }
 
     // =========================================================

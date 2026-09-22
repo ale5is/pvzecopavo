@@ -1,10 +1,8 @@
 fileFormatVersion: 2
 guid: 8849bb553a9772844960d8f77c54f760
-timeCreated: 1788813787
-licenseType: Free
 TrueTypeFontImporter:
-  serializedVersion: 4
   externalObjects: {}
+  serializedVersion: 4
   fontSize: 16
   forceTextureCase: -2
   characterSpacing: 0
@@ -13,13 +11,11 @@ TrueTypeFontImporter:
   fontNames:
   - zihunbiantaoti
   fallbackFontReferences: []
-  customCharacters:
+  customCharacters: 
   fontRenderingMode: 0
-  output:
-    hasEmptyFontData: 0
   ascentCalculationMode: 1
   useLegacyBoundsCalculation: 0
   shouldRoundAdvanceValue: 1
-  userData:
-  assetBundleName:
-  assetBundleVariant:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

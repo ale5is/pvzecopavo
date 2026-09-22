@@ -893,7 +893,7 @@ public class BattlePlayerList : MonoBehaviour
         );
 
         if (IsLocalHostPlayer(playerName) &&
-            SocketServer.Instance != null)
+            OnlineNetworkServer.Instance != null)
         {
             SelectCard selectCard =
                 new SelectCard
@@ -906,7 +906,7 @@ public class BattlePlayerList : MonoBehaviour
                     cardId = cardId
                 };
 
-            SocketServer.Instance.SelectCard(
+            OnlineNetworkServer.Instance.SelectCard(
                 selectCard
             );
         }
@@ -946,9 +946,9 @@ public class BattlePlayerList : MonoBehaviour
         );
 
         if (IsLocalHostPlayer(playerName) &&
-            SocketServer.Instance != null)
+            OnlineNetworkServer.Instance != null)
         {
-            SocketServer.Instance.SelectCard(
+            OnlineNetworkServer.Instance.SelectCard(
                 new SelectCard
                 {
                     PlayerName = playerName,

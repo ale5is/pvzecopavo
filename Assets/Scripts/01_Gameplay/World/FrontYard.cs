@@ -177,7 +177,7 @@ public class FrontYard : MapBase
 					synMap.mapPos = base.transform.position;
 					synMap.pos = component.transform.position;
 					synMap.TwoFloat = new Vector2(component.GetBaseSpeed(), 0f);
-					SocketServer.Instance.SendMapSyn(synMap);
+					OnlineNetworkServer.Instance.SendMapSyn(synMap);
 				}
 			}
 		}
@@ -430,13 +430,13 @@ public class FrontYard : MapBase
 		PuddleSpawn puddleSpawn = new PuddleSpawn();
 		if (GameManager.Instance.isServer)
 		{
-			puddleSpawn.OnlineId = SocketServer.Instance.ItemId;
+			puddleSpawn.OnlineId = OnlineNetworkServer.Instance.ItemId;
 			for (int n = 0; n < list2.Count; n++)
 			{
 				puddleSpawn.MapPos.Add(list2[n].Position);
 			}
 			puddleSpawn.InitPos = vector + new Vector2(0f, -0.3f);
-			SocketServer.Instance.SpawnPuddle(puddleSpawn);
+			OnlineNetworkServer.Instance.SpawnPuddle(puddleSpawn);
 		}
 		Puddle component = Object.Instantiate(GameManager.Instance.GameConf.Puddle).GetComponent<Puddle>();
 		component.CreateInit(list2, vector + new Vector2(0f, -0.3f), puddleSpawn.OnlineId);
@@ -467,7 +467,7 @@ public class FrontYard : MapBase
 				SynMap synMap = new SynMap();
 				synMap.SynCode[0] = 2;
 				synMap.mapPos = base.transform.position;
-				SocketServer.Instance.SendMapSyn(synMap);
+				OnlineNetworkServer.Instance.SendMapSyn(synMap);
 			}
 		}
 	}

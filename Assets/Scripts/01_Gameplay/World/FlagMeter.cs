@@ -15,7 +15,7 @@ public class FlagMeter : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     [SerializeField] private LVManager lvManager;
     [SerializeField] private LV lv;
-    [SerializeField] private SocketServer socketServer;
+    [SerializeField] private OnlineNetworkServer socketServer;
 
     [Header("Prefabs")]
     [SerializeField] private LVFlag lvFlagPrefab;

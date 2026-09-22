@@ -31,7 +31,7 @@ public class LvItemManager : MonoBehaviour
 			}
 			if (GameManager.Instance.isServer)
 			{
-				SocketServer.Instance.SendCommandBag();
+				OnlineNetworkServer.Instance.SendCommandBag();
 			}
 		}
 	}
@@ -95,12 +95,12 @@ public class LvItemManager : MonoBehaviour
 		AllVase.Add(component);
 		if (GameManager.Instance.isServer)
 		{
-			component.OnlineId = SocketServer.Instance.ItemId;
+			component.OnlineId = OnlineNetworkServer.Instance.ItemId;
 			VaseSpawn vaseSpawn = new VaseSpawn();
 			vaseSpawn.OnlineId = component.OnlineId;
 			vaseSpawn.vaseType = type;
 			vaseSpawn.GridPos = grid.Position;
-			SocketServer.Instance.SpawnVase(vaseSpawn);
+			OnlineNetworkServer.Instance.SpawnVase(vaseSpawn);
 		}
 		return component;
 	}
@@ -143,7 +143,7 @@ public class LvItemManager : MonoBehaviour
 				meltSpawn.Type = type;
 				meltSpawn.line = line;
 				meltSpawn.Pos = vector;
-				SocketServer.Instance.SpawnMelt(meltSpawn);
+				OnlineNetworkServer.Instance.SpawnMelt(meltSpawn);
 			}
 		}
 	}
@@ -165,7 +165,7 @@ public class LvItemManager : MonoBehaviour
 				fallHailSpawn.type = type;
 				fallHailSpawn.scale = scale;
 				fallHailSpawn.pos = grid.Position;
-				SocketServer.Instance.SpawnFallHail(fallHailSpawn);
+				OnlineNetworkServer.Instance.SpawnFallHail(fallHailSpawn);
 			}
 		}
 	}

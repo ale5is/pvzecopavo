@@ -618,11 +618,11 @@ public class PlantCard : MonoBehaviour
             plantPreview.isImtor = isImitater;
             if (GameManager.Instance.isClient)
             {
-                SocketClient.Instance.ApplyPlacePreview(plantPreview);
+                OnlineNetworkClient.Instance.ApplyPlacePreview(plantPreview);
             }
             if (GameManager.Instance.isServer)
             {
-                SocketServer.Instance.PlacePreview(plantPreview, null);
+                OnlineNetworkServer.Instance.PlacePreview(plantPreview, null);
             }
         }
     }
@@ -638,11 +638,11 @@ public class PlantCard : MonoBehaviour
             zombiePreview.PlayerName = GameManager.Instance.LocalPlayerSave.playerName;
             if (GameManager.Instance.isClient)
             {
-                SocketClient.Instance.ApplyZombiePreview(zombiePreview);
+                OnlineNetworkClient.Instance.ApplyZombiePreview(zombiePreview);
             }
             if (GameManager.Instance.isServer)
             {
-                SocketServer.Instance.ZombiePreview(zombiePreview, null);
+                OnlineNetworkServer.Instance.ZombiePreview(zombiePreview, null);
             }
         }
     }
@@ -754,7 +754,7 @@ public class PlantCard : MonoBehaviour
                 synItem.AName = GameManager.Instance.LocalPlayerSave.playerName;
                 synItem.SynCode[0] = 1;
                 synItem.Twofloat = grid.Position;
-                SocketClient.Instance.SendSynBag(synItem);
+                OnlineNetworkClient.Instance.SendSynBag(synItem);
             }
             else
             {
@@ -763,7 +763,7 @@ public class PlantCard : MonoBehaviour
                 plantSpawn.GridPos = grid.Position;
                 plantSpawn.CardId = CardId;
                 plantSpawn.SPcode = (isImitater ? 2 : 0);
-                SocketClient.Instance.ApplyPlacePlant(plantSpawn);
+                OnlineNetworkClient.Instance.ApplyPlacePlant(plantSpawn);
             }
             plant.Dead(isFlat: false, 0f, synClient: true, deadRattle: false);
         }
@@ -771,7 +771,7 @@ public class PlantCard : MonoBehaviour
         {
             if (GameManager.Instance.isServer && !IsDropType)
             {
-                SocketServer.Instance.SendHostCD(CardId, isOK: false);
+                OnlineNetworkServer.Instance.SendHostCD(CardId, isOK: false);
             }
             for (int k = 0; k < InGridGrids.Count; k++)
             {
@@ -855,14 +855,14 @@ public class PlantCard : MonoBehaviour
             zombieSpawnApply.GridPos = grid.Position;
             zombieSpawnApply.CardId = CardId;
             zombieSpawnApply.isRat = IsRat;
-            SocketClient.Instance.ApplyPlaceZombie(zombieSpawnApply);
+            OnlineNetworkClient.Instance.ApplyPlaceZombie(zombieSpawnApply);
             zombie.DirectDead(canDropItem: false, 0f, synClient: true);
         }
         else
         {
             if (GameManager.Instance.isServer && !IsDropType)
             {
-                SocketServer.Instance.SendHostCD(CardId, isOK: false);
+                OnlineNetworkServer.Instance.SendHostCD(CardId, isOK: false);
             }
             for (int k = 0; k < InGridGrids.Count; k++)
             {
@@ -1094,7 +1094,7 @@ public class PlantCard : MonoBehaviour
             selectCard.zombieType = CardZombieType;
             selectCard.isBack = true;
             selectCard.cardId = CardId;
-            SocketClient.Instance.SelectCard(selectCard);
+            OnlineNetworkClient.Instance.SelectCard(selectCard);
         }
 
         if (GameManager.Instance.isServer)
@@ -1105,7 +1105,7 @@ public class PlantCard : MonoBehaviour
             selectCard2.zombieType = CardZombieType;
             selectCard2.isBack = true;
             selectCard2.cardId = CardId;
-            SocketServer.Instance.SelectCard(selectCard2);
+            OnlineNetworkServer.Instance.SelectCard(selectCard2);
         }
     }
 
@@ -1133,7 +1133,7 @@ public class PlantCard : MonoBehaviour
             synItem.OnlineId = OnlineId;
             synItem.Type = SynItemType.Card;
             synItem.SynCode[0] = 2;
-            SocketServer.Instance.SendSynBag(synItem);
+            OnlineNetworkServer.Instance.SendSynBag(synItem);
         }
         ClearInGrid();
         CancelPlace();

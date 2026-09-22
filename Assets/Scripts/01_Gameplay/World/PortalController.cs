@@ -47,12 +47,12 @@ public class PortalController : MonoBehaviour
 			{
 				list.Add(portals[k].CurrGrid.Position);
 			}
-			OnlineId = SocketServer.Instance.ItemId;
+			OnlineId = OnlineNetworkServer.Instance.ItemId;
 			PortalSpawn portalSpawn = new PortalSpawn();
 			portalSpawn.OnlineId = OnlineId;
 			portalSpawn.Pos = list;
 			portalSpawn.type = type;
-			SocketServer.Instance.SpawnPortal(portalSpawn);
+			OnlineNetworkServer.Instance.SpawnPortal(portalSpawn);
 		}
 		StartCoroutine(ResetDoor());
 	}
@@ -104,7 +104,7 @@ public class PortalController : MonoBehaviour
 				synItem.Type = SynItemType.Portal;
 				synItem.SynCode[0] = i;
 				synItem.Twofloat = randomNoWaterGrid.Position;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}

@@ -856,7 +856,7 @@ public abstract class PlantBase : MonoBehaviour
 			synItem.SynCode[2] = code2;
 			synItem.SynCode[3] = code3;
 			synItem.AName = AName;
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 	}
 
@@ -1061,7 +1061,7 @@ public abstract class PlantBase : MonoBehaviour
 			{
 				synItem.SynCode[2] = 1;
 			}
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 	}
 
@@ -1104,7 +1104,7 @@ public abstract class PlantBase : MonoBehaviour
 					synItem.Type = SynItemType.Plant;
 					synItem.SynCode[0] = 0;
 					synItem.SynCode[1] = 6;
-					SocketServer.Instance.SendSynBag(synItem);
+					OnlineNetworkServer.Instance.SendSynBag(synItem);
 				}
 				AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.Frozen, base.transform.position);
 				PoolManager.Instance.GetObj(GameManager.Instance.GameConf.FrozenEvolutionParticle).transform.position = base.transform.position + new Vector3(0f, 0.1f);
@@ -1118,7 +1118,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem2.SynCode[0] = 0;
 				synItem2.SynCode[1] = 3;
 				synItem2.SynCode[2] = (byte)FrozenLevel;
-				SocketServer.Instance.SendSynBag(synItem2);
+				OnlineNetworkServer.Instance.SendSynBag(synItem2);
 			}
 		}
 	}
@@ -1163,7 +1163,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.Type = SynItemType.Plant;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 4;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1234,7 +1234,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.Twofloat = grid.Position;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 12;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1281,7 +1281,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.Type = SynItemType.Plant;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 7;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1343,7 +1343,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 8;
 				synItem.SynCode[2] = dizzyTime;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1403,7 +1403,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.SynCode[2] = 2;
 			}
 			synItem.Twofloat.x = waitTime;
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 		if (isFlat && needFlatDead && !currGrid.isNoIceWater)
 		{
@@ -1694,7 +1694,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.Type = SynItemType.Plant;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 2;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1718,7 +1718,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.Type = SynItemType.Plant;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 1;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1856,7 +1856,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 9;
 				synItem.SynCode[2] = chp;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1875,7 +1875,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 10;
 				synItem.Twofloat = new Vector2(speed, 0f);
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -1893,7 +1893,7 @@ public abstract class PlantBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 11;
 				synItem.Twofloat = new Vector2(value, 0f);
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}

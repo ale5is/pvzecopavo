@@ -162,7 +162,7 @@ public class Grid
 				graveStoneSpawn.MapPos = Position;
 				graveStoneSpawn.isHave = value;
 				graveStoneSpawn.Type = GraveStone.TypeId;
-				SocketServer.Instance.SpawnGraveStone(graveStoneSpawn);
+				OnlineNetworkServer.Instance.SpawnGraveStone(graveStoneSpawn);
 			}
 			if (haveGraveStone && !value)
 			{
@@ -221,7 +221,7 @@ public class Grid
 				synGrid.SynCode[0] = 2;
 				synGrid.SynCode[1] = 2;
 				synGrid.isHave = value;
-				SocketServer.Instance.SendGridState(synGrid);
+				OnlineNetworkServer.Instance.SendGridState(synGrid);
 			}
 			haveRightLadder = value;
 		}
@@ -252,7 +252,7 @@ public class Grid
 				synGrid.SynCode[0] = 2;
 				synGrid.SynCode[1] = 1;
 				synGrid.isHave = value;
-				SocketServer.Instance.SendGridState(synGrid);
+				OnlineNetworkServer.Instance.SendGridState(synGrid);
 			}
 			haveLeftLadder = value;
 		}

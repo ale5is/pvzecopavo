@@ -2,11 +2,16 @@ using UnityEngine;
 
 namespace StartScene
 {
-	public class JoinButton : MonoBehaviour
+	public class JoinButtonOnline : MonoBehaviour
 	{
-		public Renderer REnderer;
+        private Renderer REnderer;
 
-		private void OnMouseEnter()
+        private void Awake()
+        {
+            REnderer = GetComponent<Renderer>();
+        }
+
+        private void OnMouseEnter()
 		{
 			if (!MyTool.IsPointerOverGameObject() && !GameManager.Instance.isOnline)
 			{
@@ -24,7 +29,7 @@ namespace StartScene
 		{
 			if (!MyTool.IsPointerOverGameObject() && !GameManager.Instance.isOnline)
 			{
-				UIManager.Instance.JoinGame.gameObject.SetActive(value: true);
+				MultiplayerUI.Instance?.OpenRelayJoinCanvas();
 				AudioManager.Instance.PlayEFAudio(GameManager.Instance.AudioConf.ButtonClick, base.transform.position, isAll: true);
 			}
 		}

@@ -29,7 +29,7 @@ public class SkyManager : MonoBehaviour
     [SerializeField] private MapManager mapManager;
     [SerializeField] private GobalLight gobalLight;
     [SerializeField] private LvItemManager lvItemManager;
-    [SerializeField] private SocketServer socketServer;
+    [SerializeField] private OnlineNetworkServer socketServer;
     [SerializeField] private PlantManager plantManager;
 
     [SerializeField] private SpectatorList spectatorList;
@@ -1890,7 +1890,7 @@ public class SkyManager : MonoBehaviour
             if (socketServer == null)
             {
                 Debug.LogError(
-                    "SkyManager: SocketServer no est asignado."
+                    "SkyManager: OnlineNetworkServer no est asignado."
                 );
                 return;
             }
@@ -2009,7 +2009,7 @@ public class SkyManager : MonoBehaviour
             if (socketServer == null)
             {
                 Debug.LogError(
-                    "SkyManager: SocketServer no est asignado."
+                    "SkyManager: OnlineNetworkServer no est asignado."
                 );
                 return;
             }

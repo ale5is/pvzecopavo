@@ -56,14 +56,15 @@ public class PlayerList : MonoBehaviour
 
     public void RefreshPlayerList()
     {
-        if (SocketServer.Instance == null)
+        if (OnlineNetworkServer.Instance == null ||
+            !OnlineNetworkServer.Instance.isServerOpen)
         {
             ClearPlayerList();
             return;
         }
 
-        PlayerInfo host = SocketServer.Instance.GetHostPlayer();
-        List<PlayerInfo> players = SocketServer.Instance.GetPlayers();
+        PlayerInfo host = OnlineNetworkServer.Instance.GetHostPlayer();
+        List<PlayerInfo> players = OnlineNetworkServer.Instance.GetPlayers();
 
         UpdatePlayerList(host, players);
     }

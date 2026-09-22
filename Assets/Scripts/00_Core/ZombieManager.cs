@@ -397,7 +397,7 @@ public class ZombieManager : MonoBehaviour
 			}
 			else if (GameManager.Instance.isServer)
 			{
-				component.OnlineId = SocketServer.Instance.ItemId;
+				component.OnlineId = OnlineNetworkServer.Instance.ItemId;
 			}
 			if (isHyp)
 			{
@@ -469,13 +469,13 @@ public class ZombieManager : MonoBehaviour
 			}
 			for (int i = 0; i < zombie.OnlineIdNum; i++)
 			{
-				zombieSpawn.OnlineId = SocketServer.Instance.ItemId;
+				zombieSpawn.OnlineId = OnlineNetworkServer.Instance.ItemId;
 			}
 			zombie.OnlineId = zombieSpawn.OnlineId;
 			zombieSpawn.PlacePlayer = zombie.PlacePlayer;
 			zombieSpawn.Type = zombieType;
 			zombieSpawn.UpdateLine = UpdateLine;
-			SocketServer.Instance.SpawnZombie(zombieSpawn);
+			OnlineNetworkServer.Instance.SpawnZombie(zombieSpawn);
 			zombie.ServerInitInfo();
 		}
 	}

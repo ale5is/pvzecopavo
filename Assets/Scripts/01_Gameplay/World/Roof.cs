@@ -297,7 +297,7 @@ public class Roof : MapBase
 					synMap.mapPos = base.transform.position;
 					synMap.pos = component.transform.position;
 					synMap.TwoFloat = new Vector2(component.GetBaseSpeed(), 0f);
-					SocketServer.Instance.SendMapSyn(synMap);
+					OnlineNetworkServer.Instance.SendMapSyn(synMap);
 				}
 			}
 		}
@@ -354,7 +354,7 @@ public class Roof : MapBase
 				SynMap synMap = new SynMap();
 				synMap.SynCode[0] = 2;
 				synMap.mapPos = base.transform.position;
-				SocketServer.Instance.SendMapSyn(synMap);
+				OnlineNetworkServer.Instance.SendMapSyn(synMap);
 			}
 		}
 	}

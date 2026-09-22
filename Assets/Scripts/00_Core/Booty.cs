@@ -154,7 +154,7 @@ public class Booty : MonoBehaviour
 		{
 			SynBooty synBooty = new SynBooty();
 			synBooty.isSpawn = false;
-			SocketServer.Instance.SendSynBooty(synBooty);
+			OnlineNetworkServer.Instance.SendSynBooty(synBooty);
 		}
 	}
 

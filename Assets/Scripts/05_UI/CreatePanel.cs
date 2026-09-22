@@ -371,7 +371,7 @@ public class CreatePanel : MonoBehaviour
 		PlayerManager.Instance.SunInfinite = !PlayerManager.Instance.SunInfinite;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (PlayerManager.Instance.SunInfinite)
 		{
@@ -389,7 +389,7 @@ public class CreatePanel : MonoBehaviour
 		SeedBank.Instance.isNoCD = !SeedBank.Instance.isNoCD;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (SeedBank.Instance.isNoCD)
 		{
@@ -421,7 +421,7 @@ public class CreatePanel : MonoBehaviour
 		PlantManager.Instance.PlantInvincible = !PlantManager.Instance.PlantInvincible;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (PlantManager.Instance.PlantInvincible)
 		{
@@ -439,7 +439,7 @@ public class CreatePanel : MonoBehaviour
 		ZombieManager.Instance.ZombieInvincible = !ZombieManager.Instance.ZombieInvincible;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (ZombieManager.Instance.ZombieInvincible)
 		{
@@ -471,7 +471,7 @@ public class CreatePanel : MonoBehaviour
 		ZombieManager.Instance.ZombieDontMove = !ZombieManager.Instance.ZombieDontMove;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (ZombieManager.Instance.ZombieDontMove)
 		{
@@ -489,7 +489,7 @@ public class CreatePanel : MonoBehaviour
 		LvItemManager.Instance.VaseAlwaysLight = !LvItemManager.Instance.VaseAlwaysLight;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (LvItemManager.Instance.VaseAlwaysLight)
 		{
@@ -531,7 +531,7 @@ public class CreatePanel : MonoBehaviour
 		SkyManager.Instance.DayLightCycle = !SkyManager.Instance.DayLightCycle;
 		if (GameManager.Instance.isServer)
 		{
-			SocketServer.Instance.SendCommandBag();
+			OnlineNetworkServer.Instance.SendCommandBag();
 		}
 		if (SkyManager.Instance.DayLightCycle)
 		{

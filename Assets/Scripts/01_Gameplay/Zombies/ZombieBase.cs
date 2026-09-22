@@ -305,7 +305,7 @@ public abstract class ZombieBase : MonoBehaviour
 					synItem.Type = SynItemType.Zombie;
 					synItem.SynCode[0] = 1;
 					synItem.SynCode[1] = 0;
-					SocketServer.Instance.SendSynBag(synItem);
+					OnlineNetworkServer.Instance.SendSynBag(synItem);
 				}
 			}
 			state = value;
@@ -1711,7 +1711,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.Type = SynItemType.Zombie;
 				synItem.SynCode[0] = 1;
 				synItem.SynCode[1] = 1;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 			if (!GameManager.Instance.isClient)
 			{
@@ -1841,7 +1841,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.Type = SynItemType.Zombie;
 				synItem.SynCode[0] = 1;
 				synItem.SynCode[1] = 3;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 			Object.Instantiate(GameManager.Instance.GameConf.ImitaterParticle).transform.position = base.transform.position;
 			Hp = 0;
@@ -1862,7 +1862,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[1] = 2;
 				synItem.SynCode[2] = (canDropItem ? 1 : 0);
 				synItem.Twofloat = new Vector2(delay, 0f);
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 			Dead(canDropItem, delay);
 		}
@@ -1960,7 +1960,7 @@ public abstract class ZombieBase : MonoBehaviour
 			synItem.SynCode[1] = code1;
 			synItem.SynCode[2] = code2;
 			synItem.SynCode[3] = code3;
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 	}
 
@@ -2148,7 +2148,7 @@ public abstract class ZombieBase : MonoBehaviour
 			{
 				synItem.SynCode[2] = 1;
 			}
-			SocketServer.Instance.SendSynBag(synItem);
+			OnlineNetworkServer.Instance.SendSynBag(synItem);
 		}
 	}
 
@@ -2174,7 +2174,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 0;
 				synItem.SynCode[2] = (byte)FrozenLevel;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2235,7 +2235,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.Type = SynItemType.Zombie;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 1;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2276,7 +2276,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.Type = SynItemType.Zombie;
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 2;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2352,7 +2352,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 3;
 				synItem.SynCode[2] = (byte)num;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 			changeLineCoroutine = StartCoroutine(MovetoLine(num));
 		}
@@ -2439,7 +2439,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 5;
 				synItem.Twofloat = pos;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2474,7 +2474,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 6;
 				synItem.SynCode[2] = dizzyTime;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2605,7 +2605,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 7;
 				synItem.SynCode[2] = chp;
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2624,7 +2624,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 8;
 				synItem.Twofloat = new Vector2(speed, 0f);
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2642,7 +2642,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.SynCode[0] = 0;
 				synItem.SynCode[1] = 9;
 				synItem.Twofloat = new Vector2(value, 0f);
-				SocketServer.Instance.SendSynBag(synItem);
+				OnlineNetworkServer.Instance.SendSynBag(synItem);
 			}
 		}
 	}
@@ -2663,7 +2663,7 @@ public abstract class ZombieBase : MonoBehaviour
 				synItem.AName = GameManager.Instance.LocalPlayerSave.playerName;
 				synItem.SynCode[0] = 3;
 				synItem.SynCode[1] = 0;
-				SocketClient.Instance.SendSynBag(synItem);
+				OnlineNetworkClient.Instance.SendSynBag(synItem);
 			}
 			else
 			{

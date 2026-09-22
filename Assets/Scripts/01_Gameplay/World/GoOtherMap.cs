@@ -97,14 +97,14 @@ public class GoOtherMap : MonoBehaviour
 			{
 				PlayerMap playerMap = new PlayerMap();
 				playerMap.Pos = mapList[MapIds[0]].transform.position;
-				SocketClient.Instance.ChangeMap(playerMap);
+				OnlineNetworkClient.Instance.ChangeMap(playerMap);
 			}
 			if (GameManager.Instance.isServer)
 			{
 				PlayerMap playerMap2 = new PlayerMap();
 				playerMap2.PlayerName = GameManager.Instance.LocalPlayerSave.playerName;
 				playerMap2.Pos = mapList[MapIds[0]].transform.position;
-				SocketServer.Instance.ChangeMap(playerMap2);
+				OnlineNetworkServer.Instance.ChangeMap(playerMap2);
 			}
 		}
 	}
@@ -140,14 +140,14 @@ public class GoOtherMap : MonoBehaviour
 			{
 				PlayerMap playerMap = new PlayerMap();
 				playerMap.Pos = mapList[MapIds[0]].transform.position;
-				SocketClient.Instance.ChangeMap(playerMap);
+				OnlineNetworkClient.Instance.ChangeMap(playerMap);
 			}
 			if (GameManager.Instance.isServer)
 			{
 				PlayerMap playerMap2 = new PlayerMap();
 				playerMap2.PlayerName = GameManager.Instance.LocalPlayerSave.playerName;
 				playerMap2.Pos = mapList[MapIds[0]].transform.position;
-				SocketServer.Instance.ChangeMap(playerMap2);
+				OnlineNetworkServer.Instance.ChangeMap(playerMap2);
 			}
 		}
 	}

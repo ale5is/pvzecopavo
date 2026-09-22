@@ -187,7 +187,7 @@ public class LawnMower : MonoBehaviour
 				synMap.SynCode[0] = 1;
 				synMap.SynCode[1] = OnlineID;
 				synMap.mapPos = base.transform.position;
-				SocketServer.Instance.SendMapSyn(synMap);
+				OnlineNetworkServer.Instance.SendMapSyn(synMap);
 			}
 		}
 	}

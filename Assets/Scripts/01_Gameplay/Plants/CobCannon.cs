@@ -326,7 +326,7 @@ public class CobCannon : PlantBase
 			synItem.Twofloat = pos;
 			synItem.AName = GameManager.Instance.LocalPlayerSave.playerName;
 			synItem.SynCode[0] = 1;
-			SocketClient.Instance.SendSynBag(synItem);
+			OnlineNetworkClient.Instance.SendSynBag(synItem);
 			CanCharge = true;
 			base.transform.GetComponent<CapsuleCollider2D>().enabled = false;
 		}

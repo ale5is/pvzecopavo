@@ -197,7 +197,7 @@ public class UIPlantCardNC : MonoBehaviour, IPointerDownHandler, IEventSystemHan
             }
 
             if (GameManager.Instance.isClient &&
-                SocketClient.Instance != null)
+                OnlineNetworkClient.Instance != null)
             {
                 SelectCard selectCard = new SelectCard
                 {
@@ -207,7 +207,7 @@ public class UIPlantCardNC : MonoBehaviour, IPointerDownHandler, IEventSystemHan
                     cardId = localCardId
                 };
 
-                SocketClient.Instance.SelectCard(
+                OnlineNetworkClient.Instance.SelectCard(
                     selectCard
                 );
             }
