@@ -79,7 +79,7 @@ public class GoOtherMap : MonoBehaviour
 		}
 		if (CameraControl.Instance.GoOtherYard(MapIds[1]))
 		{
-			StatsManager.Instance.AddStatsNum(StatsEnum.ChangeMapNum);
+            GameManager.Instance.StatsManager.AddStatsNum(StatsEnum.ChangeMapNum);
 			AudioManager.Instance.ChangeMapReset();
 			if (UIManager.Instance.SetPanel.isOpenMapFade)
 			{
