@@ -31,6 +31,7 @@ public class SeedBank : MonoBehaviour
 
     private List<PlantCard> slotList = new List<PlantCard>();
     private List<PlantCard> DropCards = new List<PlantCard>();
+    public IReadOnlyList<PlantCard> SlotCards => slotList;
 
     public Sprite NoCardSprite;
 
