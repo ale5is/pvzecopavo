@@ -170,7 +170,7 @@ public abstract class Allcoin : MonoBehaviour
 			currBright -= 3f * Time.deltaTime;
 			SetAllColor(new Color(1f, 1f, 1f, currBright));
 		}
-		StatsManager.Instance.ClearStatsNum(StatsEnum.ClickMoney);
+        GameManager.Instance.StatsManager.ClearStatsNum(StatsEnum.ClickMoney);
 		StopAllCoroutines();
 		PoolManager.Instance.PushObj(Prefab, base.gameObject);
 	}

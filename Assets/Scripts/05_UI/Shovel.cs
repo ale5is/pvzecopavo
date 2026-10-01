@@ -146,7 +146,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 				}
 				else if (ClearPlant(gridPointByMouse, vector, GameManager.Instance.LocalPlayerSave.playerName))
 				{
-					BattlePlayerList.Instance.PlayShovelAnimation(gridPointByMouse.Position, 1, GameManager.Instance.LocalPlayerSave.playerName);
+                    UIManager.Instance.BattlePlayerList.PlayShovelAnimation(gridPointByMouse.Position, 1, GameManager.Instance.LocalPlayerSave.playerName);
 				}
 				if (GameManager.Instance.isServer)
 				{
@@ -156,7 +156,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 					toolApply4.Sound = 1;
 					OnlineNetworkServer.Instance.SendShovelAnim(toolApply4);
 				}
-				StatsManager.Instance.AddStatsNum(StatsEnum.ShovelOffNum);
+                GameManager.Instance.StatsManager.AddStatsNum(StatsEnum.ShovelOffNum);
 				IsShovel = false;
 			}
 			else if (Vector2.Distance(vector, gridPointByMouse.Position) > 1.6f)

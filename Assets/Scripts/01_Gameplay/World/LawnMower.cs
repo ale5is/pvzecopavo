@@ -177,7 +177,7 @@ public class LawnMower : MonoBehaviour
 	{
 		if (!GameManager.Instance.isClient || synClient)
 		{
-			StatsManager.Instance.AddStatsNum(StatsEnum.MowerStartNum);
+            GameManager.Instance.StatsManager.AddStatsNum(StatsEnum.MowerStartNum);
 			IsRun = true;
 			animator.speed = 1f;
 			LaunchEvent();

@@ -199,7 +199,7 @@ public class PlayerManager : MonoBehaviour
 		{
 			if (value > money)
 			{
-				StatsManager.Instance.AddStatsNum(StatsEnum.EarnMoney, value - money);
+                GameManager.Instance.StatsManager.AddStatsNum(StatsEnum.EarnMoney, value - money);
 			}
 			SetMoney(value);
 		}

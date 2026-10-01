@@ -15,6 +15,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private AudioManager audioManager;
     [SerializeField] private SeedChooser seedChooser;
     [SerializeField] private ZombieChooser zombieChooser;
+    public BattlePlayerList BattlePlayerList;
     [SerializeField] private Shovel shovel;
     [SerializeField] private Glove glove;
     [SerializeField] private CreatePanel createPanel;
