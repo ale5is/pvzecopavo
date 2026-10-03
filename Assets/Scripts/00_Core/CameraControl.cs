@@ -56,22 +56,22 @@ public class CameraControl : MonoBehaviour
 		if (Application.isMobilePlatform && InputCompat.touchCount == 1)
 		{
 			Touch touch = InputCompat.GetTouch(0);
-			switch (touch.phase)
+			if (touch.phase == UnityEngine.TouchPhase.Began)
 			{
-			case TouchPhase.Began:
 				isDragging = true;
 				lastTouchPosition = touch.position;
-				break;
-			case TouchPhase.Moved:
+			}
+			else if (touch.phase == UnityEngine.TouchPhase.Moved)
+			{
 				if (isDragging)
 				{
 					num = 0f - (touch.position.y - lastTouchPosition.y) * 0.002f;
 					lastTouchPosition = touch.position;
 				}
-				break;
-			case TouchPhase.Canceled:
+			}
+			else if (touch.phase == UnityEngine.TouchPhase.Canceled || touch.phase == UnityEngine.TouchPhase.Ended)
+			{
 				isDragging = false;
-				break;
 			}
 		}
 		if (num != 0f)

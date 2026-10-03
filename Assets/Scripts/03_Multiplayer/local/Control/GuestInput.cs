@@ -1,6 +1,8 @@
 using UnityEngine;
 
+#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
+#endif
 
 public enum GuestDevice
 {
@@ -124,85 +126,62 @@ public abstract class GuestInput
             return null;
         }
 
-        switch (profile.mode)
+        if (profile.mode == GuestControlMode.Keyboard)
         {
-            case GuestControlMode.Keyboard:
-                return new KeyboardGuestInput(
-                    profile
-                );
-
-            case GuestControlMode.Gamepad:
-                return new GamepadGuestInput(
-                    Mathf.Clamp(
-                        profile.gamepadNumber,
-                        1,
-                        4
-                    ) - 1
-                );
-
-            case GuestControlMode.Mouse:
-            case GuestControlMode.Disabled:
-            default:
-                return null;
+            return new KeyboardGuestInput(profile);
         }
+
+        if (profile.mode == GuestControlMode.Gamepad)
+        {
+            return new GamepadGuestInput(
+                Mathf.Clamp(profile.gamepadNumber, 1, 4) - 1
+            );
+        }
+
+        return null;
     }
 
     public static GuestInput Create(
         GuestDevice device)
     {
-        switch (device)
+        if (device == GuestDevice.KeyboardWASD)
         {
-            case GuestDevice.KeyboardWASD:
-                {
-                    GuestControlProfile p =
-                        new GuestControlProfile();
-
-                    p.SetWASD();
-
-                    return Create(p);
-                }
-
-            case GuestDevice.KeyboardArrows:
-                {
-                    GuestControlProfile p =
-                        new GuestControlProfile();
-
-                    p.SetArrows();
-
-                    return Create(p);
-                }
-
-            case GuestDevice.KeyboardIJKL:
-                {
-                    GuestControlProfile p =
-                        new GuestControlProfile();
-
-                    p.SetIJKL();
-
-                    return Create(p);
-                }
-
-            case GuestDevice.Gamepad1:
-            case GuestDevice.Gamepad2:
-            case GuestDevice.Gamepad3:
-            case GuestDevice.Gamepad4:
-                {
-                    GuestControlProfile p =
-                        new GuestControlProfile();
-
-                    p.SetGamepad(
-                        (int)device -
-                        (int)GuestDevice.Gamepad1 +
-                        1
-                    );
-
-                    return Create(p);
-                }
-
-            default:
-                return null;
+            GuestControlProfile p = new GuestControlProfile();
+            p.SetWASD();
+            return Create(p);
         }
+
+        if (device == GuestDevice.KeyboardArrows)
+        {
+            GuestControlProfile p = new GuestControlProfile();
+            p.SetArrows();
+            return Create(p);
+        }
+
+        if (device == GuestDevice.KeyboardIJKL)
+        {
+            GuestControlProfile p = new GuestControlProfile();
+            p.SetIJKL();
+            return Create(p);
+        }
+
+        if (
+            device == GuestDevice.Gamepad1 ||
+            device == GuestDevice.Gamepad2 ||
+            device == GuestDevice.Gamepad3 ||
+            device == GuestDevice.Gamepad4
+        )
+        {
+            GuestControlProfile p = new GuestControlProfile();
+            p.SetGamepad(
+                (int)device - (int)GuestDevice.Gamepad1 + 1
+            );
+            return Create(p);
+        }
+
+        return null;
     }
+
 }
 
 public sealed class KeyboardGuestInput : GuestInput
@@ -288,6 +267,8 @@ public sealed class GamepadGuestInput : GuestInput
     public override string Label =>
         "Gamepad " + (index + 1);
 
+#if ENABLE_INPUT_SYSTEM
+
     private Gamepad Pad =>
         index >= 0 &&
         index < Gamepad.all.Count
@@ -354,4 +335,25 @@ public sealed class GamepadGuestInput : GuestInput
                    .wasPressedThisFrame;
     }
 
+#else
+
+    public override bool IsAvailable =>
+        false;
+
+    protected override Vector2Int HeldDirection() =>
+        Vector2Int.zero;
+
+    protected override bool PrevPressed() =>
+        false;
+
+    protected override bool NextPressed() =>
+        false;
+
+    protected override bool ConfirmPressed() =>
+        false;
+
+    protected override bool CancelPressed() =>
+        false;
+
+#endif
 }

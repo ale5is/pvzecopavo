@@ -4,34 +4,84 @@ using UnityEngine.InputSystem.Controls;
 
 public static class InputCompat
 {
+    private static bool lastPointerWasTouch;
+    private static Vector2 lastTouchPosition;
+
+    private static bool IsTouchActive(Touchscreen touchscreen)
+    {
+        var press = touchscreen.primaryTouch.press;
+        return press.isPressed || press.wasPressedThisFrame || press.wasReleasedThisFrame;
+    }
+
+    private static bool IsTouchListed(TouchControl touch)
+    {
+        var press = touch.press;
+        return press.isPressed || press.wasReleasedThisFrame;
+    }
+
+    /// <summary>
+    /// True cuando el ultimo puntero usado fue el dedo (pantalla tactil) y no el mouse.
+    /// </summary>
+    public static bool IsTouchPointer
+    {
+        get
+        {
+            Touchscreen touchscreen = Touchscreen.current;
+            Mouse mouse = Mouse.current;
+
+            if (touchscreen != null && IsTouchActive(touchscreen))
+            {
+                lastTouchPosition = touchscreen.primaryTouch.position.ReadValue();
+                lastPointerWasTouch = true;
+                return true;
+            }
+
+            if (mouse == null)
+                return touchscreen != null;
+
+            if (touchscreen == null)
+                return false;
+
+            if (mouse.delta.ReadValue().sqrMagnitude > 0f ||
+                mouse.leftButton.wasPressedThisFrame ||
+                mouse.rightButton.wasPressedThisFrame ||
+                mouse.middleButton.wasPressedThisFrame)
+            {
+                lastPointerWasTouch = false;
+            }
+
+            return lastPointerWasTouch;
+        }
+    }
+
     public static Vector3 mousePosition
     {
         get
         {
-            if (Mouse.current != null)
-                return Mouse.current.position.ReadValue();
+            if (IsTouchPointer)
+                return lastTouchPosition;
 
-            if (Touchscreen.current != null)
-                return Touchscreen.current.primaryTouch.position.ReadValue();
+            Mouse mouse = Mouse.current;
+            if (mouse != null)
+                return mouse.position.ReadValue();
 
             return Vector3.zero;
         }
     }
 
+    // Igual que Input.touchCount: incluye el dedo que se levanta en este frame (fase Ended).
     public static int touchCount
     {
         get
         {
             Touchscreen touchscreen = Touchscreen.current;
-
             if (touchscreen == null)
                 return 0;
 
             int count = 0;
-
             foreach (TouchControl touch in touchscreen.touches)
             {
-                if (touch.press.isPressed)
+                if (IsTouchListed(touch))
                     count++;
             }
 
@@ -42,7 +92,6 @@ public static class InputCompat
     public static UnityEngine.Touch GetTouch(int index)
     {
         Touchscreen touchscreen = Touchscreen.current;
-
         if (touchscreen == null || index < 0)
             return default;
 
@@ -50,36 +99,35 @@ public static class InputCompat
 
         foreach (TouchControl touch in touchscreen.touches)
         {
-            bool pressed = touch.press.isPressed;
-            bool pressedThisFrame = touch.press.wasPressedThisFrame;
-            bool releasedThisFrame = touch.press.wasReleasedThisFrame;
-
-            if (!pressed && !releasedThisFrame)
+            if (!IsTouchListed(touch))
                 continue;
 
             if (activeIndex != index)
             {
-                if (pressed)
-                    activeIndex++;
-
+                activeIndex++;
                 continue;
             }
 
-            UnityEngine.TouchPhase phase = UnityEngine.TouchPhase.Moved;
+            bool pressedThisFrame = touch.press.wasPressedThisFrame;
+            bool releasedThisFrame = touch.press.wasReleasedThisFrame;
+            Vector2 delta = touch.delta.ReadValue();
 
+            UnityEngine.TouchPhase phase;
             if (pressedThisFrame)
                 phase = UnityEngine.TouchPhase.Began;
             else if (releasedThisFrame)
                 phase = UnityEngine.TouchPhase.Ended;
-            else if (!pressed)
-                phase = UnityEngine.TouchPhase.Canceled;
+            else if (delta.sqrMagnitude > 0f)
+                phase = UnityEngine.TouchPhase.Moved;
+            else
+                phase = UnityEngine.TouchPhase.Stationary;
 
             return new UnityEngine.Touch
             {
-                fingerId = activeIndex,
+                fingerId = touch.touchId.ReadValue(),
                 position = touch.position.ReadValue(),
                 phase = phase,
-                deltaPosition = touch.delta.ReadValue()
+                deltaPosition = delta
             };
         }
 
@@ -91,7 +139,6 @@ public static class InputCompat
         if (axisName == "Mouse ScrollWheel")
         {
             Mouse mouse = Mouse.current;
-
             if (mouse == null)
                 return 0f;
 
@@ -110,7 +157,6 @@ public static class InputCompat
     private static float GetKeyboardAxis(Key negative, Key positive)
     {
         Keyboard keyboard = Keyboard.current;
-
         if (keyboard == null)
             return 0f;
 
@@ -128,33 +174,28 @@ public static class InputCompat
     public static bool GetKey(KeyCode keyCode)
     {
         KeyControl control = GetKeyControl(keyCode);
-
         return control != null && control.isPressed;
     }
 
     public static bool GetKeyDown(KeyCode keyCode)
     {
         KeyControl control = GetKeyControl(keyCode);
-
         return control != null && control.wasPressedThisFrame;
     }
 
     public static bool GetKeyUp(KeyCode keyCode)
     {
         KeyControl control = GetKeyControl(keyCode);
-
         return control != null && control.wasReleasedThisFrame;
     }
 
     private static KeyControl GetKeyControl(KeyCode keyCode)
     {
         Keyboard keyboard = Keyboard.current;
-
         if (keyboard == null)
             return null;
 
         Key key;
-
         if (!TryConvertKeyCode(keyCode, out key))
             return null;
 
@@ -213,28 +254,55 @@ public static class InputCompat
         if (keyCode == KeyCode.Keypad9) { key = Key.Numpad9; return true; }
 
         if (keyCode == KeyCode.KeypadEnter) { key = Key.NumpadEnter; return true; }
-
         if (keyCode == KeyCode.Space) { key = Key.Space; return true; }
         if (keyCode == KeyCode.Escape) { key = Key.Escape; return true; }
         if (keyCode == KeyCode.Return) { key = Key.Enter; return true; }
-
+        if (keyCode == KeyCode.Backspace) { key = Key.Backspace; return true; }
+        if (keyCode == KeyCode.Tab) { key = Key.Tab; return true; }
         if (keyCode == KeyCode.Comma) { key = Key.Comma; return true; }
         if (keyCode == KeyCode.Period) { key = Key.Period; return true; }
         if (keyCode == KeyCode.Slash) { key = Key.Slash; return true; }
-
-        if (keyCode == KeyCode.UpArrow) { key = Key.UpArrow; return true; }
-        if (keyCode == KeyCode.DownArrow) { key = Key.DownArrow; return true; }
+        if (keyCode == KeyCode.Semicolon) { key = Key.Semicolon; return true; }
+        if (keyCode == KeyCode.Equals) { key = Key.Equals; return true; }
+        if (keyCode == KeyCode.Minus) { key = Key.Minus; return true; }
+        if (keyCode == KeyCode.LeftBracket) { key = Key.LeftBracket; return true; }
+        if (keyCode == KeyCode.RightBracket) { key = Key.RightBracket; return true; }
+        if (keyCode == KeyCode.Backslash) { key = Key.Backslash; return true; }
+        if (keyCode == KeyCode.Quote) { key = Key.Quote; return true; }
         if (keyCode == KeyCode.LeftArrow) { key = Key.LeftArrow; return true; }
         if (keyCode == KeyCode.RightArrow) { key = Key.RightArrow; return true; }
-
+        if (keyCode == KeyCode.UpArrow) { key = Key.UpArrow; return true; }
+        if (keyCode == KeyCode.DownArrow) { key = Key.DownArrow; return true; }
         if (keyCode == KeyCode.LeftShift) { key = Key.LeftShift; return true; }
         if (keyCode == KeyCode.RightShift) { key = Key.RightShift; return true; }
-
         if (keyCode == KeyCode.LeftControl) { key = Key.LeftCtrl; return true; }
         if (keyCode == KeyCode.RightControl) { key = Key.RightCtrl; return true; }
-
         if (keyCode == KeyCode.LeftAlt) { key = Key.LeftAlt; return true; }
         if (keyCode == KeyCode.RightAlt) { key = Key.RightAlt; return true; }
+        if (keyCode == KeyCode.LeftWindows) { key = Key.LeftMeta; return true; }
+        if (keyCode == KeyCode.RightWindows) { key = Key.RightMeta; return true; }
+        if (keyCode == KeyCode.CapsLock) { key = Key.CapsLock; return true; }
+        if (keyCode == KeyCode.Numlock) { key = Key.NumLock; return true; }
+        if (keyCode == KeyCode.ScrollLock) { key = Key.ScrollLock; return true; }
+        if (keyCode == KeyCode.Pause) { key = Key.Pause; return true; }
+        if (keyCode == KeyCode.Insert) { key = Key.Insert; return true; }
+        if (keyCode == KeyCode.Delete) { key = Key.Delete; return true; }
+        if (keyCode == KeyCode.Home) { key = Key.Home; return true; }
+        if (keyCode == KeyCode.End) { key = Key.End; return true; }
+        if (keyCode == KeyCode.PageUp) { key = Key.PageUp; return true; }
+        if (keyCode == KeyCode.PageDown) { key = Key.PageDown; return true; }
+        if (keyCode == KeyCode.F1) { key = Key.F1; return true; }
+        if (keyCode == KeyCode.F2) { key = Key.F2; return true; }
+        if (keyCode == KeyCode.F3) { key = Key.F3; return true; }
+        if (keyCode == KeyCode.F4) { key = Key.F4; return true; }
+        if (keyCode == KeyCode.F5) { key = Key.F5; return true; }
+        if (keyCode == KeyCode.F6) { key = Key.F6; return true; }
+        if (keyCode == KeyCode.F7) { key = Key.F7; return true; }
+        if (keyCode == KeyCode.F8) { key = Key.F8; return true; }
+        if (keyCode == KeyCode.F9) { key = Key.F9; return true; }
+        if (keyCode == KeyCode.F10) { key = Key.F10; return true; }
+        if (keyCode == KeyCode.F11) { key = Key.F11; return true; }
+        if (keyCode == KeyCode.F12) { key = Key.F12; return true; }
 
         key = Key.None;
         return false;
@@ -250,9 +318,7 @@ public static class InputCompat
                 return true;
 
             Touchscreen touchscreen = Touchscreen.current;
-
-            return touchscreen != null &&
-                   touchscreen.primaryTouch.press.wasPressedThisFrame;
+            return touchscreen != null && touchscreen.primaryTouch.press.wasPressedThisFrame;
         }
 
         if (button == 1)
@@ -274,9 +340,7 @@ public static class InputCompat
                 return true;
 
             Touchscreen touchscreen = Touchscreen.current;
-
-            return touchscreen != null &&
-                   touchscreen.primaryTouch.press.wasReleasedThisFrame;
+            return touchscreen != null && touchscreen.primaryTouch.press.wasReleasedThisFrame;
         }
 
         if (button == 1)
@@ -298,9 +362,7 @@ public static class InputCompat
                 return true;
 
             Touchscreen touchscreen = Touchscreen.current;
-
-            return touchscreen != null &&
-                   touchscreen.primaryTouch.press.isPressed;
+            return touchscreen != null && touchscreen.primaryTouch.press.isPressed;
         }
 
         if (button == 1)
