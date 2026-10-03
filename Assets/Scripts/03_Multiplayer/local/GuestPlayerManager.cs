@@ -93,6 +93,19 @@ public class GuestPlayerManager : MonoBehaviour
     private readonly List<PlantCard> cardBuffer =
         new List<PlantCard>();
 
+    // Cartas que vienen de la cinta transportadora (niveles especiales).
+    private readonly HashSet<PlantCard> beltCardSet =
+        new HashSet<PlantCard>();
+
+    [Header("Conveyor belt")]
+    [SerializeField]
+    private bool guestsUseConveyorBelt = true;
+
+    // Una carta recien aparecida esta fuera de la mascara de la cinta (x local ~2.8);
+    // solo se puede elegir cuando ya entro en la cinta.
+    [SerializeField]
+    private float beltMaxSelectableLocalX = 2.4f;
+
     private readonly Collider[] collectColliderBuffer =
         new Collider[64];
 
@@ -689,8 +702,19 @@ public class GuestPlayerManager : MonoBehaviour
             return;
         }
 
-        if (!card.CanPlace)
+        // Las cartas de la cinta no tienen recarga ni cuestan sol (NeedSun = 0).
+        bool isBelt =
+            beltCardSet.Contains(
+                card
+            );
+
+        if (!isBelt && !card.CanPlace)
             return;
+
+        int needSun =
+            isBelt
+                ? card.NeedSun
+                : -1;
 
         if (SeedBank.Instance == null)
             return;
@@ -721,7 +745,7 @@ public class GuestPlayerManager : MonoBehaviour
             SeedBank.Instance.CheckPlant(
                 plant,
                 grid,
-                -1,
+                needSun,
                 player.Name
             );
 
@@ -742,12 +766,28 @@ public class GuestPlayerManager : MonoBehaviour
         SeedBank.Instance.PlantConfirm(
             plant,
             grid,
-            -1,
+            needSun,
             spCode,
             player.Name
         );
 
-        card.CanPlace = false;
+        if (isBelt)
+        {
+            // Igual que el jugador principal: la carta de la cinta se gasta al plantar.
+            beltCardSet.Remove(
+                card
+            );
+
+            player.ClearSelectedCard();
+
+            SeedBank.Instance.RemoveDropCard(
+                card
+            );
+        }
+        else
+        {
+            card.CanPlace = false;
+        }
     }
 
     private bool ShouldRun()
@@ -868,6 +908,52 @@ public class GuestPlayerManager : MonoBehaviour
                 cardBuffer.Add(
                     card
                 );
+            }
+        }
+
+        beltCardSet.Clear();
+
+        if (
+            guestsUseConveyorBelt &&
+            ConveyorBelt.Instance != null &&
+            ConveyorBelt.Instance.BeltCards != null
+        )
+        {
+            List<Transform> beltCards =
+                ConveyorBelt.Instance.BeltCards;
+
+            for (
+                int i = 0;
+                i < beltCards.Count;
+                i++
+            )
+            {
+                Transform t =
+                    beltCards[i];
+
+                if (t == null)
+                    continue;
+
+                PlantCard card =
+                    t.GetComponent<PlantCard>();
+
+                if (
+                    card != null &&
+                    card.gameObject.activeInHierarchy &&
+                    card.CardPlantType !=
+                        PlantType.Nope &&
+                    t.localPosition.x <=
+                        beltMaxSelectableLocalX
+                )
+                {
+                    cardBuffer.Add(
+                        card
+                    );
+
+                    beltCardSet.Add(
+                        card
+                    );
+                }
             }
         }
 

@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 #endif
 
 public enum GuestDevice
@@ -197,6 +199,46 @@ public sealed class KeyboardGuestInput : GuestInput
     public override string Label =>
         "Teclado";
 
+    private bool joined;
+
+    // En PC cuenta como disponible si hay teclado. En celular el sistema registra "teclados"
+    // fantasma (botones de volumen, sensor de huella, el propio mando), asi que el invitado de
+    // teclado solo aparece cuando se aprieta una de sus teclas en un teclado real.
+    public override bool IsAvailable
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            Keyboard keyboard = Keyboard.current;
+
+            if (keyboard == null)
+                return false;
+
+            if (!Application.isMobilePlatform)
+                return true;
+
+            if (!joined && !GamepadGuestInput.IsPadSibling(keyboard) && AnyOwnKeyDown())
+                joined = true;
+
+            return joined;
+#else
+            return false;
+#endif
+        }
+    }
+
+    private bool AnyOwnKeyDown()
+    {
+        return InputCompat.GetKeyDown(profile.up) ||
+               InputCompat.GetKeyDown(profile.down) ||
+               InputCompat.GetKeyDown(profile.left) ||
+               InputCompat.GetKeyDown(profile.right) ||
+               InputCompat.GetKeyDown(profile.previousCard) ||
+               InputCompat.GetKeyDown(profile.nextCard) ||
+               InputCompat.GetKeyDown(profile.confirm) ||
+               InputCompat.GetKeyDown(profile.cancel);
+    }
+
     protected override Vector2Int HeldDirection()
     {
         int x =
@@ -269,28 +311,306 @@ public sealed class GamepadGuestInput : GuestInput
 
 #if ENABLE_INPUT_SYSTEM
 
-    private Gamepad Pad =>
-        index >= 0 &&
-        index < Gamepad.all.Count
-            ? Gamepad.all[index]
-            : null;
+    // Lista de mandos: los Gamepad reconocidos por el Input System o, si no hay ninguno,
+    // los Joystick / HID genericos. Muchos mandos Bluetooth de celular entran como Joystick o
+    // HID y no como Gamepad, por eso antes no se detectaban.
+    private static readonly List<InputDevice> pads =
+        new List<InputDevice>();
+
+    private static int padsFrame = -1;
+
+    public static IReadOnlyList<InputDevice> Pads
+    {
+        get
+        {
+            RefreshPads();
+            return pads;
+        }
+    }
+
+    private static readonly HashSet<string> seenPadIds =
+        new HashSet<string>();
+
+    // Identificador de mando fisico. En Android un mismo mando puede registrarse como varios
+    // dispositivos del Input System (por ejemplo Gamepad + HID/teclado); comparten "descriptor".
+    public static string PadId(InputDevice d)
+    {
+        string caps = d.description.capabilities;
+
+        if (!string.IsNullOrEmpty(caps))
+        {
+            int k = caps.IndexOf(
+                "\"descriptor\"",
+                System.StringComparison.Ordinal
+            );
+
+            if (k >= 0)
+            {
+                int colon = caps.IndexOf(':', k);
+                int q1 = colon >= 0 ? caps.IndexOf('"', colon + 1) : -1;
+                int q2 = q1 >= 0 ? caps.IndexOf('"', q1 + 1) : -1;
+
+                if (q2 > q1 + 1)
+                    return "d:" + caps.Substring(q1 + 1, q2 - q1 - 1);
+            }
+        }
+
+        return "k:" + d.description.interfaceName + "|" +
+               d.description.manufacturer + "|" +
+               d.description.product + "|" +
+               d.description.version + "|" +
+               d.description.serial;
+    }
+
+    // Dispositivos del propio telefono que Android expone como si fueran mandos
+    // (por ejemplo "uinput-fpc", el sensor de huella). Se pueden agregar mas nombres.
+    private static readonly string[] ignoredNameParts =
+    {
+        "uinput",
+        "fpc",
+        "fingerprint",
+        "goodix",
+        "gpio"
+    };
+
+    private static bool IsIgnoredDevice(InputDevice d)
+    {
+        string name = d.displayName + " " + d.description.product;
+
+        if (name.IndexOf("virtual", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        foreach (string part in ignoredNameParts)
+        {
+            if (name.IndexOf(part, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+
+        string caps = d.description.capabilities;
+
+        return !string.IsNullOrEmpty(caps) &&
+               caps.IndexOf(
+                   "\"isVirtual\":true",
+                   System.StringComparison.Ordinal
+               ) >= 0;
+    }
+
+    // True si el dispositivo (por ejemplo un "teclado") es en realidad parte de un mando conectado.
+    public static bool IsPadSibling(InputDevice d)
+    {
+        string product = d.description.product;
+
+        if (string.IsNullOrEmpty(product))
+            return false;
+
+        RefreshPads();
+
+        foreach (InputDevice p in pads)
+        {
+            if (p != d && p.description.product == product)
+                return true;
+        }
+
+        return false;
+    }
+
+    // Un dispositivo generico solo cuenta como mando si tiene una cruceta/stick y varios botones
+    // (un telefono tiene dispositivos "fantasma" con solo uno o dos botones, como volumen o encendido).
+    private static bool LooksLikeController(InputDevice d)
+    {
+        int buttons = 0;
+        bool hasDirection = false;
+
+        foreach (InputControl c in d.allControls)
+        {
+            if (c.parent != d || c.synthetic)
+                continue;
+
+            if (c is ButtonControl)
+                buttons++;
+            else if (c is Vector2Control)
+                hasDirection = true;
+        }
+
+        return hasDirection && buttons >= 4;
+    }
+
+    private static void RefreshPads()
+    {
+        if (padsFrame == Time.frameCount)
+            return;
+
+        padsFrame = Time.frameCount;
+        pads.Clear();
+        seenPadIds.Clear();
+
+        foreach (Gamepad g in Gamepad.all)
+        {
+            // Un mismo mando fisico no cuenta dos veces y los dispositivos virtuales no son mandos.
+            if (IsIgnoredDevice(g))
+                continue;
+
+            if (seenPadIds.Add(PadId(g)))
+                pads.Add(g);
+        }
+
+        // Los Joystick / HID genericos solo se usan si el sistema no reconocio ningun Gamepad;
+        // si no, el mismo mando aparecia dos veces (Gamepad 1 y Gamepad 2).
+        if (pads.Count > 0)
+            return;
+
+        foreach (InputDevice d in InputSystem.devices)
+        {
+            if (d == null || !d.added || d is Gamepad)
+                continue;
+
+            bool generic =
+                d is Joystick ||
+                (
+                    d.description.interfaceName == "HID" &&
+                    !(d is Keyboard) &&
+                    !(d is Pointer)
+                );
+
+            if (!generic || IsIgnoredDevice(d) || !LooksLikeController(d))
+                continue;
+
+            if (seenPadIds.Add(PadId(d)))
+                pads.Add(d);
+        }
+    }
+
+    private InputDevice mappedDevice;
+    private Vector2Control dirControl;
+    private Vector2Control stickControl;
+    private ButtonControl bConfirm;
+    private ButtonControl bCancel;
+    private ButtonControl bPrev;
+    private ButtonControl bNext;
+
+    private InputDevice Pad
+    {
+        get
+        {
+            RefreshPads();
+
+            InputDevice d =
+                index >= 0 && index < pads.Count
+                    ? pads[index]
+                    : null;
+
+            if (d != mappedDevice)
+                BuildMap(d);
+
+            return d;
+        }
+    }
 
     public override bool IsAvailable =>
         Pad != null;
 
+    private static ButtonControl FindButton(
+        InputDevice d,
+        string a,
+        string b,
+        string c)
+    {
+        InputControl control = d.TryGetChildControl(a);
+        if (control is ButtonControl) return (ButtonControl)control;
+
+        control = d.TryGetChildControl(b);
+        if (control is ButtonControl) return (ButtonControl)control;
+
+        control = d.TryGetChildControl(c);
+        if (control is ButtonControl) return (ButtonControl)control;
+
+        return null;
+    }
+
+    private static Vector2Control FindVector(
+        InputDevice d,
+        string a,
+        string b,
+        string c)
+    {
+        InputControl control = d.TryGetChildControl(a);
+        if (control is Vector2Control) return (Vector2Control)control;
+
+        control = d.TryGetChildControl(b);
+        if (control is Vector2Control) return (Vector2Control)control;
+
+        control = d.TryGetChildControl(c);
+        if (control is Vector2Control) return (Vector2Control)control;
+
+        return null;
+    }
+
+    private void BuildMap(InputDevice d)
+    {
+        mappedDevice = d;
+        dirControl = null;
+        stickControl = null;
+        bConfirm = null;
+        bCancel = null;
+        bPrev = null;
+        bNext = null;
+
+        if (d == null)
+            return;
+
+        Gamepad gp = d as Gamepad;
+        if (gp != null)
+        {
+            dirControl = gp.dpad;
+            stickControl = gp.leftStick;
+            bPrev = gp.leftShoulder;
+            bNext = gp.rightShoulder;
+            bConfirm = gp.buttonSouth;
+            bCancel = gp.buttonEast;
+            return;
+        }
+
+        // Mando generico (Joystick / HID): se buscan los controles por nombre.
+        dirControl = FindVector(d, "hatswitch", "dpad", "hat");
+
+        Joystick js = d as Joystick;
+        if (js != null)
+            stickControl = js.stick;
+        else
+            stickControl = FindVector(d, "stick", "leftStick", "stick1");
+
+        bConfirm = FindButton(d, "buttonSouth", "button1", "trigger");
+        bCancel = FindButton(d, "buttonEast", "button2", "button3");
+        bPrev = FindButton(d, "leftShoulder", "button5", "button7");
+        bNext = FindButton(d, "rightShoulder", "button6", "button8");
+
+        // Si no hay nombres conocidos, se usan los botones directos del dispositivo en orden.
+        List<ButtonControl> ordered = new List<ButtonControl>();
+        foreach (InputControl c in d.allControls)
+        {
+            ButtonControl bc = c as ButtonControl;
+            if (bc != null && c.parent == d && !c.synthetic)
+                ordered.Add(bc);
+        }
+
+        if (bConfirm == null && ordered.Count > 0) bConfirm = ordered[0];
+        if (bCancel == null && ordered.Count > 1) bCancel = ordered[1];
+        if (bPrev == null && ordered.Count > 4) bPrev = ordered[4];
+        if (bNext == null && ordered.Count > 5) bNext = ordered[5];
+    }
+
     protected override Vector2Int HeldDirection()
     {
-        Gamepad p = Pad;
-
-        if (p == null)
+        if (Pad == null)
             return Vector2Int.zero;
 
-        Vector2 v =
-            p.dpad.ReadValue();
+        Vector2 v = Vector2.zero;
 
-        if (v == Vector2.zero)
-            v =
-                p.leftStick.ReadValue();
+        if (dirControl != null)
+            v = dirControl.ReadValue();
+
+        if (v == Vector2.zero && stickControl != null)
+            v = stickControl.ReadValue();
 
         return Dominant(
             v.x,
@@ -301,38 +621,30 @@ public sealed class GamepadGuestInput : GuestInput
 
     protected override bool PrevPressed()
     {
-        Gamepad p = Pad;
-
-        return p != null &&
-               p.leftShoulder
-                   .wasPressedThisFrame;
+        return Pad != null &&
+               bPrev != null &&
+               bPrev.wasPressedThisFrame;
     }
 
     protected override bool NextPressed()
     {
-        Gamepad p = Pad;
-
-        return p != null &&
-               p.rightShoulder
-                   .wasPressedThisFrame;
+        return Pad != null &&
+               bNext != null &&
+               bNext.wasPressedThisFrame;
     }
 
     protected override bool ConfirmPressed()
     {
-        Gamepad p = Pad;
-
-        return p != null &&
-               p.buttonSouth
-                   .wasPressedThisFrame;
+        return Pad != null &&
+               bConfirm != null &&
+               bConfirm.wasPressedThisFrame;
     }
 
     protected override bool CancelPressed()
     {
-        Gamepad p = Pad;
-
-        return p != null &&
-               p.buttonEast
-                   .wasPressedThisFrame;
+        return Pad != null &&
+               bCancel != null &&
+               bCancel.wasPressedThisFrame;
     }
 
 #else
