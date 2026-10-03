@@ -2649,7 +2649,7 @@ public abstract class ZombieBase : MonoBehaviour
 
 	private void OnMouseOver()
 	{
-		if (!MyTool.IsPointerOverGameObject() && Input.GetMouseButtonUp(0))
+		if (!MyTool.IsPointerOverGameObject() && InputCompat.GetMouseButtonUp(0))
 		{
 			if (!returnFirstClick)
 			{

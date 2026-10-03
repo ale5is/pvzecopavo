@@ -79,7 +79,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 		{
 			return;
 		}
-		if (!UIManager.Instance.IsChatBoxOpen && Input.GetKeyDown(KeyCode.Alpha1))
+		if (!UIManager.Instance.IsChatBoxOpen && InputCompat.GetKeyDown(KeyCode.Alpha1))
 		{
 			IsShovel = !IsShovel;
 		}
@@ -87,13 +87,13 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 		{
 			return;
 		}
-		shovelImg.position = Input.mousePosition;
+		shovelImg.position = InputCompat.mousePosition;
 		Grid gridPointByMouse = MapManager.Instance.GetGridPointByMouse();
 		if (gridPointByMouse == null)
 		{
 			return;
 		}
-		Vector2 vector = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+		Vector2 vector = Camera.main.ScreenToWorldPoint(InputCompat.mousePosition);
 		if (Vector2.Distance(vector, gridPointByMouse.Position) < 1f)
 		{
 			if (CurrGrid == null)
@@ -107,7 +107,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 				UpdateOnlinePreview(gridPointByMouse.Position, isShow: true);
 			}
 		}
-		if (Input.GetMouseButtonDown(0))
+		if (InputCompat.GetMouseButtonDown(0))
 		{
 			if (gridPointByMouse.snow != null && gridPointByMouse.snow.SnowLvl > 0 && gridPointByMouse.IceRoadNum <= 0 && Vector2.Distance(vector, gridPointByMouse.Position) < 1f)
 			{
@@ -164,7 +164,7 @@ public class Shovel : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, 
 				IsShovel = false;
 			}
 		}
-		if (Input.GetMouseButtonDown(1) && IsShovel)
+		if (InputCompat.GetMouseButtonDown(1) && IsShovel)
 		{
 			IsShovel = false;
 			if (Random.Range(1, 3) == 1)

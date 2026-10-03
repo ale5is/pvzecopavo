@@ -216,7 +216,7 @@ public class PlantCard : MonoBehaviour
             {
                 InstantiatePlantZombie();
                 ImgRenderer.color = new Color(0.75f, 0.75f, 0.75f);
-                Vector3 vector = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Vector3 vector = Camera.main.ScreenToWorldPoint(InputCompat.mousePosition);
                 if (plant != null)
                 {
                     plant.transform.position = new Vector3(vector.x, vector.y, 0f);
@@ -484,13 +484,13 @@ public class PlantCard : MonoBehaviour
         }
         if (isChoosed && isStarted)
         {
-            if (Input.GetMouseButtonDown(1))
+            if (InputCompat.GetMouseButtonDown(1))
             {
                 GoCancelPlant();
             }
             if (WantPlace)
             {
-                Vector3 vector = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                Vector3 vector = Camera.main.ScreenToWorldPoint(InputCompat.mousePosition);
                 if (plant != null)
                 {
                     plant.transform.position = new Vector3(vector.x, vector.y, 0f);
@@ -499,7 +499,7 @@ public class PlantCard : MonoBehaviour
                 {
                     zombie.transform.position = new Vector3(vector.x, vector.y, 0f);
                 }
-                if (!secondClick && Input.GetMouseButtonDown(0))
+                if (!secondClick && InputCompat.GetMouseButtonDown(0))
                 {
                     secondClick = true;
                     return;
@@ -527,7 +527,7 @@ public class PlantCard : MonoBehaviour
                 }
                 else if (!MyTool.IsPointerOverGameObject())
                 {
-                    if (Input.GetMouseButtonDown(0) && num > 1.5f && secondClick)
+                    if (InputCompat.GetMouseButtonDown(0) && num > 1.5f && secondClick)
                     {
                         GoCancelPlant();
                     }
@@ -737,7 +737,7 @@ public class PlantCard : MonoBehaviour
             plantInGrids[0].UpdateForCreate(grid);
             UpdateOnlinePreview(grid.Position, CardPlantType);
         }
-        if (!Input.GetMouseButtonDown(0) && (!GameManager.Instance.isAndroid || SeedBank.Instance.CardSelector || !Input.GetMouseButtonUp(0) || IsDropType))
+        if (!InputCompat.GetMouseButtonDown(0) && (!GameManager.Instance.isAndroid || SeedBank.Instance.CardSelector || !InputCompat.GetMouseButtonUp(0) || IsDropType))
         {
             return;
         }
@@ -841,7 +841,7 @@ public class PlantCard : MonoBehaviour
             zombieInGrids[0].UpdateForCreate(grid);
             UpdateOnlinePreview(grid.Position, CardZombieType);
         }
-        if (!Input.GetMouseButtonDown(0) && (!GameManager.Instance.isAndroid || SeedBank.Instance.CardSelector || !Input.GetMouseButtonUp(0) || IsDropType))
+        if (!InputCompat.GetMouseButtonDown(0) && (!GameManager.Instance.isAndroid || SeedBank.Instance.CardSelector || !InputCompat.GetMouseButtonUp(0) || IsDropType))
         {
             return;
         }
@@ -936,7 +936,7 @@ public class PlantCard : MonoBehaviour
 
     private void OnMouseOver()
     {
-        if (MyTool.IsPointerOverGameObject() || !SeedBank.Instance.isCanClick || !Input.GetMouseButtonDown(0))
+        if (MyTool.IsPointerOverGameObject() || !SeedBank.Instance.isCanClick || !InputCompat.GetMouseButtonDown(0))
         {
             return;
         }

@@ -173,8 +173,8 @@ public static class MyTool
 	public static bool IsPointerOverGameObject()
 	{
 		PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
-		pointerEventData.pressPosition = Input.mousePosition;
-		pointerEventData.position = Input.mousePosition;
+		pointerEventData.pressPosition = InputCompat.mousePosition;
+		pointerEventData.position = InputCompat.mousePosition;
 		List<RaycastResult> list = new List<RaycastResult>();
 		EventSystem.current.RaycastAll(pointerEventData, list);
 		return list.Count > 0;

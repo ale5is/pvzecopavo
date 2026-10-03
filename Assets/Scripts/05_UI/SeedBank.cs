@@ -210,10 +210,10 @@ public class SeedBank : MonoBehaviour
     {
         if (Time.timeScale != 0f && CardSelector)
         {
-            if (Input.GetAxis("Mouse ScrollWheel") > 0f)
+            if (InputCompat.GetAxis("Mouse ScrollWheel") > 0f)
                 CurrSelectedId--;
 
-            if (Input.GetAxis("Mouse ScrollWheel") < 0f)
+            if (InputCompat.GetAxis("Mouse ScrollWheel") < 0f)
                 CurrSelectedId++;
         }
     }

@@ -143,7 +143,7 @@ public class UIManager : MonoBehaviour
             (SetPanel.isOpen || isChatBoxOpen)
         )
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (InputCompat.GetKeyDown(KeyCode.Escape))
             {
                 if (SetPanel.isOpen)
                 {
@@ -159,7 +159,7 @@ public class UIManager : MonoBehaviour
         }
 
         if (
-            Input.GetKeyDown(KeyCode.Escape) &&
+            InputCompat.GetKeyDown(KeyCode.Escape) &&
             lvManager != null &&
             lvManager.InGame
         )
@@ -167,12 +167,12 @@ public class UIManager : MonoBehaviour
             ShowBattleSetPanel();
         }
 
-        if (Input.GetKeyDown(KeyCode.T))
+        if (InputCompat.GetKeyDown(KeyCode.T))
         {
             IsChatBoxOpen = true;
         }
 
-        if (Input.GetKeyDown(KeyCode.Slash))
+        if (InputCompat.GetKeyDown(KeyCode.Slash))
         {
             IsChatBoxOpen = true;
 

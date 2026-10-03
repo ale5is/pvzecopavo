@@ -17,7 +17,7 @@ public class Hepatica : PlantBase
 
 	private void OnMouseOver()
 	{
-		if (!EventSystem.current.IsPointerOverGameObject() && base.currGrid != null && Input.GetMouseButtonDown(0))
+		if (!EventSystem.current.IsPointerOverGameObject() && base.currGrid != null && InputCompat.GetMouseButtonDown(0))
 		{
 			CobCannonTarget.Instance.StartAim(this, (Vector2 pos) =>
 			{

@@ -113,14 +113,14 @@ public class CreatePanel : MonoBehaviour
 
 	private void Update()
 	{
-		if (!Input.GetMouseButtonDown(0))
+		if (!InputCompat.GetMouseButtonDown(0))
 		{
 			return;
 		}
 		Grid gridPointByMouse = MapManager.Instance.GetGridPointByMouse();
 		if (gridPointByMouse != null)
 		{
-			Vector2 vector = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+			Vector2 vector = Camera.main.ScreenToWorldPoint(InputCompat.mousePosition);
 			if (isPlantPage && Vector2.Distance(vector, gridPointByMouse.Position) < 1.5f)
 			{
 				SelectPlant(gridPointByMouse);

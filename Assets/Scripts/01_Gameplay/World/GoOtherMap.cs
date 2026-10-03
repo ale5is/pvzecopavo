@@ -24,11 +24,11 @@ public class GoOtherMap : MonoBehaviour
 	{
 		if (!UIManager.Instance.IsChatBoxOpen)
 		{
-			if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2))
+			if (InputCompat.GetKeyDown(KeyCode.Alpha2) || InputCompat.GetKeyDown(KeyCode.Keypad2))
 			{
 				GoOtherYard();
 			}
-			if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3))
+			if (InputCompat.GetKeyDown(KeyCode.Alpha3) || InputCompat.GetKeyDown(KeyCode.Keypad3))
 			{
 				GoOtherYard2();
 			}

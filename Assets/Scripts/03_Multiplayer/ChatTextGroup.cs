@@ -32,7 +32,7 @@ public class ChatTextGroup : MonoBehaviour
             return;
 
         float wheel =
-            Input.GetAxis("Mouse ScrollWheel");
+            InputCompat.GetAxis("Mouse ScrollWheel");
 
         if (wheel > 0f)
             SetScroll(scrollNum + 1);

@@ -292,7 +292,7 @@ public class CobCannon : PlantBase
 
 	private void OnMouseOver()
 	{
-		if (!MyTool.IsPointerOverGameObject() && !SpectatorList.Instance.LocalIsSpectator && (LV.Instance.CurrLVType != LVType.PvP || PvPSelector.Instance.IsSameTeam(PlacePlayer)) && base.currGrid != null && Input.GetMouseButtonDown(0) && !isSleeping && LVManager.Instance.GameIsStart)
+		if (!MyTool.IsPointerOverGameObject() && !SpectatorList.Instance.LocalIsSpectator && (LV.Instance.CurrLVType != LVType.PvP || PvPSelector.Instance.IsSameTeam(PlacePlayer)) && base.currGrid != null && InputCompat.GetMouseButtonDown(0) && !isSleeping && LVManager.Instance.GameIsStart)
 		{
 			CobCannonTarget.Instance.StartAim(this, (Vector2 pos) =>
 			{

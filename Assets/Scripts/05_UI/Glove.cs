@@ -136,7 +136,7 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 		{
 			return;
 		}
-		if (!UIManager.Instance.IsChatBoxOpen && Input.GetKeyDown(KeyCode.Alpha4))
+		if (!UIManager.Instance.IsChatBoxOpen && InputCompat.GetKeyDown(KeyCode.Alpha4))
 		{
 			IsGlove = !IsGlove;
 		}
@@ -144,13 +144,13 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 		{
 			return;
 		}
-		gloveImg.position = Input.mousePosition;
+		gloveImg.position = InputCompat.mousePosition;
 		Grid gridPointByMouse = MapManager.Instance.GetGridPointByMouse();
 		if (gridPointByMouse == null)
 		{
 			return;
 		}
-		Vector2 vector = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+		Vector2 vector = Camera.main.ScreenToWorldPoint(InputCompat.mousePosition);
 		if (Vector2.Distance(vector, gridPointByMouse.Position) < 1f)
 		{
 			if (CurrGrid == null)
@@ -164,7 +164,7 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 				UpdateOnlinePreview(gridPointByMouse.Position, isShow: true);
 			}
 		}
-		if (Input.GetMouseButtonDown(0))
+		if (InputCompat.GetMouseButtonDown(0))
 		{
 			if (currPlant != null)
 			{
@@ -224,7 +224,7 @@ public class Glove : MonoBehaviour, IPointerClickHandler, IEventSystemHandler, I
 				IsGlove = false;
 			}
 		}
-		if (Input.GetMouseButtonDown(1) && IsGlove)
+		if (InputCompat.GetMouseButtonDown(1) && IsGlove)
 		{
 			IsGlove = false;
 			if (Random.Range(1, 3) == 1)

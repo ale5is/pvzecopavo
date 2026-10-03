@@ -382,7 +382,7 @@ public void CreatePortal(int num, int type)
 
 	public Grid GetGridPointByMouse()
 	{
-		return GetGridByWorldPos(Camera.main.ScreenToWorldPoint(Input.mousePosition));
+		return GetGridByWorldPos(Camera.main.ScreenToWorldPoint(InputCompat.mousePosition));
 	}
 
 	public Grid GetGridByWorldPos(Vector2 worldPos)

@@ -44,11 +44,11 @@ private void Update()
 		{
 			return;
 		}
-		if (Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Return))
+		if (InputCompat.GetKeyDown(KeyCode.KeypadEnter) || InputCompat.GetKeyDown(KeyCode.Return))
 		{
 			SendContent();
 		}
-		if (Input.GetKeyDown(KeyCode.UpArrow))
+		if (InputCompat.GetKeyDown(KeyCode.UpArrow))
 		{
 			OldChatIndex--;
 			if (oldChat.Count > 0)
@@ -57,7 +57,7 @@ private void Update()
 			}
 			InputField.MoveTextEnd(shift: false);
 		}
-		else if (Input.GetKeyDown(KeyCode.DownArrow))
+		else if (InputCompat.GetKeyDown(KeyCode.DownArrow))
 		{
 			OldChatIndex++;
 			if (oldChat.Count > 0)

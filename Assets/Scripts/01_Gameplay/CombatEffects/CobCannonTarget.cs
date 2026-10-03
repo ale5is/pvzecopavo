@@ -30,7 +30,7 @@ public class CobCannonTarget : MonoBehaviour
 			{
 				StopAim();
 			}
-			Vector3 mousePosition = Input.mousePosition;
+			Vector3 mousePosition = InputCompat.mousePosition;
 			Vector3 position = Camera.main.ScreenToWorldPoint(new Vector3(mousePosition.x, mousePosition.y));
 			position.z = 0f;
 			base.transform.position = position;
@@ -59,7 +59,7 @@ public class CobCannonTarget : MonoBehaviour
 		{
 			return;
 		}
-		if (Input.GetMouseButtonDown(0))
+		if (InputCompat.GetMouseButtonDown(0))
 		{
 			if (shootAction != null)
 			{
@@ -67,7 +67,7 @@ public class CobCannonTarget : MonoBehaviour
 			}
 			StopAim();
 		}
-		else if (Input.GetMouseButtonDown(1))
+		else if (InputCompat.GetMouseButtonDown(1))
 		{
 			StopAim();
 		}

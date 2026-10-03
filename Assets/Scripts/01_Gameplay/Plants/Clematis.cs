@@ -140,7 +140,7 @@ public class Clematis : PlantBase
 
 	private void OnMouseOver()
 	{
-		if (!MyTool.IsPointerOverGameObject() && !SpectatorList.Instance.LocalIsSpectator && (LV.Instance.CurrLVType != LVType.PvP || PvPSelector.Instance.IsSameTeam(PlacePlayer)) && base.currGrid != null && Input.GetMouseButtonDown(0) && EnergyNum >= 2 && PlayerManager.Instance.GetSunNum(isSun: true, PlacePlayer) >= 50f && !isSleeping && LVManager.Instance.GameIsStart)
+		if (!MyTool.IsPointerOverGameObject() && !SpectatorList.Instance.LocalIsSpectator && (LV.Instance.CurrLVType != LVType.PvP || PvPSelector.Instance.IsSameTeam(PlacePlayer)) && base.currGrid != null && InputCompat.GetMouseButtonDown(0) && EnergyNum >= 2 && PlayerManager.Instance.GetSunNum(isSun: true, PlacePlayer) >= 50f && !isSleeping && LVManager.Instance.GameIsStart)
 		{
 			EnergyNum = 0;
 			StartCoroutine(SunAnim());

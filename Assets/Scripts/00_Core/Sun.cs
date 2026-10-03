@@ -94,7 +94,7 @@ public class Sun : MonoBehaviour
 
         if (isTombAbsorb)
         {
-            if (!Input.GetMouseButtonUp(0))
+            if (!InputCompat.GetMouseButtonUp(0))
             {
                 return;
             }

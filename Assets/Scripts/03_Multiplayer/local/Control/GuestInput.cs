@@ -1,8 +1,6 @@
 using UnityEngine;
 
-#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
-#endif
 
 public enum GuestDevice
 {
@@ -223,20 +221,20 @@ public sealed class KeyboardGuestInput : GuestInput
     protected override Vector2Int HeldDirection()
     {
         int x =
-            (Input.GetKey(profile.right)
+            (InputCompat.GetKey(profile.right)
                 ? 1
                 : 0)
             -
-            (Input.GetKey(profile.left)
+            (InputCompat.GetKey(profile.left)
                 ? 1
                 : 0);
 
         int y =
-            (Input.GetKey(profile.up)
+            (InputCompat.GetKey(profile.up)
                 ? 1
                 : 0)
             -
-            (Input.GetKey(profile.down)
+            (InputCompat.GetKey(profile.down)
                 ? 1
                 : 0);
 
@@ -251,28 +249,28 @@ public sealed class KeyboardGuestInput : GuestInput
 
     protected override bool PrevPressed()
     {
-        return Input.GetKeyDown(
+        return InputCompat.GetKeyDown(
             profile.previousCard
         );
     }
 
     protected override bool NextPressed()
     {
-        return Input.GetKeyDown(
+        return InputCompat.GetKeyDown(
             profile.nextCard
         );
     }
 
     protected override bool ConfirmPressed()
     {
-        return Input.GetKeyDown(
+        return InputCompat.GetKeyDown(
             profile.confirm
         );
     }
 
     protected override bool CancelPressed()
     {
-        return Input.GetKeyDown(
+        return InputCompat.GetKeyDown(
             profile.cancel
         );
     }
@@ -289,8 +287,6 @@ public sealed class GamepadGuestInput : GuestInput
 
     public override string Label =>
         "Gamepad " + (index + 1);
-
-#if ENABLE_INPUT_SYSTEM
 
     private Gamepad Pad =>
         index >= 0 &&
@@ -358,25 +354,4 @@ public sealed class GamepadGuestInput : GuestInput
                    .wasPressedThisFrame;
     }
 
-#else
-
-    public override bool IsAvailable =>
-        false;
-
-    protected override Vector2Int HeldDirection() =>
-        Vector2Int.zero;
-
-    protected override bool PrevPressed() =>
-        false;
-
-    protected override bool NextPressed() =>
-        false;
-
-    protected override bool ConfirmPressed() =>
-        false;
-
-    protected override bool CancelPressed() =>
-        false;
-
-#endif
 }

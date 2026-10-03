@@ -68,7 +68,7 @@ public class Vase : MonoBehaviour
 
 	private void OnMouseOver()
 	{
-		if (!MyTool.IsPointerOverGameObject() && !isClicked && Input.GetMouseButtonDown(0))
+		if (!MyTool.IsPointerOverGameObject() && !isClicked && InputCompat.GetMouseButtonDown(0))
 		{
 			isClicked = true;
 			Shovel.Instance.CancelShovel();

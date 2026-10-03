@@ -52,10 +52,10 @@ public class CameraControl : MonoBehaviour
 		{
 			return;
 		}
-		float num = Input.GetAxis("Mouse ScrollWheel");
-		if (Application.isMobilePlatform && Input.touchCount == 1)
+		float num = InputCompat.GetAxis("Mouse ScrollWheel");
+		if (Application.isMobilePlatform && InputCompat.touchCount == 1)
 		{
-			Touch touch = Input.GetTouch(0);
+			Touch touch = InputCompat.GetTouch(0);
 			switch (touch.phase)
 			{
 			case TouchPhase.Began:
