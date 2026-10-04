@@ -272,15 +272,15 @@ public class SeedChooser : MonoBehaviour
             if (spectatorList.LocalIsSpectator)
             {
                 isPrepare = true;
-                startButton.StartText.text = "旁观中";
+                startButton.StartText.text = "Empezar";
             }
             else
             {
                 isPrepare = false;
                 startButton.StartText.text =
                     isPrepare
-                        ? "取消准备"
-                        : "准备";
+                        ? "Cancelar"
+                        : "Listo";
             }
         }
         else
@@ -289,7 +289,7 @@ public class SeedChooser : MonoBehaviour
                 spectatorList.LocalIsSpectator;
 
             startButton.StartText.text =
-                "开始战斗";
+                "Empezar";
         }
 
         if (Camera.main == null ||

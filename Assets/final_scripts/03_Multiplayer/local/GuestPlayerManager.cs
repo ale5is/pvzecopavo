@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
+#endif
 
 [DisallowMultipleComponent]
 public class GuestPlayerManager : MonoBehaviour
@@ -66,12 +70,70 @@ public class GuestPlayerManager : MonoBehaviour
     public bool includeTriggerColliders =
         true;
 
+    public enum AutoJoinInput
+    {
+        Gamepad,
+        WASD,
+        Arrows
+    }
+
+    [Serializable]
+    public class AutoJoinBinding
+    {
+        public AutoJoinInput input = AutoJoinInput.Gamepad;
+        public KeyCode activateKey = KeyCode.None;
+        public KeyCode deactivateKey = KeyCode.None;
+        public bool enabled = true;
+    }
+
+    [Header("Asignacion automatica de Guest")]
+    [Tooltip("Todos los Guest empiezan desactivados. El primer input que pulse su boton de activar toma el siguiente slot libre de Jugador 2 a 4.")]
+    public bool autoAssignGuests = true;
+
+    public AutoJoinBinding gamepadBinding = new AutoJoinBinding
+    {
+        input = AutoJoinInput.Gamepad,
+        activateKey = KeyCode.None,
+        deactivateKey = KeyCode.None,
+        enabled = true
+    };
+
+    public AutoJoinBinding wasdBinding = new AutoJoinBinding
+    {
+        input = AutoJoinInput.WASD,
+        activateKey = KeyCode.Z,
+        deactivateKey = KeyCode.X,
+        enabled = true
+    };
+
+    public AutoJoinBinding arrowsBinding = new AutoJoinBinding
+    {
+        input = AutoJoinInput.Arrows,
+        activateKey = KeyCode.Return,
+        deactivateKey = KeyCode.Backspace,
+        enabled = true
+    };
+
+    private int assignedWasdSlot = -1;
+    private int assignedArrowsSlot = -1;
+    private readonly Dictionary<string, int> assignedGamepadSlots =
+        new Dictionary<string, int>();
+
+    [SerializeField]
+    private bool autoJoinDefaultsApplied;
+
     [Header("General")]
     public bool dontDestroyOnLoad =
         true;
 
     public readonly List<GuestPlayer> Players =
         new List<GuestPlayer>();
+
+    private readonly Dictionary<int, GuestPlayer> playersBySlot =
+        new Dictionary<int, GuestPlayer>();
+
+    private readonly Dictionary<int, GuestControlProfile> playerProfilesBySlot =
+        new Dictionary<int, GuestControlProfile>();
 
     public event Action<
         GuestPlayer,
@@ -146,10 +208,10 @@ public class GuestPlayerManager : MonoBehaviour
             "Jugador 2";
 
         slot.device =
-            GuestDevice.KeyboardWASD;
+            GuestDevice.None;
 
         slot.controls.enabled =
-            true;
+            false;
 
         slot.controls.SetWASD();
 
@@ -172,10 +234,10 @@ public class GuestPlayerManager : MonoBehaviour
             "Jugador 3";
 
         slot.device =
-            GuestDevice.KeyboardArrows;
+            GuestDevice.None;
 
         slot.controls.enabled =
-            true;
+            false;
 
         slot.controls.SetArrows();
 
@@ -198,10 +260,10 @@ public class GuestPlayerManager : MonoBehaviour
             "Jugador 4";
 
         slot.device =
-            GuestDevice.Gamepad1;
+            GuestDevice.None;
 
         slot.controls.enabled =
-            true;
+            false;
 
         slot.controls.SetGamepad(1);
 
@@ -234,6 +296,20 @@ public class GuestPlayerManager : MonoBehaviour
         Instance = this;
 
         EnsureFourSlots();
+
+        if (!autoJoinDefaultsApplied)
+        {
+            slots[1].controls.enabled = false;
+            slots[1].controls.mode = GuestControlMode.Disabled;
+            slots[2].controls.enabled = false;
+            slots[2].controls.mode = GuestControlMode.Disabled;
+            slots[3].controls.enabled = false;
+            slots[3].controls.mode = GuestControlMode.Disabled;
+            slots[1].device = GuestDevice.None;
+            slots[2].device = GuestDevice.None;
+            slots[3].device = GuestDevice.None;
+            autoJoinDefaultsApplied = true;
+        }
 
         if (
             dontDestroyOnLoad &&
@@ -319,19 +395,23 @@ public class GuestPlayerManager : MonoBehaviour
         slots[0].controls.SetMouse();
 
         slots[1].controls.enabled =
-            true;
+            false;
 
         slots[1].controls.SetWASD();
 
         slots[2].controls.enabled =
-            true;
+            false;
 
         slots[2].controls.SetArrows();
 
         slots[3].controls.enabled =
-            true;
+            false;
 
         slots[3].controls.SetGamepad(1);
+
+        assignedWasdSlot = -1;
+        assignedArrowsSlot = -1;
+        assignedGamepadSlots.Clear();
 
         BuildPlayers();
     }
@@ -402,6 +482,33 @@ public class GuestPlayerManager : MonoBehaviour
 
         slot.controls.enabled =
             false;
+        slot.controls.mode = GuestControlMode.Disabled;
+        slot.controls.gamepadId = "";
+        slot.device = GuestDevice.None;
+
+        if (assignedWasdSlot == playerNumber - 1)
+            assignedWasdSlot = -1;
+
+        if (assignedArrowsSlot == playerNumber - 1)
+            assignedArrowsSlot = -1;
+
+        List<string> gamepadsToRemove = null;
+        foreach (KeyValuePair<string, int> pair in assignedGamepadSlots)
+        {
+            if (pair.Value == playerNumber - 1)
+            {
+                if (gamepadsToRemove == null)
+                    gamepadsToRemove = new List<string>();
+
+                gamepadsToRemove.Add(pair.Key);
+            }
+        }
+
+        if (gamepadsToRemove != null)
+        {
+            for (int i = 0; i < gamepadsToRemove.Count; i++)
+                assignedGamepadSlots.Remove(gamepadsToRemove[i]);
+        }
 
         BuildPlayers();
     }
@@ -579,51 +686,51 @@ public class GuestPlayerManager : MonoBehaviour
     {
         EnsureFourSlots();
 
-        for (
-            int i = 0;
-            i < Players.Count;
-            i++
-        )
-        {
-            if (Players[i] != null)
-                Players[i].Destroy();
-        }
+        List<GuestPlayer> rebuiltPlayers =
+            new List<GuestPlayer>();
 
-        Players.Clear();
-
-        for (
-            int i = 0;
-            i < 4;
-            i++
-        )
+        for (int i = 0; i < 4; i++)
         {
-            Slot slot =
-                slots[i];
+            Slot slot = slots[i];
 
             if (slot == null)
-                continue;
-
-            GuestControlProfile profile =
-                ResolveControls(
-                    slot
-                );
-
-            if (
-                profile == null ||
-                !profile.enabled ||
-                profile.mode ==
-                    GuestControlMode.Mouse ||
-                profile.mode ==
-                    GuestControlMode.Disabled
-            )
             {
+                RemovePlayerFromSlot(i);
                 continue;
             }
 
+            GuestControlProfile profile =
+                ResolveControls(slot);
+
+            bool shouldBeActive =
+                profile != null &&
+                profile.enabled &&
+                profile.mode != GuestControlMode.Mouse &&
+                profile.mode != GuestControlMode.Disabled;
+
+            if (!shouldBeActive)
+            {
+                RemovePlayerFromSlot(i);
+                continue;
+            }
+
+            GuestPlayer existingPlayer;
+
+            if (
+                playersBySlot.TryGetValue(i, out existingPlayer) &&
+                existingPlayer != null &&
+                playerProfilesBySlot.TryGetValue(i, out GuestControlProfile previousProfile) &&
+                ProfilesMatch(previousProfile, profile)
+            )
+            {
+                rebuiltPlayers.Add(existingPlayer);
+                continue;
+            }
+
+            RemovePlayerFromSlot(i);
+
             GuestInput input =
-                GuestInput.Create(
-                    profile
-                );
+                GuestInput.Create(profile);
 
             if (input == null)
                 continue;
@@ -655,10 +762,50 @@ public class GuestPlayerManager : MonoBehaviour
             player.ConfirmRequested +=
                 OnPlayerConfirm;
 
-            Players.Add(
-                player
-            );
+            playersBySlot[i] = player;
+            playerProfilesBySlot[i] = profile.Clone();
+            rebuiltPlayers.Add(player);
         }
+
+        Players.Clear();
+        Players.AddRange(rebuiltPlayers);
+    }
+
+    private void RemovePlayerFromSlot(int slotIndex)
+    {
+        GuestPlayer player;
+
+        if (playersBySlot.TryGetValue(slotIndex, out player))
+        {
+            if (player != null)
+                player.Destroy();
+
+            playersBySlot.Remove(slotIndex);
+        }
+
+        playerProfilesBySlot.Remove(slotIndex);
+    }
+
+    private static bool ProfilesMatch(
+        GuestControlProfile a,
+        GuestControlProfile b)
+    {
+        if (a == null || b == null)
+            return false;
+
+        return
+            a.enabled == b.enabled &&
+            a.mode == b.mode &&
+            a.gamepadNumber == b.gamepadNumber &&
+            a.gamepadId == b.gamepadId &&
+            a.up == b.up &&
+            a.down == b.down &&
+            a.left == b.left &&
+            a.right == b.right &&
+            a.previousCard == b.previousCard &&
+            a.nextCard == b.nextCard &&
+            a.confirm == b.confirm &&
+            a.cancel == b.cancel;
     }
 
     private void OnPlayerConfirm(
@@ -790,6 +937,234 @@ public class GuestPlayerManager : MonoBehaviour
         }
     }
 
+    private void UpdateAutoAssignment()
+    {
+        if (!autoAssignGuests)
+            return;
+
+        CleanupAssignments();
+
+        if (wasdBinding != null && wasdBinding.enabled)
+        {
+            if (InputCompat.GetKeyDown(wasdBinding.deactivateKey))
+            {
+                DeactivateKeyboardAssignment(ref assignedWasdSlot);
+            }
+            else if (InputCompat.GetKeyDown(wasdBinding.activateKey))
+            {
+                ActivateKeyboardAssignment(
+                    AutoJoinInput.WASD,
+                    ref assignedWasdSlot
+                );
+            }
+        }
+
+        if (arrowsBinding != null && arrowsBinding.enabled)
+        {
+            if (InputCompat.GetKeyDown(arrowsBinding.deactivateKey))
+            {
+                DeactivateKeyboardAssignment(ref assignedArrowsSlot);
+            }
+            else if (InputCompat.GetKeyDown(arrowsBinding.activateKey))
+            {
+                ActivateKeyboardAssignment(
+                    AutoJoinInput.Arrows,
+                    ref assignedArrowsSlot
+                );
+            }
+        }
+
+#if ENABLE_INPUT_SYSTEM
+        if (gamepadBinding != null && gamepadBinding.enabled)
+        {
+            IReadOnlyList<InputDevice> pads = GamepadGuestInput.Pads;
+
+            for (int i = 0; i < pads.Count; i++)
+            {
+                InputDevice pad = pads[i];
+                if (pad == null)
+                    continue;
+
+                string id = GamepadGuestInput.PadId(pad);
+
+                if (IsAssignedGamepad(id))
+                {
+                    if (GamepadGuestInput.SelectButtonPressed(pad))
+                    {
+                        int slotIndex = assignedGamepadSlots[id];
+                        DeactivateSlot(slotIndex);
+                        assignedGamepadSlots.Remove(id);
+                        return;
+                    }
+
+                    continue;
+                }
+
+                if (GamepadGuestInput.SelectButtonPressed(pad))
+                    continue;
+
+                if (GamepadGuestInput.StartButtonPressed(pad))
+                {
+                    int slotIndex = FindFreeGuestSlot();
+                    if (slotIndex < 0)
+                        continue;
+
+                    Slot slot = slots[slotIndex];
+                    slot.device = GuestDevice.None;
+                    slot.controls.enabled = true;
+                    slot.controls.SetGamepad(
+                        id,
+                        Mathf.Clamp(i + 1, 1, 4)
+                    );
+
+                    assignedGamepadSlots[id] = slotIndex;
+                    BuildPlayers();
+                    return;
+                }
+            }
+        }
+#endif
+    }
+
+    private void CleanupAssignments()
+    {
+        if (assignedWasdSlot >= 0 && !IsGuestSlotActive(assignedWasdSlot))
+            assignedWasdSlot = -1;
+
+        if (assignedArrowsSlot >= 0 && !IsGuestSlotActive(assignedArrowsSlot))
+            assignedArrowsSlot = -1;
+
+        List<string> remove = null;
+
+#if ENABLE_INPUT_SYSTEM
+        IReadOnlyList<InputDevice> pads = GamepadGuestInput.Pads;
+#endif
+
+        foreach (KeyValuePair<string, int> pair in assignedGamepadSlots)
+        {
+            bool removeAssignment = !IsGuestSlotActive(pair.Value);
+
+#if ENABLE_INPUT_SYSTEM
+            if (!removeAssignment)
+            {
+                bool connected = false;
+
+                for (int i = 0; i < pads.Count; i++)
+                {
+                    if (pads[i] != null &&
+                        GamepadGuestInput.PadId(pads[i]) == pair.Key)
+                    {
+                        connected = true;
+                        break;
+                    }
+                }
+
+                if (!connected)
+                    removeAssignment = true;
+            }
+#endif
+
+            if (removeAssignment)
+            {
+                if (remove == null)
+                    remove = new List<string>();
+
+                remove.Add(pair.Key);
+                DeactivateSlot(pair.Value);
+            }
+        }
+
+        if (remove == null)
+            return;
+
+        for (int i = 0; i < remove.Count; i++)
+            assignedGamepadSlots.Remove(remove[i]);
+    }
+
+    private bool IsGuestSlotActive(int index)
+    {
+        if (index < 1 || index >= slots.Count)
+            return false;
+
+        Slot slot = slots[index];
+        if (slot == null || slot.controls == null)
+            return false;
+
+        return slot.controls.enabled &&
+               slot.controls.mode != GuestControlMode.Disabled &&
+               slot.controls.mode != GuestControlMode.Mouse;
+    }
+
+    private int FindFreeGuestSlot()
+    {
+        for (int i = 1; i < 4; i++)
+        {
+            if (!IsGuestSlotActive(i))
+                return i;
+        }
+
+        return -1;
+    }
+
+    private void ActivateKeyboardAssignment(
+        AutoJoinInput inputType,
+        ref int assignedSlot)
+    {
+        if (assignedSlot >= 1 && IsGuestSlotActive(assignedSlot))
+            return;
+
+        int slotIndex = FindFreeGuestSlot();
+        if (slotIndex < 0)
+            return;
+
+        Slot slot = slots[slotIndex];
+        slot.device = GuestDevice.None;
+        slot.controls.enabled = true;
+
+        if (inputType == AutoJoinInput.WASD)
+            slot.controls.SetWASD();
+        else
+            slot.controls.SetArrows();
+
+        assignedSlot = slotIndex;
+        BuildPlayers();
+    }
+
+    private void DeactivateKeyboardAssignment(ref int assignedSlot)
+    {
+        if (assignedSlot < 1)
+        {
+            assignedSlot = -1;
+            return;
+        }
+
+        DeactivateSlot(assignedSlot);
+        assignedSlot = -1;
+    }
+
+    private bool IsAssignedGamepad(string id)
+    {
+        return !string.IsNullOrEmpty(id) &&
+               assignedGamepadSlots.ContainsKey(id) &&
+               IsGuestSlotActive(assignedGamepadSlots[id]);
+    }
+
+    private void DeactivateSlot(int index)
+    {
+        if (index < 1 || index >= slots.Count)
+            return;
+
+        Slot slot = slots[index];
+        if (slot == null)
+            return;
+
+        slot.controls.enabled = false;
+        slot.controls.mode = GuestControlMode.Disabled;
+        slot.controls.gamepadId = "";
+        slot.device = GuestDevice.None;
+        BuildPlayers();
+    }
+
     private bool ShouldRun()
     {
         if (
@@ -851,6 +1226,8 @@ public class GuestPlayerManager : MonoBehaviour
 
     private void Update()
     {
+        UpdateAutoAssignment();
+
         if (!ShouldRun())
         {
             for (

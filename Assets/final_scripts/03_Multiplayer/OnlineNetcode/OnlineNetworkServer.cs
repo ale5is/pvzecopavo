@@ -1910,7 +1910,7 @@ public class OnlineNetworkServer : NetworkBehaviour
 
         string content =
             player.Name +
-            "Te has unido a la partida";
+            " Te has unido a la partida";
 
         ChatInput.Instance?.AddMessage(
             content,

@@ -136,7 +136,8 @@ public abstract class GuestInput
         if (profile.mode == GuestControlMode.Gamepad)
         {
             return new GamepadGuestInput(
-                Mathf.Clamp(profile.gamepadNumber, 1, 4) - 1
+                Mathf.Clamp(profile.gamepadNumber, 1, 4) - 1,
+                profile.gamepadId
             );
         }
 
@@ -300,10 +301,12 @@ public sealed class KeyboardGuestInput : GuestInput
 public sealed class GamepadGuestInput : GuestInput
 {
     private readonly int index;
+    private readonly string deviceId;
 
-    public GamepadGuestInput(int index)
+    public GamepadGuestInput(int index, string deviceId = "")
     {
         this.index = index;
+        this.deviceId = deviceId ?? "";
     }
 
     public override string Label =>
@@ -435,6 +438,35 @@ public sealed class GamepadGuestInput : GuestInput
         return hasDirection && buttons >= 4;
     }
 
+    public static bool StartButtonPressed(InputDevice d)
+    {
+        ButtonControl button = FindButton(
+            d,
+            "startButton",
+            "start",
+            "button9"
+        );
+
+        return button != null && button.wasPressedThisFrame;
+    }
+
+    public static bool SelectButtonPressed(InputDevice d)
+    {
+        ButtonControl button = FindButton(
+            d,
+            "selectButton",
+            "select",
+            "button10"
+        );
+
+        return button != null && button.wasPressedThisFrame;
+    }
+
+    public static bool IsConnected(InputDevice d)
+    {
+        return d != null && d.added;
+    }
+
     private static void RefreshPads()
     {
         if (padsFrame == Time.frameCount)
@@ -487,6 +519,8 @@ public sealed class GamepadGuestInput : GuestInput
     private ButtonControl bCancel;
     private ButtonControl bPrev;
     private ButtonControl bNext;
+    private ButtonControl bStart;
+    private ButtonControl bSelect;
 
     private InputDevice Pad
     {
@@ -494,10 +528,22 @@ public sealed class GamepadGuestInput : GuestInput
         {
             RefreshPads();
 
-            InputDevice d =
-                index >= 0 && index < pads.Count
-                    ? pads[index]
-                    : null;
+            InputDevice d = null;
+
+            if (!string.IsNullOrEmpty(deviceId))
+            {
+                for (int i = 0; i < pads.Count; i++)
+                {
+                    if (PadId(pads[i]) == deviceId)
+                    {
+                        d = pads[i];
+                        break;
+                    }
+                }
+            }
+
+            if (d == null && index >= 0 && index < pads.Count)
+                d = pads[index];
 
             if (d != mappedDevice)
                 BuildMap(d);
@@ -508,6 +554,32 @@ public sealed class GamepadGuestInput : GuestInput
 
     public override bool IsAvailable =>
         Pad != null;
+
+    public bool StartPressed
+    {
+        get
+        {
+            return Pad != null &&
+                   bStart != null &&
+                   bStart.wasPressedThisFrame;
+        }
+    }
+
+    public bool SelectPressed
+    {
+        get
+        {
+            return Pad != null &&
+                   bSelect != null &&
+                   bSelect.wasPressedThisFrame;
+        }
+    }
+
+    public InputDevice CurrentDevice
+    {
+        get { return Pad; }
+    }
+
 
     private static ButtonControl FindButton(
         InputDevice d,
@@ -554,6 +626,8 @@ public sealed class GamepadGuestInput : GuestInput
         bCancel = null;
         bPrev = null;
         bNext = null;
+        bStart = null;
+        bSelect = null;
 
         if (d == null)
             return;
@@ -565,6 +639,8 @@ public sealed class GamepadGuestInput : GuestInput
             stickControl = gp.leftStick;
             bPrev = gp.leftShoulder;
             bNext = gp.rightShoulder;
+            bStart = gp.startButton;
+            bSelect = gp.selectButton;
             bConfirm = gp.buttonSouth;
             bCancel = gp.buttonEast;
             return;
@@ -583,6 +659,8 @@ public sealed class GamepadGuestInput : GuestInput
         bCancel = FindButton(d, "buttonEast", "button2", "button3");
         bPrev = FindButton(d, "leftShoulder", "button5", "button7");
         bNext = FindButton(d, "rightShoulder", "button6", "button8");
+        bStart = FindButton(d, "startButton", "start", "button9");
+        bSelect = FindButton(d, "selectButton", "select", "button10");
 
         // Si no hay nombres conocidos, se usan los botones directos del dispositivo en orden.
         List<ButtonControl> ordered = new List<ButtonControl>();

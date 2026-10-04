@@ -22,6 +22,9 @@ public class GuestControlProfile
     [Tooltip("Numero de mando de Unity: 1, 2, 3 o 4.")]
     public int gamepadNumber = 1;
 
+    [HideInInspector]
+    public string gamepadId = "";
+
     [Header("Movimiento")]
     public KeyCode up = KeyCode.W;
     public KeyCode down = KeyCode.S;
@@ -43,6 +46,7 @@ public class GuestControlProfile
             enabled = enabled,
             mode = mode,
             gamepadNumber = gamepadNumber,
+            gamepadId = gamepadId,
             up = up,
             down = down,
             left = left,
@@ -106,6 +110,14 @@ public class GuestControlProfile
     {
         mode = GuestControlMode.Gamepad;
         gamepadNumber = Mathf.Clamp(number, 1, 4);
+        gamepadId = "";
+    }
+
+    public void SetGamepad(string id, int number)
+    {
+        mode = GuestControlMode.Gamepad;
+        gamepadNumber = Mathf.Clamp(number, 1, 4);
+        gamepadId = id ?? "";
     }
 
     public void SetMouse()
