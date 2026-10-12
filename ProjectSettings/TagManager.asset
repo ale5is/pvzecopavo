@@ -3,7 +3,14 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Zombie
+  - Torchwood
+  - Wall
+  - Portal
+  - ZombieTorch
+  - Obstacle
+  - Jelly
   layers:
   - Default
   - TransparentFX
@@ -11,10 +18,10 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
-  - 
-  - 
+  - Sun
+  - Bullet
+  - Zombie
+  - UI2
   - 
   - 
   - 
@@ -40,4 +47,13 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: main
+    uniqueID: 1495930015
+    locked: 0
+  - name: item
+    uniqueID: 2926366721
+    locked: 0
+  - name: sun
+    uniqueID: 2695307663
     locked: 0

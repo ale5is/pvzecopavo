@@ -108,8 +108,8 @@ SortingGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1618682377417806}
   m_Enabled: 1
-  m_SortingLayerID: 1495930015
-  m_SortingLayer: 0
+  m_SortingLayerID: -1615189911
+  m_SortingLayer: 1
   m_SortingOrder: 2003
   m_SortAtRoot: 0
 --- !u!1 &1709254077376921
@@ -170,7 +170,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: af1aa126133d9774faa8351b76ca98b4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -188,9 +188,9 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 3
+  m_SortingLayerID: -1615189911
+  m_SortingLayer: 1
+  m_SortingOrder: 2001
   m_Sprite: {fileID: 21300000, guid: 26c4ec5f426e2ce4cb3181aeac44550e, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -284,9 +284,9 @@ SortingGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1709254077376921}
   m_Enabled: 1
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 3
+  m_SortingLayerID: -1615189911
+  m_SortingLayer: 1
+  m_SortingOrder: 2001
   m_SortAtRoot: 0
 --- !u!1 &1724804207875695
 GameObject:
@@ -362,13 +362,13 @@ SpriteMask:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: fb4947f2187a7ba4880d51b30c738635, type: 2}
-  m_MaskAlphaCutoff: 0.2
-  m_FrontSortingLayerID: 0
+  m_MaskAlphaCutoff: 0.405
+  m_FrontSortingLayerID: -1615189911
   m_BackSortingLayerID: 0
-  m_FrontSortingLayer: 0
+  m_FrontSortingLayer: 1
   m_BackSortingLayer: 0
-  m_FrontSortingOrder: 0
-  m_BackSortingOrder: 0
+  m_FrontSortingOrder: 2003
+  m_BackSortingOrder: 2001
   m_IsCustomRangeActive: 1
   m_SpriteSortPoint: 0
 --- !u!1 &1730242686860875
@@ -423,7 +423,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: af1aa126133d9774faa8351b76ca98b4, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -441,8 +441,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 1495930015
-  m_SortingLayer: 0
+  m_SortingLayerID: -1615189911
+  m_SortingLayer: 1
   m_SortingOrder: 2002
   m_Sprite: {fileID: 21300000, guid: 26c4ec5f426e2ce4cb3181aeac44550e, type: 2}
   m_Color: {r: 0.5188679, g: 0.5188679, b: 0.5188679, a: 1}
