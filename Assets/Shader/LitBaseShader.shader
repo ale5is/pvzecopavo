@@ -1,3 +1,4 @@
+
 Shader "LitBaseShader"
 {
     Properties
@@ -46,9 +47,9 @@ Shader "LitBaseShader"
         Pass
         {
             Name "BaseSprite"
+            Tags { "LightMode" = "UniversalForward" }
 
             HLSLPROGRAM
-
             #pragma target 2.0
             #pragma vertex vert
             #pragma fragment frag
@@ -58,11 +59,19 @@ Shader "LitBaseShader"
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
+            TEXTURE2D(_MaskTex);
+            SAMPLER(sampler_MaskTex);
+
+            TEXTURE2D(_NormalMap);
+            SAMPLER(sampler_NormalMap);
+
             TEXTURE2D(_AlphaTex);
             SAMPLER(sampler_AlphaTex);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
+                float4 _MaskTex_ST;
+                float4 _NormalMap_ST;
                 float4 _Color;
                 float4 _RendererColor;
                 float4 _Flip;
@@ -95,11 +104,13 @@ Shader "LitBaseShader"
                 float4 color : COLOR;
                 float2 uv : TEXCOORD0;
                 float2 alphaUV : TEXCOORD1;
+                float2 maskUV : TEXCOORD2;
+                float2 normalUV : TEXCOORD3;
             };
 
             Varyings vert(Attributes input)
             {
-                Varyings output;
+                Varyings output = (Varyings)0;
 
                 float3 position = input.positionOS.xyz;
 
@@ -131,6 +142,8 @@ Shader "LitBaseShader"
 
                 output.positionCS = TransformObjectToHClip(position);
                 output.uv = TRANSFORM_TEX(input.uv, _MainTex);
+                output.maskUV = TRANSFORM_TEX(input.uv, _MaskTex);
+                output.normalUV = TRANSFORM_TEX(input.uv, _NormalMap);
                 output.alphaUV = input.uv;
                 output.color = input.color * _Color * _RendererColor;
 
@@ -147,6 +160,23 @@ Shader "LitBaseShader"
                     sampler_MainTex,
                     input.uv
                 ) * input.color;
+
+                half4 mask = SAMPLE_TEXTURE2D(
+                    _MaskTex,
+                    sampler_MaskTex,
+                    input.maskUV
+                );
+
+                half3 normalTS = UnpackNormal(
+                    SAMPLE_TEXTURE2D(
+                        _NormalMap,
+                        sampler_NormalMap,
+                        input.normalUV
+                    )
+                );
+
+                color.rgb *= lerp(1.0h, saturate(mask.rgb), 0.0h);
+                color.rgb *= lerp(1.0h, saturate(normalTS.z), 0.0h);
 
                 if (_OpenGray > 0.5)
                 {
@@ -177,7 +207,6 @@ Shader "LitBaseShader"
 
                 return color;
             }
-
             ENDHLSL
         }
     }
