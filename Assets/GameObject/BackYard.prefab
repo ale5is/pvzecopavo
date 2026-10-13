@@ -12264,12 +12264,12 @@ SpriteMask:
   m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: 56a214e5206b6dc4e888c261cb451c1d, type: 2}
   m_MaskAlphaCutoff: 0.2
-  m_FrontSortingLayerID: 1495930015
-  m_BackSortingLayerID: 1495930015
-  m_FrontSortingLayer: 1
-  m_BackSortingLayer: 1
-  m_FrontSortingOrder: 1901
-  m_BackSortingOrder: 1900
+  m_FrontSortingLayerID: 0
+  m_BackSortingLayerID: 0
+  m_FrontSortingLayer: 0
+  m_BackSortingLayer: 0
+  m_FrontSortingOrder: 20
+  m_BackSortingOrder: 20
   m_IsCustomRangeActive: 1
   m_SpriteSortPoint: 0
 --- !u!1 &1371939378208658
@@ -15762,6 +15762,14 @@ MonoBehaviour:
   targetTempt: 0
   fadeTempt: 0
   entityTempt: 0
+  timetable: {fileID: 0}
+  skyManager: {fileID: 0}
+  lv: {fileID: 0}
+  gobalLight: {fileID: 0}
+  seedBank: {fileID: 0}
+  playerManager: {fileID: 0}
+  gameManager: {fileID: 0}
+  gridSelectorPrefab: {fileID: 0}
   PoolSpark: {fileID: 4967328832014496}
   SnowScence: {fileID: 212043919389829319}
   SnowScences:
@@ -18884,12 +18892,12 @@ SpriteMask:
   m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: d4817f87e597f9847afbb19aad8ebf4a, type: 2}
   m_MaskAlphaCutoff: 0.2
-  m_FrontSortingLayerID: 1495930015
-  m_BackSortingLayerID: 1495930015
-  m_FrontSortingLayer: 1
-  m_BackSortingLayer: 1
-  m_FrontSortingOrder: 1900
-  m_BackSortingOrder: 1899
+  m_FrontSortingLayerID: 0
+  m_BackSortingLayerID: 0
+  m_FrontSortingLayer: 0
+  m_BackSortingLayer: 0
+  m_FrontSortingOrder: 21
+  m_BackSortingOrder: 20
   m_IsCustomRangeActive: 1
   m_SpriteSortPoint: 0
 --- !u!1 &1985305603660343
