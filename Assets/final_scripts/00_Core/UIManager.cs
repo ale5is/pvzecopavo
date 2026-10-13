@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,8 +14,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     [SerializeField] private LVManager lvManager;
     [SerializeField] private AudioManager audioManager;
-    [SerializeField] private SeedChooser seedChooser;
-    [SerializeField] private ZombieChooser zombieChooser;
+    [SerializeField] public SeedChooser seedChooser;
+    [SerializeField] public ZombieChooser zombieChooser;
     public BattlePlayerList BattlePlayerList;
     [SerializeField] private Shovel shovel;
     [SerializeField] private Glove glove;
@@ -70,10 +71,7 @@ public class UIManager : MonoBehaviour
                     OutChatBox.SetActive(false);
                 }
 
-                if (
-                    chatInput != null &&
-                    chatInput.InputField != null
-                )
+                if (chatInput != null && chatInput.InputField != null)
                 {
                     chatInput.InputField.gameObject.SetActive(true);
                     chatInput.InputField.ActivateInputField();
@@ -134,14 +132,32 @@ public class UIManager : MonoBehaviour
             OutChatBox.SetActive(true);
         }
 
+        StartCoroutine(InitializeBattleUIOnSceneStart());
+    }
+
+    private IEnumerator InitializeBattleUIOnSceneStart()
+    {
+        if (BattleUI == null)
+        {
+            yield break;
+        }
+
+        BattleUI.transform.localScale = Vector3.zero;
+        BattleUI.SetActive(true);
+
+        yield return null;
+        yield return null;
+
+        if (BattleUI != null)
+        {
+            BattleUI.transform.localScale = Vector3.one;
+            BattleUI.SetActive(false);
+        }
     }
 
     private void Update()
     {
-        if (
-            SetPanel != null &&
-            (SetPanel.isOpen || isChatBoxOpen)
-        )
+        if (SetPanel != null && (SetPanel.isOpen || isChatBoxOpen))
         {
             if (InputCompat.GetKeyDown(KeyCode.Escape))
             {
@@ -183,16 +199,21 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
     // =========================================================
     // CHOOSER
     // =========================================================
 
     public void SetChooserType(SeedBankType type)
     {
-        if (
-            seedChooser == null ||
-            zombieChooser == null
-        )
+        if (seedChooser == null || zombieChooser == null)
         {
             return;
         }
@@ -225,16 +246,12 @@ public class UIManager : MonoBehaviour
 
     public void ChangeChooser()
     {
-        if (
-            seedChooser == null ||
-            zombieChooser == null
-        )
+        if (seedChooser == null || zombieChooser == null)
         {
             return;
         }
 
-        bool seed =
-            !seedChooser.gameObject.activeSelf;
+        bool seed = !seedChooser.gameObject.activeSelf;
 
         seedChooser.gameObject.SetActive(seed);
         zombieChooser.gameObject.SetActive(!seed);
@@ -366,13 +383,12 @@ public class UIManager : MonoBehaviour
 
         if (UIBackgroundImage != null)
         {
-            UIBackgroundImage.color =
-                new Color(
-                    0f,
-                    0f,
-                    0f,
-                    isBlack ? 0.4f : 0f
-                );
+            UIBackgroundImage.color = new Color(
+                0f,
+                0f,
+                0f,
+                isBlack ? 0.4f : 0f
+            );
         }
 
         UIBackground.SetActive(true);
@@ -410,14 +426,9 @@ public class UIManager : MonoBehaviour
             createPanel.BattleUIOpen();
         }
 
-        if (
-            QuickChatGroup != null &&
-            SetPanel != null
-        )
+        if (QuickChatGroup != null && SetPanel != null)
         {
-            QuickChatGroup.SetActive(
-                SetPanel.OpenQuickChat
-            );
+            QuickChatGroup.SetActive(SetPanel.OpenQuickChat);
         }
 
         if (BattleUI != null)

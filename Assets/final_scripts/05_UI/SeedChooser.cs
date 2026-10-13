@@ -30,6 +30,7 @@ public class SeedChooser : MonoBehaviour
     private RectTransform rectTransform;
     private UIPlantCardNC[][] cards;
     private int currPage;
+    private Coroutine initializeSecondPageCoroutine;
 
     private static readonly PlantType[] LastStandPlants =
     {
@@ -57,10 +58,16 @@ public class SeedChooser : MonoBehaviour
             else
                 currPage = value;
 
-            if (oldPage >= 0 && oldPage < Pages.Count)
+            if (oldPage >= 0 && oldPage < Pages.Count &&
+                Pages[oldPage] != null)
+            {
                 Pages[oldPage].gameObject.SetActive(false);
+            }
 
-            Pages[currPage].gameObject.SetActive(true);
+            if (Pages[currPage] != null)
+            {
+                Pages[currPage].gameObject.SetActive(true);
+            }
         }
     }
 
@@ -83,20 +90,37 @@ public class SeedChooser : MonoBehaviour
         }
     }
 
-    private void Start()
+    private void OnEnable()
     {
+        if (Pages == null || Pages.Count == 0)
+            return;
+
         CurrPage = 0;
 
-        StartCoroutine(
-            InitializeSecondPage()
-        );
+        if (initializeSecondPageCoroutine != null)
+        {
+            StopCoroutine(initializeSecondPageCoroutine);
+            initializeSecondPageCoroutine = null;
+        }
+
+        initializeSecondPageCoroutine =
+            StartCoroutine(InitializeSecondPage());
+    }
+
+    private void OnDisable()
+    {
+        if (initializeSecondPageCoroutine != null)
+        {
+            StopCoroutine(initializeSecondPageCoroutine);
+            initializeSecondPageCoroutine = null;
+        }
     }
 
     private IEnumerator InitializeSecondPage()
     {
-        if (Pages.Count <= 1 ||
-            Pages[1] == null)
+        if (Pages.Count <= 1 || Pages[1] == null)
         {
+            initializeSecondPageCoroutine = null;
             yield break;
         }
 
@@ -105,7 +129,12 @@ public class SeedChooser : MonoBehaviour
         yield return null;
         yield return null;
 
-        Pages[1].gameObject.SetActive(false);
+        if (Pages.Count > 1 && Pages[1] != null)
+        {
+            Pages[1].gameObject.SetActive(false);
+        }
+
+        initializeSecondPageCoroutine = null;
     }
 
     public UIPlantCardNC GetCardInfo(PlantType plantType)
@@ -122,8 +151,11 @@ public class SeedChooser : MonoBehaviour
 
             for (int j = 0; j < pageCards.Length; j++)
             {
-                if (pageCards[j].CardPlantType == plantType)
+                if (pageCards[j] != null &&
+                    pageCards[j].CardPlantType == plantType)
+                {
                     return pageCards[j];
+                }
             }
         }
 
@@ -132,7 +164,8 @@ public class SeedChooser : MonoBehaviour
 
     public UIPlantCardNC[] GetCardInfos(int pageIndex)
     {
-        if (pageIndex < 0 ||
+        if (cards == null ||
+            pageIndex < 0 ||
             pageIndex >= cards.Length)
         {
             return null;
@@ -154,6 +187,9 @@ public class SeedChooser : MonoBehaviour
 
             for (int j = 0; j < pageCards.Length; j++)
             {
+                if (pageCards[j] == null)
+                    continue;
+
                 count++;
 
                 if (count == cardId)
@@ -166,8 +202,7 @@ public class SeedChooser : MonoBehaviour
 
     public PlantType GetCardType(int cardId)
     {
-        UIPlantCardNC card =
-            GetCardInfo(cardId);
+        UIPlantCardNC card = GetCardInfo(cardId);
 
         return card != null
             ? card.CardPlantType
@@ -185,7 +220,10 @@ public class SeedChooser : MonoBehaviour
 
             for (int j = 0; j < pageCards.Length; j++)
             {
-                pageCards[j].IsChoosed = false;
+                if (pageCards[j] != null)
+                {
+                    pageCards[j].IsChoosed = false;
+                }
             }
         }
     }
@@ -197,6 +235,7 @@ public class SeedChooser : MonoBehaviour
 
         CurrPage = 0;
         StopAllCoroutines();
+        initializeSecondPageCoroutine = null;
 
         if (startButton != null)
             startButton.gameObject.SetActive(true);
@@ -222,11 +261,13 @@ public class SeedChooser : MonoBehaviour
 
             for (int j = 0; j < pageCards.Length; j++)
             {
-                UIPlantCardNC card =
-                    pageCards[j];
+                UIPlantCardNC card = pageCards[j];
 
-                if (card.CardPlantType == PlantType.Nope)
+                if (card == null ||
+                    card.CardPlantType == PlantType.Nope)
+                {
                     continue;
+                }
 
                 card.isForCreate = false;
 
@@ -240,8 +281,7 @@ public class SeedChooser : MonoBehaviour
                 }
 
                 if (lv != null &&
-                    lv.LvSpStates.Contains(
-                        LVSpState.LastStand) &&
+                    lv.LvSpStates.Contains(LVSpState.LastStand) &&
                     System.Array.IndexOf(
                         LastStandPlants,
                         card.CardPlantType
@@ -278,22 +318,16 @@ public class SeedChooser : MonoBehaviour
             {
                 isPrepare = false;
                 startButton.StartText.text =
-                    isPrepare
-                        ? "Cancelar"
-                        : "Listo";
+                    isPrepare ? "Cancelar" : "Listo";
             }
         }
         else
         {
-            isPrepare =
-                spectatorList.LocalIsSpectator;
-
-            startButton.StartText.text =
-                "Empezar";
+            isPrepare = spectatorList.LocalIsSpectator;
+            startButton.StartText.text = "Empezar";
         }
 
-        if (Camera.main == null ||
-            rectTransform == null)
+        if (Camera.main == null || rectTransform == null)
         {
             Debug.LogError(
                 "[SeedChooser] StartMove BLOQUEADO: Camera.main o RectTransform es null."
@@ -308,13 +342,10 @@ public class SeedChooser : MonoBehaviour
                 new Vector3(5f, 0f)
             ).x;
 
-        StartCoroutine(
-            DoMove(targetX, false)
-        );
+        StartCoroutine(DoMove(targetX, false));
     }
 
-    public void StartRunLv(
-        bool synClient = false)
+    public void StartRunLv(bool synClient = false)
     {
         Debug.Log(
             $"[SeedChooser] StartRunLv RECIBIDO | synClient={synClient}"
@@ -342,13 +373,9 @@ public class SeedChooser : MonoBehaviour
             $"[SeedChooser] gameManager.isClient={gameManager.isClient}"
         );
 
-        bool canStart =
-            !gameManager.isClient ||
-            synClient;
+        bool canStart = !gameManager.isClient || synClient;
 
-        Debug.Log(
-            $"[SeedChooser] canStart={canStart}"
-        );
+        Debug.Log($"[SeedChooser] canStart={canStart}");
 
         if (!canStart)
         {
@@ -359,27 +386,17 @@ public class SeedChooser : MonoBehaviour
             return;
         }
 
-        Debug.Log(
-            "[SeedChooser] Iniciando DoMove(-800, true)"
-        );
+        Debug.Log("[SeedChooser] Iniciando DoMove(-800, true)");
 
-        StartCoroutine(
-            DoMove(-800f, true)
-        );
+        StartCoroutine(DoMove(-800f, true));
 
-        Debug.Log(
-            "[SeedChooser] DoMove iniciado."
-        );
+        Debug.Log("[SeedChooser] DoMove iniciado.");
 
-        Debug.Log(
-            "[SeedChooser] Llamando lvManager.StartRunLv()..."
-        );
+        Debug.Log("[SeedChooser] Llamando lvManager.StartRunLv()...");
 
         lvManager.StartRunLv();
 
-        Debug.Log(
-            "[SeedChooser] lvManager.StartRunLv() EJECUTADO."
-        );
+        Debug.Log("[SeedChooser] lvManager.StartRunLv() EJECUTADO.");
     }
 
     public void Prepare()
@@ -398,32 +415,21 @@ public class SeedChooser : MonoBehaviour
 
         isPrepare = !isPrepare;
 
-        Debug.Log(
-            $"[SeedChooser] Prepare -> isPrepare={isPrepare}"
-        );
+        Debug.Log($"[SeedChooser] Prepare -> isPrepare={isPrepare}");
 
         startButton.StartText.text =
-            isPrepare
-                ? "取消准备"
-                : "准备";
+            isPrepare ? "取消准备" : "准备";
 
-        SelectPrepare selectPrepare =
-            new SelectPrepare
-            {
-                isPrepare = isPrepare
-            };
+        SelectPrepare selectPrepare = new SelectPrepare
+        {
+            isPrepare = isPrepare
+        };
 
-        Debug.Log(
-            "[SeedChooser] Enviando SelectPrepare al servidor."
-        );
+        Debug.Log("[SeedChooser] Enviando SelectPrepare al servidor.");
 
-        socketClient.SelectPrepare(
-            selectPrepare
-        );
+        socketClient.SelectPrepare(selectPrepare);
 
-        Debug.Log(
-            "[SeedChooser] SelectPrepare enviado."
-        );
+        Debug.Log("[SeedChooser] SelectPrepare enviado.");
 
         if (gameManager.LocalPlayerSave != null)
         {
@@ -438,9 +444,7 @@ public class SeedChooser : MonoBehaviour
         }
     }
 
-    private IEnumerator DoMove(
-        float targetPosX,
-        bool isOut)
+    private IEnumerator DoMove(float targetPosX, bool isOut)
     {
         if (rectTransform == null)
         {
@@ -456,35 +460,25 @@ public class SeedChooser : MonoBehaviour
         );
 
         while (Mathf.Abs(
-            targetPosX -
-            rectTransform.position.x
+            targetPosX - rectTransform.position.x
         ) > 0.1f)
         {
-            Vector3 position =
-                rectTransform.position;
+            Vector3 position = rectTransform.position;
 
-            position.x =
-                Mathf.MoveTowards(
-                    position.x,
-                    targetPosX,
-                    4000f *
-                    Time.deltaTime
-                );
+            position.x = Mathf.MoveTowards(
+                position.x,
+                targetPosX,
+                4000f * Time.deltaTime
+            );
 
-            rectTransform.position =
-                position;
+            rectTransform.position = position;
 
             yield return null;
         }
 
-        Vector3 finalPosition =
-            rectTransform.position;
-
-        finalPosition.x =
-            targetPosX;
-
-        rectTransform.position =
-            finalPosition;
+        Vector3 finalPosition = rectTransform.position;
+        finalPosition.x = targetPosX;
+        rectTransform.position = finalPosition;
 
         Debug.Log(
             $"[SeedChooser] DoMove TERMINADO | posición={rectTransform.position.x}"
@@ -497,22 +491,16 @@ public class SeedChooser : MonoBehaviour
             );
 
             ClearAllChoose();
-
             gameObject.SetActive(false);
 
-            Debug.Log(
-                "[SeedChooser] SeedChooser desactivado."
-            );
+            Debug.Log("[SeedChooser] SeedChooser desactivado.");
         }
     }
 
     public void OpenForCreate()
     {
-        if (lvManager == null ||
-            !lvManager.GameIsStart)
-        {
+        if (lvManager == null || !lvManager.GameIsStart)
             return;
-        }
 
         gameObject.SetActive(true);
 
@@ -540,19 +528,17 @@ public class SeedChooser : MonoBehaviour
 
         for (int i = 0; i < cards.Length; i++)
         {
-            UIPlantCardNC[] pageCards =
-                cards[i];
+            UIPlantCardNC[] pageCards = cards[i];
 
             if (pageCards == null)
                 continue;
 
             for (int j = 0; j < pageCards.Length; j++)
             {
-                UIPlantCardNC card =
-                    pageCards[j];
+                UIPlantCardNC card = pageCards[j];
 
-                if (card.CardPlantType ==
-                    PlantType.Nope)
+                if (card == null ||
+                    card.CardPlantType == PlantType.Nope)
                 {
                     continue;
                 }

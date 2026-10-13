@@ -91,7 +91,7 @@ namespace StartScene
 			TitleBarText1.text = "大 图 鉴  -  植 物";
 			TitleBarText2.text = "大 图 鉴  -  植 物";
 			PageNum = 0;
-			UIPlantCardNC[] cardInfos = SeedChooser.Instance.GetCardInfos(PageNum);
+			UIPlantCardNC[] cardInfos = UIManager.Instance.seedChooser.GetCardInfos(PageNum);
 			for (int i = 0; i < cardInfos.Length; i++)
 			{
 				if (cardSlots.Count >= i)
@@ -109,11 +109,11 @@ namespace StartScene
 		public void NextPage()
 		{
 			PageNum++;
-			if (PageNum > SeedChooser.Instance.Pages.Count - 1)
+			if (PageNum > UIManager.Instance.seedChooser.Pages.Count - 1)
 			{
 				PageNum = 0;
 			}
-			UIPlantCardNC[] cardInfos = SeedChooser.Instance.GetCardInfos(PageNum);
+			UIPlantCardNC[] cardInfos = UIManager.Instance.seedChooser.GetCardInfos(PageNum);
 			for (int i = 0; i < cardInfos.Length; i++)
 			{
 				if (cardSlots.Count >= i)
@@ -137,7 +137,7 @@ namespace StartScene
 			TitleBarText1.text = "大 图 鉴  -  僵 尸";
 			TitleBarText2.text = "大 图 鉴  -  僵 尸";
 			PageNum = 0;
-			UIPlantCardNC[] cardInfos = ZombieChooser.Instance.GetCardInfos(PageNum);
+			UIPlantCardNC[] cardInfos = UIManager.Instance.zombieChooser.GetCardInfos(PageNum);
 			for (int i = 0; i < cardInfos.Length; i++)
 			{
 				if (cardSlots.Count >= i)

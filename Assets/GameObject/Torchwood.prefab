@@ -1126,7 +1126,7 @@ MonoBehaviour:
   FireCollider: {fileID: 70161607090078389}
   Fire: {fileID: 0}
   NoFire: {fileID: 0}
-  Light2d: {fileID: 0}
+  Light2d: {fileID: 8114364848585862904}
   fireRederers:
   - {fileID: 212875609422105747}
   - {fileID: 212694121525821480}
