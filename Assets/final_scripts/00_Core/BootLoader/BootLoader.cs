@@ -41,23 +41,18 @@ public class BootLoader : MonoBehaviour
         while (!operation.isDone)
         {
             float sceneProgress =
-                Mathf.Clamp01(operation.progress);
+                Mathf.Clamp01(operation.progress / 0.9f);
 
             float targetProgress =
                 sceneProgress * 0.8f;
 
-            while (displayedProgress < targetProgress)
-            {
-                displayedProgress = Mathf.MoveTowards(
-                    displayedProgress,
-                    targetProgress,
-                    progressSpeed * Time.deltaTime
-                );
+            displayedProgress = Mathf.MoveTowards(
+                displayedProgress,
+                targetProgress,
+                progressSpeed * Time.deltaTime
+            );
 
-                SetProgress(displayedProgress);
-
-                yield return null;
-            }
+            SetProgress(displayedProgress);
 
             yield return null;
         }
@@ -82,26 +77,20 @@ public class BootLoader : MonoBehaviour
 
         while (!GameManager.Instance.IsStartupReady)
         {
-            float startupProgress =
-                Mathf.Clamp01(
-                    GameManager.Instance.StartupProgress
-                );
+            float startupProgress = Mathf.Clamp01(
+                GameManager.Instance.StartupProgress
+            );
 
             float targetProgress =
                 0.8f + startupProgress * 0.2f;
 
-            while (displayedProgress < targetProgress)
-            {
-                displayedProgress = Mathf.MoveTowards(
-                    displayedProgress,
-                    targetProgress,
-                    progressSpeed * Time.deltaTime
-                );
+            displayedProgress = Mathf.MoveTowards(
+                displayedProgress,
+                targetProgress,
+                progressSpeed * Time.deltaTime
+            );
 
-                SetProgress(displayedProgress);
-
-                yield return null;
-            }
+            SetProgress(displayedProgress);
 
             yield return null;
         }
@@ -134,7 +123,9 @@ public class BootLoader : MonoBehaviour
             progressSlider.value = progress;
 
         if (progressText != null)
+        {
             progressText.text =
                 Mathf.RoundToInt(progress * 100f) + "%";
+        }
     }
 }
